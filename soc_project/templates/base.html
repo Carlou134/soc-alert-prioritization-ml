@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SOC Predictor{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+    {% if user.is_authenticated %}
+    <div class="min-h-screen flex">
+        <aside class="w-72 bg-slate-900 text-white p-6 hidden md:block">
+            <h1 class="text-2xl font-bold mb-8">SOC Predictor</h1>
+
+            <nav class="space-y-3">
+                <a href="{% url 'dashboard' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Dashboard</a>
+                <a href="{% url 'predict' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Predicción manual</a>
+                <a href="{% url 'predict_json' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Predicción por JSON</a>
+                <a href="{% url 'history' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Historial</a>
+                <a href="{% url 'logout' %}" class="block px-4 py-3 rounded-xl bg-red-600 hover:bg-red-700 mt-6">Salir</a>
+            </nav>
+        </aside>
+
+        <main class="flex-1 p-6 md:p-8">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% else %}
+    <main class="min-h-screen">
+        {% block public_content %}{% endblock %}
+    </main>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <div>
+        <h1 class="text-3xl font-bold text-slate-900">Dashboard</h1>
+        <p class="text-slate-500 mt-2">Resumen visual de predicciones del sistema SOC.</p>
+    </div>
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+        <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
+            <p class="text-sm text-slate-500">Predicciones totales</p>
+            <h2 class="text-4xl font-bold mt-2 text-slate-900">{{ total_predictions }}</h2>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
+            <p class="text-sm text-slate-500">Benignos</p>
+            <h2 class="text-4xl font-bold mt-2 text-emerald-600">{{ total_benigno }}</h2>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
+            <p class="text-sm text-slate-500">A investigar</p>
+            <h2 class="text-4xl font-bold mt-2 text-amber-500">{{ total_investigar }}</h2>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
+            <p class="text-sm text-slate-500">Maliciosos</p>
+            <h2 class="text-4xl font-bold mt-2 text-red-600">{{ total_malicioso }}</h2>
+        </div>
+    </div>
+
+    <!-- Charts row 1 -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-slate-900">Predicciones por clase</h2>
+                <span class="text-xs text-slate-400">Barras</span>
+            </div>
+            <div class="h-[320px]">
+                <canvas id="classChart"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-slate-900">Origen de predicciones</h2>
+                <span class="text-xs text-slate-400">Dona</span>
+            </div>
+            <div class="h-[320px]">
+                <canvas id="sourceChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart row 2 -->
+    <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-slate-900">Tendencia diaria</h2>
+            <span class="text-xs text-slate-400">Línea</span>
+        </div>
+        <div class="h-[320px]">
+            <canvas id="dailyChart"></canvas>
+        </div>
+    </div>
+
+    <!-- recent table -->
+    <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-slate-900">Últimas predicciones</h2>
+            <a href="{% url 'history' %}" class="text-sm font-medium text-cyan-700 hover:text-cyan-800">
+                Ver historial
+            </a>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b text-left text-slate-500">
+                        <th class="py-3 pr-4">Fecha</th>
+                        <th class="py-3 pr-4">Clase</th>
+                        <th class="py-3 pr-4">Origen</th>
+                        <th class="py-3 pr-4">Detalle</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in recent_predictions %}
+                    <tr class="border-b last:border-b-0">
+                        <td class="py-3 pr-4">{{ item.created_at|date:"Y-m-d H:i" }}</td>
+                        <td class="py-3 pr-4">
+                            {% if item.predicted_class == 'benigno' %}
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                                    {{ item.predicted_class }}
+                                </span>
+                            {% elif item.predicted_class == 'a_investigar' %}
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                                    {{ item.predicted_class }}
+                                </span>
+                            {% else %}
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                                    {{ item.predicted_class }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 pr-4 capitalize">{{ item.source }}</td>
+                        <td class="py-3 pr-4 text-slate-500">
+                            {{ item.input_data.host_affected|default:"-" }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="py-4 text-slate-500">No hay predicciones aún.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const classLabels = JSON.parse('{{ class_labels|safe|escapejs }}'.replace(/'/g, '"'));
+    const classData = JSON.parse('{{ class_data|safe|escapejs }}');
+
+    const sourceLabels = JSON.parse('{{ source_labels|safe|escapejs }}'.replace(/'/g, '"'));
+    const sourceData = JSON.parse('{{ source_data|safe|escapejs }}');
+
+    const dailyLabels = JSON.parse('{{ daily_labels|safe|escapejs }}'.replace(/'/g, '"'));
+    const dailyTotals = JSON.parse('{{ daily_totals|safe|escapejs }}');
+
+    new Chart(document.getElementById('classChart'), {
+        type: 'bar',
+        data: {
+            labels: classLabels,
+            datasets: [{
+                label: 'Cantidad',
+                data: classData,
+                backgroundColor: [
+                    'rgba(16, 185, 129, 0.7)',
+                    'rgba(245, 158, 11, 0.7)',
+                    'rgba(239, 68, 68, 0.7)'
+                ],
+                borderRadius: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+
+    new Chart(document.getElementById('sourceChart'), {
+        type: 'doughnut',
+        data: {
+            labels: sourceLabels,
+            datasets: [{
+                data: sourceData,
+                backgroundColor: [
+                    'rgba(6, 182, 212, 0.75)',
+                    'rgba(99, 102, 241, 0.75)',
+                    'rgba(168, 85, 247, 0.75)'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+
+    new Chart(document.getElementById('dailyChart'), {
+        type: 'line',
+        data: {
+            labels: dailyLabels,
+            datasets: [{
+                label: 'Predicciones',
+                data: dailyTotals,
+                borderColor: 'rgba(6, 182, 212, 1)',
+                backgroundColor: 'rgba(6, 182, 212, 0.15)',
+                fill: true,
+                tension: 0.35
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+</script>
+{% endblock %}

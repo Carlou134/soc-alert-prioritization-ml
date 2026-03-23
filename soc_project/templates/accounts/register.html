@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Registro{% endblock %}
+
+{% block public_content %}
+<div class="min-h-screen flex items-center justify-center px-6 bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-700">
+    <div class="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8">
+        <h1 class="text-3xl font-bold text-slate-900 mb-2">Crear cuenta</h1>
+        <p class="text-slate-500 mb-6">Regístrate para usar el sistema SOC.</p>
+
+        <form method="post" class="space-y-5">
+            {% csrf_token %}
+
+            {% for field in form %}
+            <div>
+                <label class="block text-sm font-medium mb-1">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                <p class="text-red-600 text-sm mt-1">{{ field.errors|striptags }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-xl">
+                Registrarme
+            </button>
+        </form>
+
+        <p class="text-sm text-slate-500 mt-6">
+            ¿Ya tienes cuenta?
+            <a href="{% url 'login' %}" class="text-cyan-700 font-semibold">Inicia sesión</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="bg-white rounded-2xl shadow p-8">
+    <h1 class="text-3xl font-bold mb-2">Predicción manual</h1>
+    <p class="text-slate-500 mb-8">Completa los campos del evento SOC.</p>
+
+    <form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {% csrf_token %}
+        {% for field in form %}
+        <div>
+            <label class="block text-sm font-medium mb-1">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+            <p class="text-red-600 text-sm mt-1">{{ field.errors|striptags }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="md:col-span-2">
+            <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded-xl font-semibold">
+                Predecir
+            </button>
+        </div>
+    </form>
+
+    {% if result %}
+    <div class="mt-8 rounded-2xl border bg-slate-50 p-6">
+        <h2 class="text-xl font-bold mb-3">Resultado</h2>
+        <p class="text-lg mb-4">Clase predicha: <span class="font-bold text-cyan-700">{{ result }}</span></p>
+
+        <div class="space-y-2">
+            {% for key, value in probabilities.items %}
+            <div class="flex justify-between bg-white border rounded-lg px-4 py-2">
+                <span>{{ key }}</span>
+                <span>{{ value|floatformat:4 }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

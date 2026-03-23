@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block title %}Login{% endblock %}
+
+{% block public_content %}
+<div class="min-h-screen flex items-center justify-center px-6 bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-700">
+    <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8">
+        <h1 class="text-3xl font-bold text-slate-900 mb-2">Iniciar sesión</h1>
+        <p class="text-slate-500 mb-6">Accede al sistema SOC de predicción.</p>
+
+        {% if error %}
+        <div class="mb-4 rounded-xl bg-red-100 text-red-700 px-4 py-3">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="post" class="space-y-5">
+            {% csrf_token %}
+            <div>
+                <label class="block text-sm font-medium mb-1">Usuario</label>
+                <input type="text" name="username" class="w-full rounded-xl border border-slate-300 px-4 py-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Contraseña</label>
+                <input type="password" name="password" class="w-full rounded-xl border border-slate-300 px-4 py-2">
+            </div>
+            <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-xl">
+                Entrar
+            </button>
+        </form>
+
+        <p class="text-sm text-slate-500 mt-6">
+            ¿No tienes cuenta?
+            <a href="{% url 'register' %}" class="text-cyan-700 font-semibold">Regístrate</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

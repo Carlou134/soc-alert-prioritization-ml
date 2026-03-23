@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="bg-white rounded-2xl shadow p-8">
+    <h1 class="text-3xl font-bold mb-2">Historial</h1>
+    <p class="text-slate-500 mb-8">Todas tus predicciones realizadas.</p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b text-left">
+                    <th class="py-3">Fecha</th>
+                    <th class="py-3">Clase</th>
+                    <th class="py-3">Origen</th>
+                    <th class="py-3">Input</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in logs %}
+                <tr class="border-b align-top">
+                    <td class="py-3">{{ item.created_at }}</td>
+                    <td class="py-3 font-semibold">{{ item.predicted_class }}</td>
+                    <td class="py-3">{{ item.source }}</td>
+                    <td class="py-3">
+                        <pre class="text-xs whitespace-pre-wrap">{{ item.input_data }}</pre>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="py-4 text-slate-500">No hay registros todavía.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
