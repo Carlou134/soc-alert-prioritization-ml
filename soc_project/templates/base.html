@@ -17,7 +17,10 @@
                 <a href="{% url 'predict' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Predicción manual</a>
                 <a href="{% url 'predict_json' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Predicción por JSON</a>
                 <a href="{% url 'history' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Historial</a>
-                <a href="{% url 'logout' %}" class="block px-4 py-3 rounded-xl bg-red-600 hover:bg-red-700 mt-6">Salir</a>
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="w-full text-left px-4 py-3 rounded-xl bg-red-600 hover:bg-red-700 mt-6">Salir</button>
+                </form>
             </nav>
         </aside>
 
