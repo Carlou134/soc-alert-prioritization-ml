@@ -1,133 +1,128 @@
 {% extends 'base.html' %}
 
-{% block title %}Dashboard{% endblock %}
+{% block title %}Dashboard — SOC Predictor{% endblock %}
 
 {% block content %}
-<div class="space-y-8">
+<div class="space-y-6">
+
+    <!-- Page header -->
     <div>
-        <h1 class="text-3xl font-bold text-slate-900">Dashboard</h1>
-        <p class="text-slate-500 mt-2">Resumen visual de predicciones del sistema SOC.</p>
+        <h1 class="text-lg font-semibold text-white">Dashboard</h1>
+        <p class="text-sm text-slate-400 mt-0.5">Resumen de predicciones del sistema SOC.</p>
     </div>
 
     <!-- KPIs -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-        <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
-            <p class="text-sm text-slate-500">Predicciones totales</p>
-            <h2 class="text-4xl font-bold mt-2 text-slate-900">{{ total_predictions }}</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+            <p class="text-xs text-slate-400 uppercase tracking-wide">Total</p>
+            <p class="text-3xl font-bold text-white mt-2 font-mono">{{ total_predictions }}</p>
+            <p class="text-xs text-slate-500 mt-1">Predicciones totales</p>
         </div>
-
-        <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
-            <p class="text-sm text-slate-500">Benignos</p>
-            <h2 class="text-4xl font-bold mt-2 text-emerald-600">{{ total_benigno }}</h2>
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+            <p class="text-xs text-slate-400 uppercase tracking-wide">Benignos</p>
+            <p class="text-3xl font-bold text-emerald-500 mt-2 font-mono">{{ total_benigno }}</p>
+            <p class="text-xs text-slate-500 mt-1">Sin amenaza detectada</p>
         </div>
-
-        <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
-            <p class="text-sm text-slate-500">A investigar</p>
-            <h2 class="text-4xl font-bold mt-2 text-amber-500">{{ total_investigar }}</h2>
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+            <p class="text-xs text-slate-400 uppercase tracking-wide">A investigar</p>
+            <p class="text-3xl font-bold text-amber-500 mt-2 font-mono">{{ total_investigar }}</p>
+            <p class="text-xs text-slate-500 mt-1">Requieren análisis</p>
         </div>
-
-        <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
-            <p class="text-sm text-slate-500">Maliciosos</p>
-            <h2 class="text-4xl font-bold mt-2 text-red-600">{{ total_malicioso }}</h2>
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 border-l-4 border-l-red-500">
+            <p class="text-xs text-slate-400 uppercase tracking-wide">Maliciosos</p>
+            <p class="text-3xl font-bold text-red-500 mt-2 font-mono">{{ total_malicioso }}</p>
+            <p class="text-xs text-slate-500 mt-1">Amenazas confirmadas</p>
         </div>
     </div>
 
     <!-- Charts row 1 -->
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-bold text-slate-900">Predicciones por clase</h2>
-                <span class="text-xs text-slate-400">Barras</span>
+                <p class="text-sm font-semibold text-white">Predicciones por clase</p>
+                <span class="text-xs text-slate-500 font-mono">BARRAS</span>
             </div>
-            <div class="h-[320px]">
+            <div class="h-64">
                 <canvas id="classChart"></canvas>
             </div>
         </div>
-
-        <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-bold text-slate-900">Origen de predicciones</h2>
-                <span class="text-xs text-slate-400">Dona</span>
+                <p class="text-sm font-semibold text-white">Origen de predicciones</p>
+                <span class="text-xs text-slate-500 font-mono">DISTRIBUCIÓN</span>
             </div>
-            <div class="h-[320px]">
+            <div class="h-64">
                 <canvas id="sourceChart"></canvas>
             </div>
         </div>
     </div>
 
     <!-- Chart row 2 -->
-    <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-bold text-slate-900">Tendencia diaria</h2>
-            <span class="text-xs text-slate-400">Línea</span>
+            <p class="text-sm font-semibold text-white">Tendencia diaria</p>
+            <span class="text-xs text-slate-500 font-mono">LÍNEA DE TIEMPO</span>
         </div>
-        <div class="h-[320px]">
+        <div class="h-64">
             <canvas id="dailyChart"></canvas>
         </div>
     </div>
 
-    <!-- recent table -->
-    <div class="bg-white rounded-2xl shadow p-6 border border-slate-100">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-bold text-slate-900">Últimas predicciones</h2>
-            <a href="{% url 'history' %}" class="text-sm font-medium text-cyan-700 hover:text-cyan-800">
-                Ver historial
+    <!-- Recent predictions table -->
+    <div class="bg-slate-800 border border-slate-700 rounded-lg">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+            <p class="text-sm font-semibold text-white">Últimas predicciones</p>
+            <a href="{% url 'history' %}" class="text-xs text-blue-400 hover:text-blue-300 font-medium">
+                Ver historial →
             </a>
         </div>
-
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="w-full text-left">
                 <thead>
-                    <tr class="border-b text-left text-slate-500">
-                        <th class="py-3 pr-4">Fecha</th>
-                        <th class="py-3 pr-4">Clase</th>
-                        <th class="py-3 pr-4">Origen</th>
-                        <th class="py-3 pr-4">Detalle</th>
+                    <tr class="border-b border-slate-700">
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Fecha</th>
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Clase</th>
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Origen</th>
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Host afectado</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in recent_predictions %}
-                    <tr class="border-b last:border-b-0">
-                        <td class="py-3 pr-4">{{ item.created_at|date:"Y-m-d H:i" }}</td>
-                        <td class="py-3 pr-4">
+                    <tr class="border-b border-slate-800 hover:bg-slate-800/50 {% if item.predicted_class == 'malicioso' %}border-l-4 border-l-red-500{% endif %}">
+                        <td class="px-5 py-3 text-xs font-mono text-slate-400">{{ item.created_at|date:"Y-m-d H:i" }}</td>
+                        <td class="px-5 py-3">
                             {% if item.predicted_class == 'benigno' %}
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-                                    {{ item.predicted_class }}
-                                </span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">benigno</span>
                             {% elif item.predicted_class == 'a_investigar' %}
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                                    {{ item.predicted_class }}
-                                </span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">a_investigar</span>
                             {% else %}
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-                                    {{ item.predicted_class }}
-                                </span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">malicioso</span>
                             {% endif %}
                         </td>
-                        <td class="py-3 pr-4 capitalize">{{ item.source }}</td>
-                        <td class="py-3 pr-4 text-slate-500">
-                            {{ item.input_data.host_affected|default:"-" }}
-                        </td>
+                        <td class="px-5 py-3 text-sm text-slate-400 capitalize">{{ item.source }}</td>
+                        <td class="px-5 py-3 text-xs font-mono text-slate-400">{{ item.input_data.host_affected|default:"—" }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="py-4 text-slate-500">No hay predicciones aún.</td>
+                        <td colspan="4" class="px-5 py-8 text-sm text-slate-500 text-center">No hay predicciones aún.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.5)';
+
     const classLabels = JSON.parse('{{ class_labels|safe|escapejs }}'.replace(/'/g, '"'));
     const classData = JSON.parse('{{ class_data|safe|escapejs }}');
-
     const sourceLabels = JSON.parse('{{ source_labels|safe|escapejs }}'.replace(/'/g, '"'));
     const sourceData = JSON.parse('{{ source_data|safe|escapejs }}');
-
     const dailyLabels = JSON.parse('{{ daily_labels|safe|escapejs }}'.replace(/'/g, '"'));
     const dailyTotals = JSON.parse('{{ daily_totals|safe|escapejs }}');
 
@@ -139,18 +134,21 @@
                 label: 'Cantidad',
                 data: classData,
                 backgroundColor: [
-                    'rgba(16, 185, 129, 0.7)',
-                    'rgba(245, 158, 11, 0.7)',
-                    'rgba(239, 68, 68, 0.7)'
+                    'rgba(16, 185, 129, 0.8)',
+                    'rgba(245, 158, 11, 0.8)',
+                    'rgba(239, 68, 68, 0.8)'
                 ],
-                borderRadius: 10
+                borderRadius: 4,
+                borderSkipped: false
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true }
             }
         }
     });
@@ -162,16 +160,23 @@
             datasets: [{
                 data: sourceData,
                 backgroundColor: [
-                    'rgba(6, 182, 212, 0.75)',
-                    'rgba(99, 102, 241, 0.75)',
-                    'rgba(168, 85, 247, 0.75)'
+                    'rgba(59, 130, 246, 0.8)',
+                    'rgba(99, 102, 241, 0.8)',
+                    'rgba(168, 85, 247, 0.8)'
                 ],
-                borderWidth: 0
+                borderWidth: 2,
+                borderColor: '#1e293b'
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { padding: 16, font: { size: 11 } }
+                }
+            }
         }
     });
 
@@ -182,15 +187,22 @@
             datasets: [{
                 label: 'Predicciones',
                 data: dailyTotals,
-                borderColor: 'rgba(6, 182, 212, 1)',
-                backgroundColor: 'rgba(6, 182, 212, 0.15)',
+                borderColor: 'rgba(59, 130, 246, 1)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 fill: true,
-                tension: 0.35
+                tension: 0.35,
+                pointRadius: 3,
+                pointBackgroundColor: 'rgba(59, 130, 246, 1)'
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true }
+            }
         }
     });
 </script>

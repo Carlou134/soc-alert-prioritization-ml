@@ -1,35 +1,49 @@
 {% extends 'base.html' %}
 
-{% block title %}Registro{% endblock %}
+{% block title %}Registro — SOC Predictor{% endblock %}
 
 {% block public_content %}
-<div class="min-h-screen flex items-center justify-center px-6 bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-700">
-    <div class="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8">
-        <h1 class="text-3xl font-bold text-slate-900 mb-2">Crear cuenta</h1>
-        <p class="text-slate-500 mb-6">Regístrate para usar el sistema SOC.</p>
+<div class="min-h-screen flex items-center justify-center bg-slate-900 px-6 py-10">
+    <div class="w-full max-w-sm">
 
-        <form method="post" class="space-y-5">
-            {% csrf_token %}
-
-            {% for field in form %}
-            <div>
-                <label class="block text-sm font-medium mb-1">{{ field.label }}</label>
-                {{ field }}
-                {% if field.errors %}
-                <p class="text-red-600 text-sm mt-1">{{ field.errors|striptags }}</p>
-                {% endif %}
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-12 h-12 bg-blue-500 rounded-lg mb-4">
+                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                </svg>
             </div>
-            {% endfor %}
+            <h1 class="text-lg font-semibold text-white">SOC Predictor</h1>
+            <p class="text-slate-500 text-sm mt-1">Crear nueva cuenta</p>
+        </div>
 
-            <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-xl">
-                Registrarme
-            </button>
-        </form>
+        <!-- Card -->
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
+            <h2 class="text-sm font-semibold text-white mb-5">Registro</h2>
 
-        <p class="text-sm text-slate-500 mt-6">
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+                {% for field in form %}
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1.5">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                    <p class="text-red-400 text-xs mt-1">{{ field.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <button type="submit"
+                    class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 rounded-md text-sm">
+                    Crear cuenta
+                </button>
+            </form>
+        </div>
+
+        <p class="text-center text-xs text-slate-500 mt-4">
             ¿Ya tienes cuenta?
-            <a href="{% url 'login' %}" class="text-cyan-700 font-semibold">Inicia sesión</a>
+            <a href="{% url 'login' %}" class="text-blue-400 hover:text-blue-300 font-medium">Inicia sesión</a>
         </p>
+
     </div>
 </div>
 {% endblock %}

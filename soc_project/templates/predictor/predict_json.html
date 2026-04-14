@@ -1,43 +1,63 @@
 {% extends 'base.html' %}
 
+{% block title %}Predicción por JSON — SOC Predictor{% endblock %}
+
 {% block content %}
-<div class="bg-white rounded-2xl shadow p-8">
-    <h1 class="text-3xl font-bold mb-2">Predicción manual</h1>
-    <p class="text-slate-500 mb-8">Completa los campos del evento SOC.</p>
+<div class="space-y-6 max-w-4xl">
 
-    <form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {% csrf_token %}
-        {% for field in form %}
-        <div>
-            <label class="block text-sm font-medium mb-1">{{ field.label }}</label>
-            {{ field }}
-            {% if field.errors %}
-            <p class="text-red-600 text-sm mt-1">{{ field.errors|striptags }}</p>
-            {% endif %}
-        </div>
-        {% endfor %}
+    <div>
+        <h1 class="text-lg font-semibold text-white">Predicción por JSON</h1>
+        <p class="text-sm text-slate-400 mt-0.5">Pega un JSON con los campos del evento SOC para obtener una predicción.</p>
+    </div>
 
-        <div class="md:col-span-2">
-            <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded-xl font-semibold">
-                Predecir
-            </button>
-        </div>
-    </form>
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            {% for field in form %}
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                <p class="text-red-400 text-xs mt-1">{{ field.errors|striptags }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <div class="pt-2">
+                <button type="submit"
+                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+                    Ejecutar predicción
+                </button>
+            </div>
+        </form>
+    </div>
 
     {% if result %}
-    <div class="mt-8 rounded-2xl border bg-slate-50 p-6">
-        <h2 class="text-xl font-bold mb-3">Resultado</h2>
-        <p class="text-lg mb-4">Clase predicha: <span class="font-bold text-cyan-700">{{ result }}</span></p>
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 {% if result == 'malicioso' %}border-l-4 border-l-red-500{% elif result == 'a_investigar' %}border-l-4 border-l-amber-500{% else %}border-l-4 border-l-emerald-500{% endif %}">
+        <p class="text-xs text-slate-400 uppercase tracking-wide mb-3">Resultado de predicción</p>
 
+        <div class="flex items-center gap-3 mb-5">
+            <span class="text-sm text-slate-300">Clase predicha:</span>
+            {% if result == 'benigno' %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">{{ result }}</span>
+            {% elif result == 'a_investigar' %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">{{ result }}</span>
+            {% else %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-red-500/10 text-red-500 border border-red-500/20">{{ result }}</span>
+            {% endif %}
+        </div>
+
+        <p class="text-xs text-slate-400 uppercase tracking-wide mb-3">Probabilidades</p>
         <div class="space-y-2">
             {% for key, value in probabilities.items %}
-            <div class="flex justify-between bg-white border rounded-lg px-4 py-2">
-                <span>{{ key }}</span>
-                <span>{{ value|floatformat:4 }}</span>
+            <div class="flex items-center justify-between border-b border-slate-700 pb-2 last:border-0 last:pb-0">
+                <span class="text-sm text-slate-300">{{ key }}</span>
+                <span class="text-sm font-mono text-slate-400">{{ value|floatformat:4 }}</span>
             </div>
             {% endfor %}
         </div>
     </div>
     {% endif %}
+
 </div>
 {% endblock %}
