@@ -28,21 +28,25 @@ EXPECTED_FIELDS = [
     'severity',
 ]
 
-# Campos que el modelo usa para predecir (los que quedaron en X tras el entrenamiento)
-# attack_type, attack_signature, ids_ips_alert, malware_indicator, severity
-# fueron descartados en train_model.py (drop_cols). El modelo usa los restantes
-# más las features temporales derivadas del timestamp.
+# Campos que el modelo usa para predecir.
+# Origen: train_model.py línea 141-143:
+#   cols_excluir = ["label", "attack_type", "attack_signature", "malware_indicator"]
+#   X = df_clean.drop(columns=cols_excluir, errors="ignore")
+# → attack_type, attack_signature y malware_indicator fueron excluidos del entrenamiento.
+# → ids_ips_alert y severity SÍ fueron incluidos en X (no están en cols_excluir).
 MODEL_FIELDS = [
+    'event_category',
     'protocol',
     'traffic_type',
-    'event_category',
     'mitre_tactic',
     'kill_chain_stage',
-    'log_source',
-    'firewall_action',
-    'asset_criticality',
     'failed_login_attempts',
     'request_rate_per_min',
+    'ids_ips_alert',
+    'asset_criticality',
+    'log_source',
+    'firewall_action',
+    'severity',
 ]
 
 
@@ -63,7 +67,7 @@ def preprocess_input(data: dict) -> pd.DataFrame:
     for col in df.select_dtypes(include='object').columns:
         df[col] = df[col].astype(str).str.strip().str.lower()
 
-    df_encoded = pd.get_dummies(df, drop_first=True)
+    df_encoded = pd.get_dummies(df, drop_first=False)
     df_encoded = df_encoded.reindex(columns=training_columns, fill_value=0)
 
     return df_encoded

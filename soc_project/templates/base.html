@@ -16,6 +16,7 @@
                 <a href="{% url 'dashboard' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Dashboard</a>
                 <a href="{% url 'predict' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Predicción manual</a>
                 <a href="{% url 'predict_json' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Predicción por JSON</a>
+                <a href="{% url 'upload_alerts' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Subir Alertas</a>
                 <a href="{% url 'history' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Historial</a>
                 <form method="post" action="{% url 'logout' %}">
                     {% csrf_token %}
