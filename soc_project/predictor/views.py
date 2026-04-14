@@ -9,7 +9,6 @@ from .models import PredictionLog
 from .utils import predict_alert, extract_valid_fields
 
 @login_required
-@login_required
 def dashboard_view(request):
     user_logs = PredictionLog.objects.filter(user=request.user)
 

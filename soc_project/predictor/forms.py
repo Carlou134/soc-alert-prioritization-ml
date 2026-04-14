@@ -3,33 +3,75 @@ import json
 
 INPUT_CLASS = 'w-full rounded-xl border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500'
 TEXTAREA_CLASS = 'w-full rounded-xl border border-slate-300 px-4 py-3 h-72 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500'
+SELECT_CLASS = 'w-full rounded-xl border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500'
+
+SEVERITY_CHOICES = [('', '---'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical')]
+FIREWALL_CHOICES = [('', '---'), ('allow', 'Allow'), ('deny', 'Deny'), ('drop', 'Drop'), ('reject', 'Reject')]
+CRITICALITY_CHOICES = [('', '---'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical')]
+
 
 class PredictionForm(forms.Form):
-    source_port = forms.IntegerField(label='Puerto origen', widget=forms.NumberInput(attrs={'class': INPUT_CLASS}))
-    destination_port = forms.IntegerField(label='Puerto destino', widget=forms.NumberInput(attrs={'class': INPUT_CLASS}))
+    event_category = forms.CharField(label='Categoría del evento', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
+    attack_type = forms.CharField(label='Tipo de ataque', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
+    attack_signature = forms.CharField(label='Firma del ataque', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
     protocol = forms.CharField(label='Protocolo', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
     traffic_type = forms.CharField(label='Tipo de tráfico', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
-    host_affected = forms.CharField(label='Host afectado', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
-    event_category = forms.CharField(label='Categoría del evento', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
     mitre_tactic = forms.CharField(label='Táctica MITRE', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
     kill_chain_stage = forms.CharField(label='Kill Chain Stage', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
+    ids_ips_alert = forms.CharField(label='Alerta IDS/IPS', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
+    malware_indicator = forms.CharField(label='Indicador de malware', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
+    asset_criticality = forms.ChoiceField(
+        label='Criticidad del activo',
+        choices=CRITICALITY_CHOICES,
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
     log_source = forms.CharField(label='Fuente de log', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
-    firewall_action = forms.CharField(label='Acción del firewall', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
-    anomaly_score = forms.FloatField(label='Anomaly score', widget=forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.01'}))
-    failed_login_attempts = forms.IntegerField(label='Intentos fallidos', widget=forms.NumberInput(attrs={'class': INPUT_CLASS}))
-    request_rate_per_min = forms.IntegerField(label='Request rate/min', widget=forms.NumberInput(attrs={'class': INPUT_CLASS}))
-    asset_criticality = forms.CharField(label='Criticidad del activo', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
-    hour = forms.IntegerField(label='Hora', min_value=0, max_value=23, widget=forms.NumberInput(attrs={'class': INPUT_CLASS}))
-    day = forms.IntegerField(label='Día', min_value=1, max_value=31, widget=forms.NumberInput(attrs={'class': INPUT_CLASS}))
-    month = forms.IntegerField(label='Mes', min_value=1, max_value=12, widget=forms.NumberInput(attrs={'class': INPUT_CLASS}))
-    day_of_week = forms.IntegerField(label='Día semana', min_value=0, max_value=6, widget=forms.NumberInput(attrs={'class': INPUT_CLASS}))
+    firewall_action = forms.ChoiceField(
+        label='Acción del firewall',
+        choices=FIREWALL_CHOICES,
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
+    severity = forms.ChoiceField(
+        label='Severidad',
+        choices=SEVERITY_CHOICES,
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
+    failed_login_attempts = forms.IntegerField(
+        label='Intentos fallidos de login',
+        min_value=0,
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASS})
+    )
+    request_rate_per_min = forms.FloatField(
+        label='Request rate por minuto',
+        min_value=0.0,
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.1'})
+    )
+
 
 class JSONPredictionForm(forms.Form):
     payload = forms.CharField(
         label='Pega tu JSON',
         widget=forms.Textarea(attrs={
             'class': TEXTAREA_CLASS,
-            'placeholder': '{\n  "source_port": 443,\n  "destination_port": 8080,\n  "protocol": "tcp"\n}'
+            'placeholder': (
+                '{\n'
+                '  "event_category": "network",\n'
+                '  "attack_type": "ddos",\n'
+                '  "attack_signature": "SYN Flood",\n'
+                '  "protocol": "tcp",\n'
+                '  "traffic_type": "malicious",\n'
+                '  "mitre_tactic": "initial-access",\n'
+                '  "kill_chain_stage": "delivery",\n'
+                '  "ids_ips_alert": "yes",\n'
+                '  "malware_indicator": "no",\n'
+                '  "asset_criticality": "high",\n'
+                '  "log_source": "firewall",\n'
+                '  "firewall_action": "deny",\n'
+                '  "severity": "high",\n'
+                '  "failed_login_attempts": 5,\n'
+                '  "request_rate_per_min": 320.5\n'
+                '}'
+            )
         })
     )
 
@@ -42,4 +84,15 @@ class JSONPredictionForm(forms.Form):
 
         if not isinstance(data, dict):
             raise forms.ValidationError('El JSON debe ser un objeto.')
+
+        required_fields = [
+            'event_category', 'attack_type', 'attack_signature', 'protocol',
+            'traffic_type', 'mitre_tactic', 'kill_chain_stage', 'ids_ips_alert',
+            'malware_indicator', 'asset_criticality', 'log_source', 'firewall_action',
+            'severity', 'failed_login_attempts', 'request_rate_per_min',
+        ]
+        missing = [f for f in required_fields if f not in data or data[f] is None]
+        if missing:
+            raise forms.ValidationError(f'Campos faltantes: {", ".join(missing)}')
+
         return data

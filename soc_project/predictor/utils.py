@@ -9,35 +9,52 @@ artifact = joblib.load(MODEL_PATH)
 model = artifact['model']
 training_columns = artifact['training_columns']
 
+# Campos que el analista envía en cada alerta (validados por el serializer)
 EXPECTED_FIELDS = [
-    'source_port',
-    'destination_port',
+    'event_category',
+    'attack_type',
+    'attack_signature',
     'protocol',
     'traffic_type',
-    'host_affected',
+    'mitre_tactic',
+    'kill_chain_stage',
+    'failed_login_attempts',
+    'request_rate_per_min',
+    'ids_ips_alert',
+    'malware_indicator',
+    'asset_criticality',
+    'log_source',
+    'firewall_action',
+    'severity',
+]
+
+# Campos que el modelo usa para predecir (los que quedaron en X tras el entrenamiento)
+# attack_type, attack_signature, ids_ips_alert, malware_indicator, severity
+# fueron descartados en train_model.py (drop_cols). El modelo usa los restantes
+# más las features temporales derivadas del timestamp.
+MODEL_FIELDS = [
+    'protocol',
+    'traffic_type',
     'event_category',
     'mitre_tactic',
     'kill_chain_stage',
     'log_source',
     'firewall_action',
-    'anomaly_score',
+    'asset_criticality',
     'failed_login_attempts',
     'request_rate_per_min',
-    'asset_criticality',
-    'hour',
-    'day',
-    'month',
-    'day_of_week',
 ]
+
 
 def normalize_input(data: dict) -> dict:
     normalized = {}
-    for field in EXPECTED_FIELDS:
+    for field in MODEL_FIELDS:
         value = data.get(field)
         if isinstance(value, str):
             value = value.strip().lower()
         normalized[field] = value
     return normalized
+
 
 def preprocess_input(data: dict) -> pd.DataFrame:
     clean_data = normalize_input(data)
@@ -51,6 +68,7 @@ def preprocess_input(data: dict) -> pd.DataFrame:
 
     return df_encoded
 
+
 def predict_alert(data: dict):
     X = preprocess_input(data)
     prediction = model.predict(X)[0]
@@ -62,6 +80,7 @@ def predict_alert(data: dict):
             probabilities[cls] = float(prob)
 
     return prediction, probabilities
+
 
 def extract_valid_fields(data: dict) -> dict:
     return {field: data.get(field) for field in EXPECTED_FIELDS}
