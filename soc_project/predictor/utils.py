@@ -73,15 +73,22 @@ def preprocess_input(data: dict) -> pd.DataFrame:
     return df_encoded
 
 
+# Mapeo de clases numéricas del modelo a etiquetas legibles.
+# El modelo fue entrenado con labels 0, 1, 2 (columna numérica en el CSV).
+CLASS_LABELS = {0: 'benigno', 1: 'a_investigar', 2: 'malicioso'}
+
+
 def predict_alert(data: dict):
     X = preprocess_input(data)
-    prediction = model.predict(X)[0]
+    prediction_raw = model.predict(X)[0]
+    prediction = CLASS_LABELS.get(int(prediction_raw), str(prediction_raw))
 
     probabilities = {}
     if hasattr(model, 'predict_proba'):
         probs = model.predict_proba(X)[0]
         for cls, prob in zip(model.classes_, probs):
-            probabilities[cls] = float(prob)
+            label = CLASS_LABELS.get(int(cls), str(cls))
+            probabilities[label] = float(prob)
 
     return prediction, probabilities
 
