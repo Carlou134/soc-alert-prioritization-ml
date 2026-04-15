@@ -5,27 +5,125 @@ INPUT_CLASS = 'w-full bg-slate-700 border border-slate-600 text-slate-100 placeh
 TEXTAREA_CLASS = 'w-full bg-slate-700 border border-slate-600 text-slate-100 placeholder:text-slate-500 rounded-md px-3 py-3 h-72 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
 SELECT_CLASS = 'w-full bg-slate-700 border border-slate-600 text-slate-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
 
-SEVERITY_CHOICES = [('', '---'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical')]
-FIREWALL_CHOICES = [('', '---'), ('allow', 'Allow'), ('deny', 'Deny'), ('drop', 'Drop'), ('reject', 'Reject')]
-CRITICALITY_CHOICES = [('', '---'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical')]
+# Los valores de los choices deben coincidir exactamente con los del dataset de entrenamiento.
+EVENT_CATEGORY_CHOICES = [
+    ('', '---'),
+    ('command_and_control', 'Command & Control'),
+    ('credential_access', 'Credential Access'),
+    ('data_collection', 'Data Collection'),
+    ('data_exfiltration', 'Data Exfiltration'),
+    ('evasion', 'Evasion'),
+    ('execution', 'Execution'),
+    ('impact', 'Impact'),
+    ('intrusion_attempt', 'Intrusion Attempt'),
+    ('lateral_movement', 'Lateral Movement'),
+    ('malware_activity', 'Malware Activity'),
+    ('other', 'Other'),
+    ('persistence', 'Persistence'),
+    ('privilege_escalation', 'Privilege Escalation'),
+    ('reconnaissance', 'Reconnaissance'),
+    ('suspicious_activity', 'Suspicious Activity'),
+]
+PROTOCOL_CHOICES = [('', '---'), ('tcp', 'TCP'), ('udp', 'UDP')]
+TRAFFIC_TYPE_CHOICES = [
+    ('', '---'),
+    ('dns', 'DNS'), ('ftp', 'FTP'), ('http', 'HTTP'), ('https', 'HTTPS'),
+    ('icmp', 'ICMP'), ('ldap', 'LDAP'), ('rpc', 'RPC'),
+    ('smb', 'SMB'), ('ssh', 'SSH'), ('tcp', 'TCP'),
+]
+MITRE_TACTIC_CHOICES = [
+    ('', '---'),
+    ('collection', 'Collection'),
+    ('command and control', 'Command and Control'),
+    ('credential access', 'Credential Access'),
+    ('defense evasion', 'Defense Evasion'),
+    ('discovery', 'Discovery'),
+    ('execution', 'Execution'),
+    ('exfiltration', 'Exfiltration'),
+    ('impact', 'Impact'),
+    ('initial access', 'Initial Access'),
+    ('lateral movement', 'Lateral Movement'),
+    ('persistence', 'Persistence'),
+    ('privilege escalation', 'Privilege Escalation'),
+    ('unknown', 'Unknown'),
+]
+KILL_CHAIN_CHOICES = [
+    ('', '---'),
+    ('collection', 'Collection'),
+    ('command & control', 'Command & Control'),
+    ('credential access', 'Credential Access'),
+    ('defense evasion', 'Defense Evasion'),
+    ('exfiltration', 'Exfiltration'),
+    ('exploitation', 'Exploitation'),
+    ('impact', 'Impact'),
+    ('initial access', 'Initial Access'),
+    ('lateral movement', 'Lateral Movement'),
+    ('persistence', 'Persistence'),
+    ('privilege escalation', 'Privilege Escalation'),
+    ('reconnaissance', 'Reconnaissance'),
+    ('unknown', 'Unknown'),
+]
+IDS_IPS_CHOICES = [
+    ('', '---'),
+    ('confirmed malicious indicator', 'Confirmed Malicious Indicator'),
+    ('no alert', 'No Alert'),
+    ('suspicious pattern', 'Suspicious Pattern'),
+    ('unknown', 'Unknown'),
+]
+CRITICALITY_CHOICES = [('', '---'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High')]
+LOG_SOURCE_CHOICES = [
+    ('', '---'),
+    ('edr', 'EDR'), ('firewall', 'Firewall'), ('ips', 'IPS'),
+    ('siem', 'SIEM'), ('waf', 'WAF'),
+]
+FIREWALL_CHOICES = [('', '---'), ('blocked', 'Blocked'), ('unknown', 'Unknown')]
+SEVERITY_CHOICES = [('', '---'), ('medium', 'Medium'), ('critical', 'Critical'), ('unknown', 'Unknown')]
 
 
 class PredictionForm(forms.Form):
-    event_category = forms.CharField(label='Categoría del evento', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
+    event_category = forms.ChoiceField(
+        label='Categoría del evento',
+        choices=EVENT_CATEGORY_CHOICES,
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
     attack_type = forms.CharField(label='Tipo de ataque', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
     attack_signature = forms.CharField(label='Firma del ataque', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
-    protocol = forms.CharField(label='Protocolo', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
-    traffic_type = forms.CharField(label='Tipo de tráfico', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
-    mitre_tactic = forms.CharField(label='Táctica MITRE', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
-    kill_chain_stage = forms.CharField(label='Kill Chain Stage', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
-    ids_ips_alert = forms.CharField(label='Alerta IDS/IPS', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
+    protocol = forms.ChoiceField(
+        label='Protocolo',
+        choices=PROTOCOL_CHOICES,
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
+    traffic_type = forms.ChoiceField(
+        label='Tipo de tráfico',
+        choices=TRAFFIC_TYPE_CHOICES,
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
+    mitre_tactic = forms.ChoiceField(
+        label='Táctica MITRE',
+        choices=MITRE_TACTIC_CHOICES,
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
+    kill_chain_stage = forms.ChoiceField(
+        label='Kill Chain Stage',
+        choices=KILL_CHAIN_CHOICES,
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
+    ids_ips_alert = forms.ChoiceField(
+        label='Alerta IDS/IPS',
+        choices=IDS_IPS_CHOICES,
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
     malware_indicator = forms.CharField(label='Indicador de malware', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
     asset_criticality = forms.ChoiceField(
         label='Criticidad del activo',
         choices=CRITICALITY_CHOICES,
         widget=forms.Select(attrs={'class': SELECT_CLASS})
     )
-    log_source = forms.CharField(label='Fuente de log', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
+    log_source = forms.ChoiceField(
+        label='Fuente de log',
+        choices=LOG_SOURCE_CHOICES,
+        widget=forms.Select(attrs={'class': SELECT_CLASS})
+    )
     firewall_action = forms.ChoiceField(
         label='Acción del firewall',
         choices=FIREWALL_CHOICES,
@@ -55,20 +153,20 @@ class JSONPredictionForm(forms.Form):
             'class': TEXTAREA_CLASS,
             'placeholder': (
                 '{\n'
-                '  "event_category": "network",\n'
-                '  "attack_type": "ddos",\n'
-                '  "attack_signature": "SYN Flood",\n'
+                '  "event_category": "intrusion_attempt",\n'
+                '  "attack_type": "brute force",\n'
+                '  "attack_signature": "SSH Brute Force",\n'
                 '  "protocol": "tcp",\n'
-                '  "traffic_type": "malicious",\n'
-                '  "mitre_tactic": "initial-access",\n'
-                '  "kill_chain_stage": "delivery",\n'
-                '  "ids_ips_alert": "yes",\n'
+                '  "traffic_type": "ssh",\n'
+                '  "mitre_tactic": "initial access",\n'
+                '  "kill_chain_stage": "initial access",\n'
+                '  "ids_ips_alert": "suspicious pattern",\n'
                 '  "malware_indicator": "no",\n'
                 '  "asset_criticality": "high",\n'
                 '  "log_source": "firewall",\n'
-                '  "firewall_action": "deny",\n'
-                '  "severity": "high",\n'
-                '  "failed_login_attempts": 5,\n'
+                '  "firewall_action": "blocked",\n'
+                '  "severity": "critical",\n'
+                '  "failed_login_attempts": 15,\n'
                 '  "request_rate_per_min": 320.5\n'
                 '}'
             )
