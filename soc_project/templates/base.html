@@ -1,32 +1,99 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SOC Predictor{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen">
+<body class="bg-slate-900 text-slate-300 min-h-screen">
     {% if user.is_authenticated %}
     <div class="min-h-screen flex">
-        <aside class="w-72 bg-slate-900 text-white p-6 hidden md:block">
-            <h1 class="text-2xl font-bold mb-8">SOC Predictor</h1>
 
-            <nav class="space-y-3">
-                <a href="{% url 'dashboard' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Dashboard</a>
-                <a href="{% url 'predict' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Predicción manual</a>
-                <a href="{% url 'predict_json' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Predicción por JSON</a>
-                <a href="{% url 'history' %}" class="block px-4 py-3 rounded-xl hover:bg-slate-800">Historial</a>
+        <!-- Sidebar -->
+        <aside class="w-64 bg-slate-950 border-r border-slate-800 hidden md:flex flex-col shrink-0">
+
+            <!-- Logo -->
+            <div class="px-5 py-4 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                        </svg>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-white font-semibold text-sm leading-tight">SOC Predictor</p>
+                        <p class="text-slate-500 text-xs">ML Threat Analysis</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nav -->
+            <nav class="flex-1 px-3 py-3 space-y-0.5">
+                <a href="{% url 'dashboard' %}" class="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-slate-400 hover:text-white hover:bg-slate-800">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                    </svg>
+                    Dashboard
+                </a>
+                <a href="{% url 'predict' %}" class="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-slate-400 hover:text-white hover:bg-slate-800">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                    </svg>
+                    Predicción manual
+                </a>
+                <a href="{% url 'predict_json' %}" class="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-slate-400 hover:text-white hover:bg-slate-800">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+                    </svg>
+                    Predicción por JSON
+                </a>
+                <a href="{% url 'upload_alerts' %}" class="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-slate-400 hover:text-white hover:bg-slate-800">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    Subir Alertas
+                </a>
+                <a href="{% url 'history' %}" class="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-slate-400 hover:text-white hover:bg-slate-800">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Historial
+                </a>
+            </nav>
+
+            <!-- User / Logout -->
+            <div class="px-3 py-3 border-t border-slate-800">
+                <div class="flex items-center gap-3 px-3 py-2 mb-1">
+                    <div class="w-7 h-7 bg-slate-700 rounded-full flex items-center justify-center shrink-0">
+                        <span class="text-xs text-slate-300 font-medium">{{ request.user.username|first|upper }}</span>
+                    </div>
+                    <span class="text-sm text-slate-400 truncate">{{ request.user.username }}</span>
+                </div>
                 <form method="post" action="{% url 'logout' %}">
                     {% csrf_token %}
-                    <button type="submit" class="w-full text-left px-4 py-3 rounded-xl bg-red-600 hover:bg-red-700 mt-6">Salir</button>
+                    <button type="submit" class="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-slate-500 hover:text-red-400 hover:bg-red-500/10">
+                        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                        </svg>
+                        Cerrar sesión
+                    </button>
                 </form>
-            </nav>
+            </div>
         </aside>
 
-        <main class="flex-1 p-6 md:p-8">
-            {% block content %}{% endblock %}
+        <!-- Main content -->
+        <main class="flex-1 overflow-auto">
+            <div class="p-6 md:p-8">
+                {% block content %}{% endblock %}
+            </div>
         </main>
+
     </div>
     {% else %}
     <main class="min-h-screen">

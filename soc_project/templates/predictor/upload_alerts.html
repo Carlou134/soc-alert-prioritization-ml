@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Subir Alertas — SOC Predictor{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-3xl">
+
+    <div>
+        <h1 class="text-lg font-semibold text-white">Subir Alertas</h1>
+        <p class="text-sm text-slate-400 mt-0.5">
+            Carga un archivo <span class="font-mono text-slate-300">.json</span> o <span class="font-mono text-slate-300">.csv</span> con alertas SOC para procesarlas automáticamente.
+        </p>
+    </div>
+
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <form method="post" enctype="multipart/form-data" class="space-y-5">
+            {% csrf_token %}
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5">Archivo de alertas</label>
+                <input type="file" name="file" accept=".json,.csv"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:bg-slate-600 file:border-0 file:text-slate-300 file:rounded file:px-3 file:py-1 file:mr-3 file:text-xs">
+                <p class="text-slate-500 text-xs mt-1.5">Formatos: .json, .csv — Máximo 10 MB</p>
+            </div>
+            <button type="submit"
+                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+                Procesar archivo
+            </button>
+        </form>
+    </div>
+
+    {% if error %}
+    <div class="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+        <p class="text-sm text-red-400"><span class="font-medium">Error:</span> {{ error }}</p>
+    </div>
+    {% endif %}
+
+    {% if summary %}
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+        <p class="text-xs text-slate-400 uppercase tracking-wide mb-4">Resumen del procesamiento</p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold font-mono text-white">{{ summary.total }}</p>
+                <p class="text-xs text-slate-400 mt-1">Total</p>
+            </div>
+            <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold font-mono text-emerald-500">{{ summary.ok }}</p>
+                <p class="text-xs text-emerald-400 mt-1">Procesadas</p>
+            </div>
+            <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold font-mono text-red-500">{{ summary.errors }}</p>
+                <p class="text-xs text-red-400 mt-1">Con errores</p>
+            </div>
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 text-center">
+                <p class="text-xs font-mono text-slate-300 truncate">{{ summary.file }}</p>
+                <p class="text-xs text-slate-500 mt-1">Archivo</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if processed %}
+    <div>
+        <p class="text-sm font-semibold text-white mb-3">
+            Alertas procesadas
+            <span class="text-xs font-normal text-slate-400 ml-1">({{ processed|length }})</span>
+        </p>
+        <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b border-slate-700">
+                        <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Registro</th>
+                        <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Clase predicha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in processed %}
+                    <tr class="border-b border-slate-800 hover:bg-slate-800/50 {% if item.predicted_class == 'malicioso' %}border-l-4 border-l-red-500{% endif %}">
+                        <td class="px-4 py-3 text-xs font-mono text-slate-400">#{{ item.record }}</td>
+                        <td class="px-4 py-3">
+                            {% if item.predicted_class == 'benigno' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">benigno</span>
+                            {% elif item.predicted_class == 'a_investigar' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">a_investigar</span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">malicioso</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if failed %}
+    <div>
+        <p class="text-sm font-semibold text-white mb-3">
+            Registros con errores
+            <span class="text-xs font-normal text-slate-400 ml-1">({{ failed|length }})</span>
+        </p>
+        <div class="space-y-2">
+            {% for item in failed %}
+            <div class="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+                <p class="text-xs font-semibold text-red-400">Registro #{{ item.record }}</p>
+                <p class="text-xs font-mono text-red-300/70 mt-1">{{ item.errors }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

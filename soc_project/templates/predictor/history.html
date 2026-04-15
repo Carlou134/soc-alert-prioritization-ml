@@ -1,37 +1,53 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<div class="bg-white rounded-2xl shadow p-8">
-    <h1 class="text-3xl font-bold mb-2">Historial</h1>
-    <p class="text-slate-500 mb-8">Todas tus predicciones realizadas.</p>
+{% block title %}Historial — SOC Predictor{% endblock %}
 
-    <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-            <thead>
-                <tr class="border-b text-left">
-                    <th class="py-3">Fecha</th>
-                    <th class="py-3">Clase</th>
-                    <th class="py-3">Origen</th>
-                    <th class="py-3">Input</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in logs %}
-                <tr class="border-b align-top">
-                    <td class="py-3">{{ item.created_at }}</td>
-                    <td class="py-3 font-semibold">{{ item.predicted_class }}</td>
-                    <td class="py-3">{{ item.source }}</td>
-                    <td class="py-3">
-                        <pre class="text-xs whitespace-pre-wrap">{{ item.input_data }}</pre>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="4" class="py-4 text-slate-500">No hay registros todavía.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+{% block content %}
+<div class="space-y-6">
+
+    <div>
+        <h1 class="text-lg font-semibold text-white">Historial</h1>
+        <p class="text-sm text-slate-400 mt-0.5">Todas tus predicciones realizadas.</p>
     </div>
+
+    <div class="bg-slate-800 border border-slate-700 rounded-lg">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b border-slate-700">
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Fecha</th>
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Clase</th>
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Origen</th>
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Input</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in logs %}
+                    <tr class="border-b border-slate-800 hover:bg-slate-800/50 align-top {% if item.predicted_class == 'malicioso' %}border-l-4 border-l-red-500{% endif %}">
+                        <td class="px-5 py-3 text-xs font-mono text-slate-400 whitespace-nowrap">{{ item.created_at|date:"Y-m-d H:i" }}</td>
+                        <td class="px-5 py-3 whitespace-nowrap">
+                            {% if item.predicted_class == 'benigno' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">benigno</span>
+                            {% elif item.predicted_class == 'a_investigar' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">a_investigar</span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">malicioso</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-3 text-sm text-slate-400 capitalize whitespace-nowrap">{{ item.source }}</td>
+                        <td class="px-5 py-3">
+                            <pre class="text-xs font-mono text-slate-400 whitespace-pre-wrap max-w-lg">{{ item.input_data }}</pre>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="px-5 py-8 text-sm text-slate-500 text-center">No hay registros todavía.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
