@@ -19,6 +19,8 @@ INSTALLED_APPS = [
 
     'accounts',
     'predictor',
+    'tailwind',
+    'theme',
 ]
 
 MIDDLEWARE = [
@@ -89,3 +91,5 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+TAILWIND_APP_NAME = 'theme'
