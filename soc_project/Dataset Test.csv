@@ -1,0 +1,51 @@
+﻿event_category,attack_type,attack_signature,protocol,traffic_type,mitre_tactic,kill_chain_stage,failed_login_attempts,request_rate_per_min,ids_ips_alert,malware_indicator,asset_criticality,log_source,firewall_action,severity,label
+lateral_movement,Lateral Movement,Remote Service Exploitation,TCP,SMB,Lateral Movement,Lateral Movement,8,15.85,alert,No,High,SIEM,blocked,high,2
+intrusion_attempt,Initial Compromise,Valid Account Abuse,TCP,SSH,Initial Access,Initial Access,2,6.03,alert,No,Medium,EDR,allowed,medium,1
+intrusion_attempt,Initial Compromise,Unauthorized Initial Access Attempt,TCP,SSH,Initial Access,Initial Access,2,28.09,alert,No,Medium,EDR,blocked,high,2
+malware_activity,Execution,Malicious Script Execution,HTTP,Web,Execution,Execution,0,45.2,alert,Yes,High,SIEM,blocked,high,2
+phishing_attempt,Initial Compromise,Suspicious Email Link,HTTP,Email,Initial Access,Delivery,1,5.4,alert,No,Medium,Firewall,allowed,low,0
+lateral_movement,Lateral Movement,Pass the Hash,TCP,SMB,Lateral Movement,Lateral Movement,6,20.1,alert,No,High,SIEM,blocked,high,2
+data_exfiltration,Exfiltration,Large Data Transfer,FTP,File Transfer,Exfiltration,Exfiltration,0,60.7,alert,No,High,Firewall,blocked,high,2
+intrusion_attempt,Initial Compromise,Brute Force Attack,TCP,SSH,Initial Access,Initial Access,12,80.5,alert,No,Medium,EDR,blocked,high,2
+benign_activity,Normal,Regular User Login,TCP,HTTP,None,None,1,3.2,none,No,Low,SIEM,allowed,low,0
+malware_activity,Execution,Ransomware Behavior,TCP,HTTP,Execution,Execution,0,55.1,alert,Yes,High,EDR,blocked,critical,2
+intrusion_attempt,Initial Compromise,Credential Stuffing,TCP,HTTP,Initial Access,Initial Access,15,90.2,alert,No,Medium,Firewall,blocked,high,2
+phishing_attempt,Initial Compromise,Fake Login Page,HTTP,Web,Initial Access,Delivery,3,12.4,alert,No,Medium,SIEM,blocked,medium,1
+lateral_movement,Lateral Movement,Remote Desktop Abuse,TCP,RDP,Lateral Movement,Lateral Movement,4,18.3,alert,No,High,EDR,blocked,high,2
+data_exfiltration,Exfiltration,DNS Tunneling,UDP,DNS,Exfiltration,Exfiltration,0,70.5,alert,Yes,High,SIEM,blocked,critical,2
+benign_activity,Normal,System Update,TCP,HTTP,None,None,0,10.2,none,No,Low,Firewall,allowed,low,0
+malware_activity,Execution,Trojan Download,HTTP,Web,Execution,Execution,0,50.4,alert,Yes,High,EDR,blocked,high,2
+intrusion_attempt,Initial Compromise,SQL Injection,TCP,HTTP,Initial Access,Exploitation,0,65.8,alert,No,Medium,SIEM,blocked,high,2
+phishing_attempt,Initial Compromise,Spear Phishing Email,HTTP,Email,Initial Access,Delivery,2,8.7,alert,No,Medium,Firewall,blocked,medium,1
+lateral_movement,Lateral Movement,Internal Recon,TCP,SMB,Lateral Movement,Lateral Movement,5,22.1,alert,No,High,SIEM,blocked,high,2
+data_exfiltration,Exfiltration,Cloud Data Leak,HTTPS,Web,Exfiltration,Exfiltration,0,75.3,alert,Yes,High,EDR,blocked,critical,2
+benign_activity,Normal,User Browsing,HTTP,Web,None,None,0,4.5,none,No,Low,Firewall,allowed,low,0
+malware_activity,Execution,Keylogger Activity,TCP,HTTP,Execution,Execution,0,40.2,alert,Yes,High,EDR,blocked,high,2
+intrusion_attempt,Initial Compromise,Port Scanning,TCP,Network,Reconnaissance,Reconnaissance,0,95.1,alert,No,Medium,SIEM,blocked,medium,1
+phishing_attempt,Initial Compromise,Malicious Attachment,SMTP,Email,Initial Access,Delivery,1,7.3,alert,Yes,Medium,Firewall,blocked,medium,1
+lateral_movement,Lateral Movement,Credential Dumping,TCP,SMB,Lateral Movement,Lateral Movement,7,25.4,alert,No,High,EDR,blocked,high,2
+data_exfiltration,Exfiltration,FTP Data Leak,FTP,File Transfer,Exfiltration,Exfiltration,0,68.2,alert,Yes,High,SIEM,blocked,high,2
+benign_activity,Normal,API Request,HTTP,Web,None,None,0,6.5,none,No,Low,Firewall,allowed,low,0
+malware_activity,Execution,Backdoor Installation,TCP,HTTP,Execution,Execution,0,48.9,alert,Yes,High,EDR,blocked,high,2
+intrusion_attempt,Initial Compromise,Privilege Escalation,TCP,System,Privilege Escalation,Exploitation,0,35.6,alert,No,High,SIEM,blocked,high,2
+phishing_attempt,Initial Compromise,Fake Domain Access,HTTP,Web,Initial Access,Delivery,1,9.1,alert,No,Medium,Firewall,blocked,medium,1
+lateral_movement,Lateral Movement,Session Hijacking,TCP,HTTP,Lateral Movement,Lateral Movement,3,17.8,alert,No,High,EDR,blocked,high,2
+data_exfiltration,Exfiltration,Email Data Leak,SMTP,Email,Exfiltration,Exfiltration,0,62.4,alert,Yes,High,SIEM,blocked,high,2
+benign_activity,Normal,Heartbeat Signal,TCP,Network,None,None,0,2.1,none,No,Low,Firewall,allowed,low,0
+malware_activity,Execution,Spyware Activity,TCP,HTTP,Execution,Execution,0,39.5,alert,Yes,High,EDR,blocked,high,2
+intrusion_attempt,Initial Compromise,Web Shell Upload,HTTP,Web,Initial Access,Exploitation,0,55.7,alert,No,High,SIEM,blocked,high,2
+phishing_attempt,Initial Compromise,Fake Invoice Email,SMTP,Email,Initial Access,Delivery,2,11.2,alert,No,Medium,Firewall,blocked,medium,1
+lateral_movement,Lateral Movement,Remote WMI Execution,TCP,System,Lateral Movement,Lateral Movement,6,21.6,alert,No,High,EDR,blocked,high,2
+data_exfiltration,Exfiltration,Cloud Sync Abuse,HTTPS,Web,Exfiltration,Exfiltration,0,77.8,alert,Yes,High,SIEM,blocked,critical,2
+benign_activity,Normal,File Access,TCP,SMB,None,None,0,5.3,none,No,Low,Firewall,allowed,low,0
+malware_activity,Execution,Worm Propagation,TCP,Network,Execution,Execution,0,85.1,alert,Yes,High,EDR,blocked,critical,2
+intrusion_attempt,Initial Compromise,Unauthorized API Access,HTTP,Web,Initial Access,Exploitation,0,33.4,alert,No,Medium,SIEM,blocked,medium,1
+phishing_attempt,Initial Compromise,Credential Harvesting Page,HTTP,Web,Initial Access,Delivery,1,10.6,alert,No,Medium,Firewall,blocked,medium,1
+lateral_movement,Lateral Movement,Service Account Abuse,TCP,System,Lateral Movement,Lateral Movement,5,19.9,alert,No,High,EDR,blocked,high,2
+data_exfiltration,Exfiltration,Database Dump,TCP,Database,Exfiltration,Exfiltration,0,88.2,alert,Yes,High,SIEM,blocked,critical,2
+benign_activity,Normal,System Monitoring,TCP,Network,None,None,0,3.8,none,No,Low,Firewall,allowed,low,0
+malware_activity,Execution,Rootkit Activity,TCP,System,Execution,Execution,0,52.6,alert,Yes,High,EDR,blocked,critical,2
+intrusion_attempt,Initial Compromise,Exploit Kit Activity,HTTP,Web,Initial Access,Exploitation,0,44.7,alert,No,High,SIEM,blocked,high,2
+phishing_attempt,Initial Compromise,Suspicious Redirect,HTTP,Web,Initial Access,Delivery,1,9.9,alert,No,Medium,Firewall,blocked,medium,1
+lateral_movement,Lateral Movement,Kerberos Abuse,TCP,Authentication,Lateral Movement,Lateral Movement,4,16.2,alert,No,High,EDR,blocked,high,2
+data_exfiltration,Exfiltration,Encrypted Data Leak,HTTPS,Web,Exfiltration,Exfiltration,0,79.5,alert,Yes,High,SIEM,blocked,critical,2
