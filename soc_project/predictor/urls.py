@@ -6,6 +6,12 @@ from .views import (
     predict_json_view,
     predict_view,
     upload_alerts_view,
+    pipeline_view,
+    pipeline_upload_view,
+    pipeline_map_view,
+    pipeline_normalize_view,
+    pipeline_preview_view,
+    pipeline_export_view,
 )
 
 urlpatterns = [
@@ -16,4 +22,11 @@ urlpatterns = [
     path('upload-alerts/', upload_alerts_view, name='upload_alerts'),
     path('history/', history_view, name='history'),
     path('alerts/', alert_list_view, name='alert_list'),
+    # HU009 — Pipeline de normalización
+    path('pipeline/', pipeline_view, name='pipeline'),
+    path('pipeline/upload/', pipeline_upload_view, name='pipeline_upload'),
+    path('pipeline/map/', pipeline_map_view, name='pipeline_map'),
+    path('pipeline/normalize/', pipeline_normalize_view, name='pipeline_normalize'),
+    path('pipeline/preview/', pipeline_preview_view, name='pipeline_preview'),
+    path('pipeline/export/', pipeline_export_view, name='pipeline_export'),
 ]
