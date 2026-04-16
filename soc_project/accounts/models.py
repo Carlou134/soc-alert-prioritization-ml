@@ -8,6 +8,8 @@ ACTION_PREDICT_JSON = 'predict_json'
 ACTION_USER_ACTIVATED = 'user_activated'
 ACTION_USER_DEACTIVATED = 'user_deactivated'
 ACTION_USER_ROLE_CHANGED = 'user_role_changed'
+ACTION_PIPELINE_NORMALIZATION = 'pipeline_normalization'
+ACTION_PIPELINE_EXPORT = 'pipeline_export'
 
 ACTION_LABELS = {
     ACTION_UPLOAD_ALERTS: 'Subida de alertas',
@@ -16,6 +18,8 @@ ACTION_LABELS = {
     ACTION_USER_ACTIVATED: 'Activación de usuario',
     ACTION_USER_DEACTIVATED: 'Desactivación de usuario',
     ACTION_USER_ROLE_CHANGED: 'Cambio de rol',
+    ACTION_PIPELINE_NORMALIZATION: 'Pipeline de normalización',
+    ACTION_PIPELINE_EXPORT: 'Exportación de dataset',
 }
 
 

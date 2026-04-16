@@ -8,18 +8,31 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 
 from accounts.models import (
     ACTION_PREDICT_JSON,
     ACTION_PREDICT_MANUAL,
     ACTION_UPLOAD_ALERTS,
+    ACTION_PIPELINE_NORMALIZATION,
+    ACTION_PIPELINE_EXPORT,
     log_action,
 )
 from .forms import PredictionForm, JSONPredictionForm
 from .models import Alert, PredictionLog
 from .utils import predict_alert, extract_valid_fields
 from .serializers import PredictionRequestSerializer
+from .pipeline import (
+    REQUIRED_COLUMNS,
+    NUMERIC_COLUMNS,
+    parse_file,
+    validate_columns,
+    apply_mapping,
+    clean_records,
+    export_to_csv,
+    export_to_json,
+)
 
 @login_required
 def dashboard_view(request):
@@ -361,3 +374,231 @@ def _parse_csv_file(file):
         return None, 'El CSV no contiene filas de datos (solo encabezado o vacío).'
 
     return records, None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HU009 — Pipeline de normalización de datos
+# ─────────────────────────────────────────────────────────────────────────────
+
+_PIPELINE_SESSION_KEYS = [
+    'pipeline_records',
+    'pipeline_filename',
+    'pipeline_columns',
+    'pipeline_missing',
+    'pipeline_mapping',
+    'pipeline_clean_records',
+    'pipeline_stats',
+]
+
+
+def _clear_pipeline_session(session):
+    for key in _PIPELINE_SESSION_KEYS:
+        session.pop(key, None)
+
+
+@login_required
+def pipeline_view(request):
+    """Paso 1: Formulario de carga de archivo."""
+    _clear_pipeline_session(request.session)
+    return render(request, 'predictor/pipeline.html', {
+        'stage': 'upload',
+        'required_cols': REQUIRED_COLUMNS,
+    })
+
+
+@login_required
+def pipeline_upload_view(request):
+    """POST: Parsea el archivo, detecta columnas y decide el siguiente paso."""
+    if request.method != 'POST':
+        return redirect('pipeline')
+
+    def _render_upload_error(error):
+        return render(request, 'predictor/pipeline.html', {
+            'stage': 'upload',
+            'required_cols': REQUIRED_COLUMNS,
+            'error': error,
+        })
+
+    file = request.FILES.get('file')
+    if not file:
+        return _render_upload_error('No se seleccionó ningún archivo.')
+    if file.size == 0:
+        return _render_upload_error('El archivo está vacío.')
+    if file.size > 10 * 1024 * 1024:
+        return _render_upload_error('El archivo supera el límite de 10 MB.')
+
+    records, error = parse_file(file)
+    if error:
+        return _render_upload_error(error)
+    if not records:
+        return _render_upload_error('El archivo no contiene registros.')
+
+    detected_cols, missing_cols = validate_columns(records)
+
+    request.session['pipeline_records'] = records
+    request.session['pipeline_filename'] = file.name
+    request.session['pipeline_columns'] = detected_cols
+    request.session['pipeline_missing'] = missing_cols
+
+    if missing_cols:
+        return redirect('pipeline_map')
+    return redirect('pipeline_normalize')
+
+
+@login_required
+def pipeline_map_view(request):
+    """Paso 2: Formulario dinámico de mapping de columnas."""
+    records = request.session.get('pipeline_records')
+    if not records:
+        return redirect('pipeline')
+
+    detected_cols = request.session.get('pipeline_columns', [])
+    missing_cols = request.session.get('pipeline_missing', [])
+    filename = request.session.get('pipeline_filename', '')
+
+    if request.method == 'POST':
+        mapping = {}
+        for col in missing_cols:
+            source = request.POST.get(f'map_{col}', '').strip()
+            if source and source != '__skip__':
+                mapping[col] = source
+
+        mapped_records = apply_mapping(records, mapping)
+        new_detected, new_missing = validate_columns(mapped_records)
+
+        request.session['pipeline_records'] = mapped_records
+        request.session['pipeline_mapping'] = mapping
+        request.session['pipeline_columns'] = new_detected
+        request.session['pipeline_missing'] = new_missing
+
+        return redirect('pipeline_normalize')
+
+    return render(request, 'predictor/pipeline.html', {
+        'stage': 'map',
+        'detected_cols': detected_cols,
+        'missing_cols': missing_cols,
+        'filename': filename,
+        'numeric_cols': NUMERIC_COLUMNS,
+        'required_cols': REQUIRED_COLUMNS,
+    })
+
+
+@login_required
+def pipeline_normalize_view(request):
+    """
+    GET: Muestra preview de datos en bruto y botón de normalización.
+    POST: Ejecuta la limpieza y redirige al preview limpio.
+    """
+    records = request.session.get('pipeline_records')
+    if not records:
+        return redirect('pipeline')
+
+    detected_cols = request.session.get('pipeline_columns', [])
+    filename = request.session.get('pipeline_filename', '')
+    missing_cols = [col for col in REQUIRED_COLUMNS if col not in detected_cols]
+
+    if request.method == 'POST':
+        clean, stats = clean_records(records)
+
+        if not clean:
+            return render(request, 'predictor/pipeline.html', {
+                'stage': 'normalize',
+                'filename': filename,
+                'detected_cols': detected_cols,
+                'preview_rows': [],
+                'total_records': len(records),
+                'missing_cols': missing_cols,
+                'error': 'No quedaron registros tras la limpieza. Verifica el archivo.',
+                'stats': stats,
+            })
+
+        request.session['pipeline_clean_records'] = clean
+        request.session['pipeline_stats'] = stats
+
+        log_action(
+            request.user,
+            ACTION_PIPELINE_NORMALIZATION,
+            (
+                f'Ejecutó pipeline de normalización sobre "{filename}". '
+                f'Registros procesados: {stats["total_clean"]}. '
+                f'Duplicados eliminados: {stats["duplicates_removed"]}. '
+                f'Nulos rellenados: {stats["nulls_filled"]}.'
+            ),
+        )
+        return redirect('pipeline_preview')
+
+    preview_rows = [
+        [record.get(col, '') for col in detected_cols]
+        for record in records[:10]
+    ]
+
+    return render(request, 'predictor/pipeline.html', {
+        'stage': 'normalize',
+        'filename': filename,
+        'detected_cols': detected_cols,
+        'preview_rows': preview_rows,
+        'total_records': len(records),
+        'missing_cols': missing_cols,
+    })
+
+
+@login_required
+def pipeline_preview_view(request):
+    """Paso 4: Preview del dataset limpio y botones de exportación."""
+    clean = request.session.get('pipeline_clean_records')
+    if not clean:
+        return redirect('pipeline')
+
+    preview_rows = [
+        [record.get(col, '') for col in REQUIRED_COLUMNS]
+        for record in clean[:20]
+    ]
+
+    return render(request, 'predictor/pipeline.html', {
+        'stage': 'preview',
+        'filename': request.session.get('pipeline_filename', ''),
+        'stats': request.session.get('pipeline_stats', {}),
+        'required_cols': REQUIRED_COLUMNS,
+        'preview_rows': preview_rows,
+        'total_records': len(clean),
+    })
+
+
+@login_required
+def pipeline_export_view(request):
+    """POST: Genera y descarga el dataset limpio en CSV o JSON."""
+    if request.method != 'POST':
+        return redirect('pipeline_preview')
+
+    clean = request.session.get('pipeline_clean_records')
+    if not clean:
+        return redirect('pipeline')
+
+    export_format = request.POST.get('format', 'csv').lower()
+    filename = request.session.get('pipeline_filename', 'dataset')
+    base_name = filename.rsplit('.', 1)[0] if '.' in filename else filename
+
+    if export_format == 'json':
+        content = export_to_json(clean)
+        response = HttpResponse(content, content_type='application/json; charset=utf-8')
+        response['Content-Disposition'] = (
+            f'attachment; filename="{base_name}_clean.json"'
+        )
+    else:
+        content = export_to_csv(clean)
+        response = HttpResponse(content, content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = (
+            f'attachment; filename="{base_name}_clean.csv"'
+        )
+
+    log_action(
+        request.user,
+        ACTION_PIPELINE_EXPORT,
+        (
+            f'Exportó dataset limpio "{base_name}_clean.{export_format}". '
+            f'Registros exportados: {len(clean)}. '
+            f'Formato: {export_format.upper()}.'
+        ),
+    )
+
+    return response
