@@ -76,7 +76,7 @@ LOG_SOURCE_CHOICES = [
     ('edr', 'EDR'), ('firewall', 'Firewall'), ('ips', 'IPS'),
     ('siem', 'SIEM'), ('waf', 'WAF'),
 ]
-FIREWALL_CHOICES = [('', '---'), ('blocked', 'Blocked'), ('unknown', 'Unknown')]
+FIREWALL_CHOICES = [('', '---'), ('allow', 'Allow'), ('blocked', 'Blocked'), ('unknown', 'Unknown')]
 SEVERITY_CHOICES = [('', '---'), ('low', 'Low'), ('medium', 'Medium'), ('critical', 'Critical'), ('unknown', 'Unknown')]
 
 
