@@ -514,18 +514,25 @@ def pipeline_upload_view(request):
     if file.size > 10 * 1024 * 1024:
         return _render_upload_error('El archivo supera el límite de 10 MB.')
 
-    records, error = parse_file(file)
-    if error:
-        return _render_upload_error(error)
-    if not records:
-        return _render_upload_error('El archivo no contiene registros.')
+    try:
+        records, error = parse_file(file)
+        if error:
+            return _render_upload_error(error)
+        if not records:
+            return _render_upload_error('El archivo no contiene registros.')
 
-    detected_cols, missing_cols = validate_columns(records)
+        detected_cols, missing_cols = validate_columns(records)
 
-    request.session['pipeline_records'] = records
-    request.session['pipeline_filename'] = file.name
-    request.session['pipeline_columns'] = detected_cols
-    request.session['pipeline_missing'] = missing_cols
+        request.session['pipeline_records'] = records
+        request.session['pipeline_filename'] = file.name
+        request.session['pipeline_columns'] = detected_cols
+        request.session['pipeline_missing'] = missing_cols
+    except Exception as exc:
+        log_error(request.user, 'pipeline_upload', str(exc))
+        return _render_upload_error(
+            'No se pudo procesar el archivo. Verifique que el formato sea '
+            'CSV o JSON válido e intente nuevamente.'
+        )
 
     if missing_cols:
         return redirect('pipeline_map')
@@ -585,7 +592,22 @@ def pipeline_normalize_view(request):
     missing_cols = [col for col in REQUIRED_COLUMNS if col not in detected_cols]
 
     if request.method == 'POST':
-        clean, stats = clean_records(records)
+        try:
+            clean, stats = clean_records(records)
+        except Exception as exc:
+            log_error(request.user, 'pipeline_normalize', str(exc))
+            return render(request, 'predictor/pipeline.html', {
+                'stage': 'normalize',
+                'filename': filename,
+                'detected_cols': detected_cols,
+                'preview_rows': [],
+                'total_records': len(records),
+                'missing_cols': missing_cols,
+                'error': (
+                    'Ocurrió un error durante la normalización de los datos. '
+                    'Verifique que los campos numéricos contengan valores válidos.'
+                ),
+            })
 
         if not clean:
             return render(request, 'predictor/pipeline.html', {
@@ -665,18 +687,26 @@ def pipeline_export_view(request):
     filename = request.session.get('pipeline_filename', 'dataset')
     base_name = filename.rsplit('.', 1)[0] if '.' in filename else filename
 
-    if export_format == 'json':
-        content = export_to_json(clean)
-        response = HttpResponse(content, content_type='application/json; charset=utf-8')
-        response['Content-Disposition'] = (
-            f'attachment; filename="{base_name}_clean.json"'
+    try:
+        if export_format == 'json':
+            content = export_to_json(clean)
+            response = HttpResponse(content, content_type='application/json; charset=utf-8')
+            response['Content-Disposition'] = (
+                f'attachment; filename="{base_name}_clean.json"'
+            )
+        else:
+            content = export_to_csv(clean)
+            response = HttpResponse(content, content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = (
+                f'attachment; filename="{base_name}_clean.csv"'
+            )
+    except Exception as exc:
+        log_error(request.user, 'pipeline_export', str(exc))
+        messages.error(
+            request,
+            'No se pudo generar el archivo de exportación. Intente nuevamente.',
         )
-    else:
-        content = export_to_csv(clean)
-        response = HttpResponse(content, content_type='text/csv; charset=utf-8')
-        response['Content-Disposition'] = (
-            f'attachment; filename="{base_name}_clean.csv"'
-        )
+        return redirect('pipeline_preview')
 
     log_action(
         request.user,
