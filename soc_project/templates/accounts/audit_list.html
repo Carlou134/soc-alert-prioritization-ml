@@ -112,6 +112,10 @@
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">Desactivación de usuario</span>
                             {% elif log.action == 'user_role_changed' %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">Cambio de rol</span>
+                            {% elif log.action == 'pipeline_normalization' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">Pipeline ML</span>
+                            {% elif log.action == 'pipeline_export' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Exportación dataset</span>
                             {% else %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-600/50 text-slate-300 border border-slate-600">{{ log.action }}</span>
                             {% endif %}

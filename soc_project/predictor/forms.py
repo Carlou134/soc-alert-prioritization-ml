@@ -77,7 +77,7 @@ LOG_SOURCE_CHOICES = [
     ('siem', 'SIEM'), ('waf', 'WAF'),
 ]
 FIREWALL_CHOICES = [('', '---'), ('blocked', 'Blocked'), ('unknown', 'Unknown')]
-SEVERITY_CHOICES = [('', '---'), ('medium', 'Medium'), ('critical', 'Critical'), ('unknown', 'Unknown')]
+SEVERITY_CHOICES = [('', '---'), ('low', 'Low'), ('medium', 'Medium'), ('critical', 'Critical'), ('unknown', 'Unknown')]
 
 
 class PredictionForm(forms.Form):

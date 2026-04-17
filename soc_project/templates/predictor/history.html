@@ -1,53 +1,210 @@
 {% extends 'base.html' %}
 
-{% block title %}Historial — SOC Predictor{% endblock %}
+{% block title %}Historial de Predicciones — SOC Predictor{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-5">
 
-    <div>
-        <h1 class="text-lg font-semibold text-white">Historial</h1>
-        <p class="text-sm text-slate-400 mt-0.5">Todas tus predicciones realizadas.</p>
+    <!-- ── Encabezado ─────────────────────────────────────────────────────── -->
+    <div class="flex items-start justify-between">
+        <div>
+            <h1 class="text-lg font-semibold text-white">Historial de Predicciones</h1>
+            <p class="text-sm text-slate-400 mt-0.5">
+                {{ total_count }} predicción{{ total_count|pluralize:"es" }} registrada{{ total_count|pluralize:"s" }}
+            </p>
+        </div>
     </div>
 
-    <div class="bg-slate-800 border border-slate-700 rounded-lg">
+    <!-- ── Filtros ─────────────────────────────────────────────────────────── -->
+    <form method="get" class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+
+            <!-- Clase predicha -->
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Clase predicha</label>
+                <select name="clase"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todas las clases</option>
+                    {% for c in class_choices %}
+                    <option value="{{ c }}" {% if c == class_filter %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Origen -->
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Origen</label>
+                <select name="source"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todos los orígenes</option>
+                    {% for s in source_choices %}
+                    <option value="{{ s }}" {% if s == source_filter %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Fecha desde -->
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Desde</label>
+                <input type="date" name="date_from" value="{{ date_from }}"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Fecha hasta -->
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Hasta</label>
+                <input type="date" name="date_to" value="{{ date_to }}"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+        </div>
+
+        <div class="flex items-center gap-3 mt-3">
+            <button type="submit"
+                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+                Filtrar
+            </button>
+            <a href="{% url 'history' %}"
+                class="text-slate-400 hover:text-white text-sm px-3 py-2 rounded-md hover:bg-slate-700">
+                Limpiar
+            </a>
+        </div>
+    </form>
+
+    <!-- ── Tabla ───────────────────────────────────────────────────────────── -->
+    {% if page_obj.object_list %}
+    <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-left">
+            <table class="w-full text-left text-sm">
                 <thead>
-                    <tr class="border-b border-slate-700">
-                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Fecha</th>
-                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Clase</th>
-                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Origen</th>
-                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Input</th>
+                    <tr class="border-b border-slate-700 bg-slate-900">
+                        <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide whitespace-nowrap">Fecha</th>
+                        <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Clase predicha</th>
+                        <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Origen</th>
+                        <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Confianza</th>
+                        <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Datos de entrada</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for item in logs %}
-                    <tr class="border-b border-slate-800 hover:bg-slate-800/50 align-top {% if item.predicted_class == 'malicioso' %}border-l-4 border-l-red-500{% endif %}">
-                        <td class="px-5 py-3 text-xs font-mono text-slate-400 whitespace-nowrap">{{ item.created_at|date:"Y-m-d H:i" }}</td>
-                        <td class="px-5 py-3 whitespace-nowrap">
+                <tbody class="divide-y divide-slate-700/50">
+                    {% for item in page_obj %}
+                    <tr class="hover:bg-slate-700/30 transition-colors align-top
+                        {% if item.predicted_class == 'malicioso' %}border-l-2 border-l-red-500{% elif item.predicted_class == 'a_investigar' %}border-l-2 border-l-amber-500{% endif %}">
+
+                        <td class="px-4 py-3 text-xs font-mono text-slate-400 whitespace-nowrap">
+                            {{ item.created_at|date:"Y-m-d H:i" }}
+                        </td>
+
+                        <td class="px-4 py-3 whitespace-nowrap">
                             {% if item.predicted_class == 'benigno' %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">benigno</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">benigno</span>
                             {% elif item.predicted_class == 'a_investigar' %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">a_investigar</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">a_investigar</span>
                             {% else %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">malicioso</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">malicioso</span>
                             {% endif %}
                         </td>
-                        <td class="px-5 py-3 text-sm text-slate-400 capitalize whitespace-nowrap">{{ item.source }}</td>
-                        <td class="px-5 py-3">
-                            <pre class="text-xs font-mono text-slate-400 whitespace-pre-wrap max-w-lg">{{ item.input_data }}</pre>
+
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="text-xs text-slate-400 font-mono">{{ item.source }}</span>
                         </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="4" class="px-5 py-8 text-sm text-slate-500 text-center">No hay registros todavía.</td>
+
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            {% if item.probabilities %}
+                                {% with prob=item.probabilities %}
+                                <div class="space-y-0.5 text-xs font-mono">
+                                    {% if prob.benigno is not None %}
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-slate-500 w-20 truncate">benigno</span>
+                                        <span class="text-emerald-400">{{ prob.benigno|floatformat:2 }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if prob.a_investigar is not None %}
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-slate-500 w-20 truncate">investig.</span>
+                                        <span class="text-amber-400">{{ prob.a_investigar|floatformat:2 }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if prob.malicioso is not None %}
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-slate-500 w-20 truncate">malicioso</span>
+                                        <span class="text-red-400">{{ prob.malicioso|floatformat:2 }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endwith %}
+                            {% else %}
+                                <span class="text-slate-600 text-xs">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-4 py-3">
+                            <details class="group">
+                                <summary class="cursor-pointer text-xs text-blue-400 hover:text-blue-300 list-none select-none">
+                                    Ver campos
+                                    <span class="group-open:hidden">▾</span>
+                                    <span class="hidden group-open:inline">▴</span>
+                                </summary>
+                                <pre class="mt-2 text-xs font-mono text-slate-400 whitespace-pre-wrap max-w-sm bg-slate-900 rounded p-2 overflow-auto max-h-40">{{ item.input_data }}</pre>
+                            </details>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
+
+    <!-- ── Paginación ─────────────────────────────────────────────────────── -->
+    {% if page_obj.has_other_pages %}
+    <div class="flex items-center justify-between">
+        <p class="text-xs text-slate-500">
+            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+            &mdash; {{ total_count }} resultado{{ total_count|pluralize }}
+        </p>
+        <div class="flex items-center gap-1">
+            {% if page_obj.has_previous %}
+            <a href="?{% if class_filter %}clase={{ class_filter }}&{% endif %}{% if source_filter %}source={{ source_filter }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}page={{ page_obj.previous_page_number }}"
+               class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">
+                ← Anterior
+            </a>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <span class="px-3 py-1.5 rounded-md text-xs font-medium bg-blue-500 text-white">{{ num }}</span>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <a href="?{% if class_filter %}clase={{ class_filter }}&{% endif %}{% if source_filter %}source={{ source_filter }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}page={{ num }}"
+                   class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">
+                    {{ num }}
+                </a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <a href="?{% if class_filter %}clase={{ class_filter }}&{% endif %}{% if source_filter %}source={{ source_filter }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}page={{ page_obj.next_page_number }}"
+               class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">
+                Siguiente →
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- ── Estado vacío ───────────────────────────────────────────────────── -->
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-12 text-center">
+        <svg class="w-10 h-10 text-slate-600 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+        </svg>
+        {% if class_filter or source_filter or date_from or date_to %}
+        <p class="text-slate-400 text-sm font-medium">Sin resultados para los filtros aplicados.</p>
+        <a href="{% url 'history' %}" class="text-blue-400 hover:text-blue-300 text-xs mt-2 inline-block">Limpiar filtros</a>
+        {% else %}
+        <p class="text-slate-400 text-sm font-medium">Aún no hay predicciones registradas.</p>
+        <p class="text-slate-500 text-xs mt-1">Realiza una predicción manual, por JSON o cargando un archivo.</p>
+        {% endif %}
+    </div>
+    {% endif %}
 
 </div>
 {% endblock %}
