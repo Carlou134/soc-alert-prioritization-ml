@@ -1,0 +1,503 @@
+{% extends 'base.html' %}
+
+{% block title %}Pipeline ML — SOC Predictor{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-6xl">
+
+    <!-- ── Encabezado ─────────────────────────────────────────────────────── -->
+    <div>
+        <h1 class="text-lg font-semibold text-white">Pipeline de Normalización</h1>
+        <p class="text-sm text-slate-400 mt-0.5">
+            Carga, valida, limpia y exporta datasets listos para el modelo ML.
+        </p>
+    </div>
+
+    <!-- ── Indicador de pasos ─────────────────────────────────────────────── -->
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+        <ol class="flex items-center gap-0">
+
+            {% with steps="upload,map,normalize,preview" %}
+
+            <!-- Paso 1: Cargar -->
+            <li class="flex items-center flex-1">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0
+                        {% if stage == 'upload' %}bg-blue-500/20 border border-blue-500 text-blue-400
+                        {% else %}bg-emerald-500/20 border border-emerald-500 text-emerald-400{% endif %}">
+                        {% if stage != 'upload' %}
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+                        {% else %}1{% endif %}
+                    </div>
+                    <span class="text-xs font-medium hidden sm:block
+                        {% if stage == 'upload' %}text-blue-400{% else %}text-emerald-400{% endif %}">
+                        Cargar
+                    </span>
+                </div>
+                <div class="flex-1 mx-3 h-px {% if stage != 'upload' %}bg-emerald-500/40{% else %}bg-slate-600{% endif %}"></div>
+            </li>
+
+            <!-- Paso 2: Mapeo -->
+            <li class="flex items-center flex-1">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0
+                        {% if stage == 'map' %}bg-blue-500/20 border border-blue-500 text-blue-400
+                        {% elif stage == 'normalize' or stage == 'preview' %}bg-emerald-500/20 border border-emerald-500 text-emerald-400
+                        {% else %}bg-slate-700 border border-slate-600 text-slate-500{% endif %}">
+                        {% if stage == 'normalize' or stage == 'preview' %}
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+                        {% else %}2{% endif %}
+                    </div>
+                    <span class="text-xs font-medium hidden sm:block
+                        {% if stage == 'map' %}text-blue-400
+                        {% elif stage == 'normalize' or stage == 'preview' %}text-emerald-400
+                        {% else %}text-slate-500{% endif %}">
+                        Mapeo
+                    </span>
+                </div>
+                <div class="flex-1 mx-3 h-px {% if stage == 'normalize' or stage == 'preview' %}bg-emerald-500/40{% else %}bg-slate-600{% endif %}"></div>
+            </li>
+
+            <!-- Paso 3: Normalizar -->
+            <li class="flex items-center flex-1">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0
+                        {% if stage == 'normalize' %}bg-blue-500/20 border border-blue-500 text-blue-400
+                        {% elif stage == 'preview' %}bg-emerald-500/20 border border-emerald-500 text-emerald-400
+                        {% else %}bg-slate-700 border border-slate-600 text-slate-500{% endif %}">
+                        {% if stage == 'preview' %}
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+                        {% else %}3{% endif %}
+                    </div>
+                    <span class="text-xs font-medium hidden sm:block
+                        {% if stage == 'normalize' %}text-blue-400
+                        {% elif stage == 'preview' %}text-emerald-400
+                        {% else %}text-slate-500{% endif %}">
+                        Normalizar
+                    </span>
+                </div>
+                <div class="flex-1 mx-3 h-px {% if stage == 'preview' %}bg-emerald-500/40{% else %}bg-slate-600{% endif %}"></div>
+            </li>
+
+            <!-- Paso 4: Exportar -->
+            <li class="flex items-center">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0
+                        {% if stage == 'preview' %}bg-blue-500/20 border border-blue-500 text-blue-400
+                        {% else %}bg-slate-700 border border-slate-600 text-slate-500{% endif %}">
+                        4
+                    </div>
+                    <span class="text-xs font-medium hidden sm:block
+                        {% if stage == 'preview' %}text-blue-400{% else %}text-slate-500{% endif %}">
+                        Exportar
+                    </span>
+                </div>
+            </li>
+
+            {% endwith %}
+        </ol>
+    </div>
+
+    <!-- ── Mensaje de error global ────────────────────────────────────────── -->
+    {% if error %}
+    <div class="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 flex items-start gap-3">
+        <svg class="w-4 h-4 text-red-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+        </svg>
+        <p class="text-sm text-red-400"><span class="font-semibold">Error:</span> {{ error }}</p>
+    </div>
+    {% endif %}
+
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         PASO 1 — CARGAR ARCHIVO
+    ══════════════════════════════════════════════════════════════════════════ -->
+    {% if stage == 'upload' %}
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-5">
+        <div>
+            <h2 class="text-sm font-semibold text-white">Cargar Dataset</h2>
+            <p class="text-xs text-slate-400 mt-0.5">
+                Sube un archivo <span class="font-mono text-slate-300">.csv</span> o
+                <span class="font-mono text-slate-300">.json</span> con los datos de alertas SOC.
+            </p>
+        </div>
+
+        <form method="post" action="{% url 'pipeline_upload' %}" enctype="multipart/form-data" class="space-y-5">
+            {% csrf_token %}
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5">Archivo de datos</label>
+                <input type="file" name="file" accept=".json,.csv" required
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                           file:bg-slate-600 file:border-0 file:text-slate-300 file:rounded file:px-3 file:py-1 file:mr-3 file:text-xs cursor-pointer">
+                <p class="text-slate-500 text-xs mt-1.5">Formatos: .csv, .json — Máximo 10 MB</p>
+            </div>
+
+            <div>
+                <p class="text-xs font-medium text-slate-400 mb-2">Columnas requeridas por el modelo ML:</p>
+                <div class="flex flex-wrap gap-1.5">
+                    {% for col in required_cols %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-700/80 border border-slate-600 text-slate-300">{{ col }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <button type="submit"
+                class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/>
+                </svg>
+                Analizar archivo
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         PASO 2 — MAPEO DE COLUMNAS
+    ══════════════════════════════════════════════════════════════════════════ -->
+    {% if stage == 'map' %}
+    <div class="space-y-4">
+
+        <!-- Resumen de detección -->
+        <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-3 flex items-start gap-3">
+            <svg class="w-4 h-4 text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/>
+            </svg>
+            <div>
+                <p class="text-sm font-semibold text-amber-400">Columnas faltantes detectadas</p>
+                <p class="text-xs text-amber-300/70 mt-0.5">
+                    Archivo: <span class="font-mono text-amber-300">{{ filename }}</span> —
+                    Se detectaron <strong>{{ detected_cols|length }}</strong> columnas,
+                    faltan <strong>{{ missing_cols|length }}</strong> columnas requeridas.
+                    Mapea o ignora cada una para continuar.
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-5">
+            <div>
+                <h2 class="text-sm font-semibold text-white">Mapeo de Columnas</h2>
+                <p class="text-xs text-slate-400 mt-0.5">
+                    Selecciona qué columna de tu archivo equivale a cada campo requerido.
+                    Si ignoras una columna, se rellenará con "unknown" durante la limpieza.
+                </p>
+            </div>
+
+            <!-- Columnas detectadas -->
+            <div>
+                <p class="text-xs font-medium text-slate-400 mb-2">Columnas detectadas en el archivo:</p>
+                <div class="flex flex-wrap gap-1.5">
+                    {% for col in detected_cols %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-700 border border-slate-600 text-slate-300">{{ col }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+
+                <!-- Tabla de mapping -->
+                <div class="rounded-lg border border-slate-700 overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <thead>
+                            <tr class="bg-slate-900 border-b border-slate-700">
+                                <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Campo requerido (modelo ML)</th>
+                                <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Columna equivalente en tu archivo</th>
+                                <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide w-28">Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for col in missing_cols %}
+                            <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+                                <td class="px-4 py-3">
+                                    <span class="text-xs font-mono font-semibold text-amber-400">{{ col }}</span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <select name="map_{{ col }}"
+                                        class="bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 w-full max-w-xs">
+                                        <option value="__skip__">— Ignorar (se rellena con default) —</option>
+                                        {% for dcol in detected_cols %}
+                                        <option value="{{ dcol }}">{{ dcol }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td class="px-4 py-3">
+                                    {% if col == 'failed_login_attempts' %}
+                                        <span class="text-xs font-mono text-blue-400">int</span>
+                                    {% elif col == 'request_rate_per_min' %}
+                                        <span class="text-xs font-mono text-blue-400">float</span>
+                                    {% else %}
+                                        <span class="text-xs font-mono text-emerald-400">string</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="submit"
+                        class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        Aplicar mapping y continuar
+                    </button>
+                    <a href="{% url 'pipeline' %}"
+                        class="inline-flex items-center bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         PASO 3 — NORMALIZAR DATOS
+    ══════════════════════════════════════════════════════════════════════════ -->
+    {% if stage == 'normalize' %}
+    <div class="space-y-4">
+
+        <!-- Info -->
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
+            <div class="flex items-start justify-between">
+                <div>
+                    <h2 class="text-sm font-semibold text-white">Listo para normalizar</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        Archivo: <span class="font-mono text-slate-300">{{ filename }}</span>
+                        — <strong class="text-white">{{ total_records }}</strong> registros en cola.
+                    </p>
+                </div>
+            </div>
+
+            {% if missing_cols %}
+            <div class="bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
+                <p class="text-xs text-amber-400">
+                    <span class="font-semibold">Columnas no mapeadas</span> (se rellenarán con "unknown" o 0):
+                    <span class="font-mono">{{ missing_cols|join:", " }}</span>
+                </p>
+            </div>
+            {% endif %}
+
+            <!-- Operaciones que se aplicarán -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="bg-slate-700/40 border border-slate-600 rounded-md p-3 text-center">
+                    <p class="text-xs text-slate-300 font-medium">Eliminar duplicados</p>
+                    <p class="text-emerald-400 text-xs mt-1 font-mono">✓ Activo</p>
+                </div>
+                <div class="bg-slate-700/40 border border-slate-600 rounded-md p-3 text-center">
+                    <p class="text-xs text-slate-300 font-medium">Rellenar nulos</p>
+                    <p class="text-emerald-400 text-xs mt-1 font-mono">✓ Activo</p>
+                </div>
+                <div class="bg-slate-700/40 border border-slate-600 rounded-md p-3 text-center">
+                    <p class="text-xs text-slate-300 font-medium">Normalizar categorías</p>
+                    <p class="text-emerald-400 text-xs mt-1 font-mono">✓ Activo</p>
+                </div>
+                <div class="bg-slate-700/40 border border-slate-600 rounded-md p-3 text-center">
+                    <p class="text-xs text-slate-300 font-medium">Validar rangos</p>
+                    <p class="text-emerald-400 text-xs mt-1 font-mono">✓ Activo</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview datos en bruto -->
+        {% if preview_rows %}
+        <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+            <div class="px-5 py-3 border-b border-slate-700 flex items-center justify-between">
+                <p class="text-xs font-medium text-slate-400 uppercase tracking-wide">
+                    Vista previa — primeros {{ preview_rows|length }} registros (sin limpiar)
+                </p>
+                <span class="text-xs text-amber-400 font-medium">Sin procesar</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-900">
+                            <th class="px-3 py-2.5 font-medium text-slate-500 whitespace-nowrap">#</th>
+                            {% for col in detected_cols %}
+                            <th class="px-3 py-2.5 font-medium whitespace-nowrap
+                                {% if col in missing_cols %}text-amber-400{% else %}text-slate-400{% endif %}">
+                                {{ col }}
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in preview_rows %}
+                        <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+                            <td class="px-3 py-2 font-mono text-slate-600 text-xs">{{ forloop.counter }}</td>
+                            {% for val in row %}
+                            <td class="px-3 py-2 font-mono text-slate-400 whitespace-nowrap max-w-[8rem] truncate" title="{{ val }}">
+                                {% if val == '' or val == None %}
+                                    <span class="text-slate-600 italic">vacío</span>
+                                {% else %}
+                                    {{ val }}
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Acciones -->
+        <div class="flex gap-3">
+            <form method="post" action="{% url 'pipeline_normalize' %}">
+                {% csrf_token %}
+                <button type="submit"
+                    class="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2 rounded-md text-sm font-medium transition-colors">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
+                    </svg>
+                    Normalizar datos
+                </button>
+            </form>
+            <a href="{% url 'pipeline' %}"
+                class="inline-flex items-center bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                Cancelar
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         PASO 4 — PREVIEW LIMPIO + EXPORTAR
+    ══════════════════════════════════════════════════════════════════════════ -->
+    {% if stage == 'preview' %}
+    <div class="space-y-5">
+
+        <!-- Estadísticas de limpieza -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold font-mono text-white">{{ stats.total_original }}</p>
+                <p class="text-xs text-slate-400 mt-1">Originales</p>
+            </div>
+            <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold font-mono text-amber-400">{{ stats.duplicates_removed }}</p>
+                <p class="text-xs text-amber-400/70 mt-1">Duplicados eliminados</p>
+            </div>
+            <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold font-mono text-blue-400">{{ stats.nulls_filled }}</p>
+                <p class="text-xs text-blue-400/70 mt-1">Nulos rellenados</p>
+            </div>
+            <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold font-mono text-red-400">{{ stats.invalid_rows_removed }}</p>
+                <p class="text-xs text-red-400/70 mt-1">Filas inválidas</p>
+            </div>
+            <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold font-mono text-emerald-400">{{ stats.total_clean }}</p>
+                <p class="text-xs text-emerald-400/70 mt-1">Registros limpios</p>
+            </div>
+        </div>
+
+        <!-- Columnas faltantes del modelo -->
+        {% if stats.columns_missing %}
+        <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-3">
+            <p class="text-xs text-amber-400">
+                <span class="font-semibold">Columnas no incluidas en la exportación</span>
+                (no estaban en el archivo):
+                <span class="font-mono">{{ stats.columns_missing|join:", " }}</span>
+            </p>
+        </div>
+        {% endif %}
+
+        <!-- Panel de exportación -->
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
+            <div>
+                <h2 class="text-sm font-semibold text-white">Exportar Dataset Limpio</h2>
+                <p class="text-xs text-slate-400 mt-0.5">
+                    <strong class="text-white">{{ total_records }}</strong> registros normalizados y listos para el modelo ML.
+                    Elige el formato de exportación:
+                </p>
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+                <!-- Exportar CSV -->
+                <form method="post" action="{% url 'pipeline_export' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="format" value="csv">
+                    <button type="submit"
+                        class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+                        </svg>
+                        Exportar dataset (.csv)
+                    </button>
+                </form>
+
+                <!-- Exportar JSON -->
+                <form method="post" action="{% url 'pipeline_export' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="format" value="json">
+                    <button type="submit"
+                        class="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+                        </svg>
+                        Exportar dataset (.json)
+                    </button>
+                </form>
+
+                <!-- Nuevo pipeline -->
+                <a href="{% url 'pipeline' %}"
+                    class="inline-flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
+                    </svg>
+                    Nuevo pipeline
+                </a>
+            </div>
+        </div>
+
+        <!-- Preview datos limpios -->
+        <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+            <div class="px-5 py-3 border-b border-slate-700 flex items-center justify-between">
+                <p class="text-xs font-medium text-slate-400 uppercase tracking-wide">
+                    Dataset limpio — primeros {{ preview_rows|length }} de {{ total_records }} registros
+                </p>
+                <span class="inline-flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    Normalizado
+                </span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-900">
+                            <th class="px-3 py-2.5 font-medium text-slate-500 whitespace-nowrap">#</th>
+                            {% for col in required_cols %}
+                            <th class="px-3 py-2.5 font-medium text-slate-400 whitespace-nowrap">{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in preview_rows %}
+                        <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+                            <td class="px-3 py-2 font-mono text-slate-600 text-xs">{{ forloop.counter }}</td>
+                            {% for val in row %}
+                            <td class="px-3 py-2 font-mono text-slate-400 whitespace-nowrap max-w-[7rem] truncate" title="{{ val }}">
+                                {% if val == '' or val == None %}
+                                    <span class="text-slate-600">—</span>
+                                {% else %}
+                                    {{ val }}
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
