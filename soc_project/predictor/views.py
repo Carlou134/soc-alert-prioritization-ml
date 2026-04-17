@@ -20,7 +20,7 @@ from accounts.models import (
     log_action,
 )
 from .forms import PredictionForm, JSONPredictionForm
-from .models import Alert, PredictionLog
+from .models import Alert, PredictionLog, log_error
 from .utils import predict_alert, extract_valid_fields
 from .serializers import PredictionRequestSerializer
 from .pipeline import (
@@ -95,25 +95,32 @@ def predict_view(request):
         form = PredictionForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
-            result, probabilities = predict_alert(data)
-
-            PredictionLog.objects.create(
-                user=request.user,
-                input_data=data,
-                predicted_class=result,
-                probabilities=probabilities,
-                source='manual'
-            )
-            log_action(
-                request.user,
-                ACTION_PREDICT_MANUAL,
-                f'Predicción manual ejecutada. Resultado: {result}.',
-            )
+            try:
+                result, probabilities = predict_alert(data)
+                PredictionLog.objects.create(
+                    user=request.user,
+                    input_data=data,
+                    predicted_class=result,
+                    probabilities=probabilities,
+                    source='manual',
+                )
+                log_action(
+                    request.user,
+                    ACTION_PREDICT_MANUAL,
+                    f'Predicción manual ejecutada. Resultado: {result}.',
+                )
+            except Exception as exc:
+                log_error(request.user, 'predict_manual', str(exc))
+                messages.error(
+                    request,
+                    'Ocurrió un error al ejecutar la predicción. '
+                    'Verifique los datos ingresados e intente nuevamente.',
+                )
 
     return render(request, 'predictor/predict.html', {
         'form': form,
         'result': result,
-        'probabilities': probabilities
+        'probabilities': probabilities,
     })
 
 @login_required
@@ -128,23 +135,30 @@ def predict_json_view(request):
         form = JSONPredictionForm(request.POST)
         if form.is_valid():
             payload = form.cleaned_data['payload']
-            cleaned_payload = extract_valid_fields(payload)
-            missing_fields = [k for k, v in cleaned_payload.items() if v is None]
+            try:
+                cleaned_payload = extract_valid_fields(payload)
+                missing_fields = [k for k, v in cleaned_payload.items() if v is None]
 
-            if not missing_fields:
-                result, probabilities = predict_alert(cleaned_payload)
-
-                PredictionLog.objects.create(
-                    user=request.user,
-                    input_data=cleaned_payload,
-                    predicted_class=result,
-                    probabilities=probabilities,
-                    source='json'
-                )
-                log_action(
-                    request.user,
-                    ACTION_PREDICT_JSON,
-                    f'Predicción por JSON ejecutada. Resultado: {result}.',
+                if not missing_fields:
+                    result, probabilities = predict_alert(cleaned_payload)
+                    PredictionLog.objects.create(
+                        user=request.user,
+                        input_data=cleaned_payload,
+                        predicted_class=result,
+                        probabilities=probabilities,
+                        source='json',
+                    )
+                    log_action(
+                        request.user,
+                        ACTION_PREDICT_JSON,
+                        f'Predicción por JSON ejecutada. Resultado: {result}.',
+                    )
+            except Exception as exc:
+                log_error(request.user, 'predict_json', str(exc))
+                messages.error(
+                    request,
+                    'El payload JSON no pudo ser procesado. '
+                    'Verifique que los campos y valores sean correctos.',
                 )
 
     return render(request, 'predictor/predict_json.html', {
@@ -157,8 +171,38 @@ def predict_json_view(request):
 
 @login_required
 def history_view(request):
-    logs = PredictionLog.objects.filter(user=request.user).order_by('-created_at')
-    return render(request, 'predictor/history.html', {'logs': logs})
+    qs = PredictionLog.objects.filter(user=request.user).order_by('-created_at')
+
+    date_from = request.GET.get('date_from', '').strip()
+    if date_from:
+        qs = qs.filter(created_at__date__gte=date_from)
+
+    date_to = request.GET.get('date_to', '').strip()
+    if date_to:
+        qs = qs.filter(created_at__date__lte=date_to)
+
+    source_filter = request.GET.get('source', '').strip()
+    if source_filter:
+        qs = qs.filter(source=source_filter)
+
+    class_filter = request.GET.get('clase', '').strip()
+    if class_filter:
+        qs = qs.filter(predicted_class=class_filter)
+
+    total_count = qs.count()
+    paginator = Paginator(qs, 15)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'predictor/history.html', {
+        'page_obj': page_obj,
+        'date_from': date_from,
+        'date_to': date_to,
+        'source_filter': source_filter,
+        'class_filter': class_filter,
+        'total_count': total_count,
+        'source_choices': ['manual', 'json', 'api', 'upload_csv', 'upload_json'],
+        'class_choices': ['benigno', 'a_investigar', 'malicioso'],
+    })
 
 
 @login_required
@@ -205,43 +249,59 @@ def upload_alerts_view(request):
     processed = []
     failed = []
 
-    for index, record in enumerate(records, start=1):
-        serializer = PredictionRequestSerializer(data=record)
-        if serializer.is_valid():
-            data = serializer.validated_data
-            predicted_class, probabilities = predict_alert(data)
+    try:
+        for index, record in enumerate(records, start=1):
+            serializer = PredictionRequestSerializer(data=record)
+            if not serializer.is_valid():
+                failed.append({'record': index, 'errors': _friendly_serializer_errors(serializer.errors)})
+                continue
 
-            PredictionLog.objects.create(
-                user=request.user,
-                input_data=data,
-                predicted_class=predicted_class,
-                probabilities=probabilities,
-                source=source,
-            )
+            try:
+                data = serializer.validated_data
+                predicted_class, probabilities = predict_alert(data)
 
-            Alert.objects.create(
-                event_category=data.get('event_category', ''),
-                attack_type=data.get('attack_type', ''),
-                attack_signature=data.get('attack_signature', ''),
-                protocol=data.get('protocol', ''),
-                traffic_type=data.get('traffic_type', ''),
-                mitre_tactic=data.get('mitre_tactic', ''),
-                kill_chain_stage=data.get('kill_chain_stage', ''),
-                failed_login_attempts=data.get('failed_login_attempts', 0),
-                request_rate_per_min=data.get('request_rate_per_min', 0.0),
-                ids_ips_alert=data.get('ids_ips_alert', ''),
-                malware_indicator=data.get('malware_indicator', ''),
-                asset_criticality=data.get('asset_criticality', ''),
-                log_source=data.get('log_source', ''),
-                firewall_action=data.get('firewall_action', ''),
-                severity=data.get('severity', ''),
-                label=record.get('label', ''),
-                created_by=request.user,
-            )
+                PredictionLog.objects.create(
+                    user=request.user,
+                    input_data=data,
+                    predicted_class=predicted_class,
+                    probabilities=probabilities,
+                    source=source,
+                )
+                Alert.objects.create(
+                    event_category=data.get('event_category', ''),
+                    attack_type=data.get('attack_type', ''),
+                    attack_signature=data.get('attack_signature', ''),
+                    protocol=data.get('protocol', ''),
+                    traffic_type=data.get('traffic_type', ''),
+                    mitre_tactic=data.get('mitre_tactic', ''),
+                    kill_chain_stage=data.get('kill_chain_stage', ''),
+                    failed_login_attempts=data.get('failed_login_attempts', 0),
+                    request_rate_per_min=data.get('request_rate_per_min', 0.0),
+                    ids_ips_alert=data.get('ids_ips_alert', ''),
+                    malware_indicator=data.get('malware_indicator', ''),
+                    asset_criticality=data.get('asset_criticality', ''),
+                    log_source=data.get('log_source', ''),
+                    firewall_action=data.get('firewall_action', ''),
+                    severity=data.get('severity', ''),
+                    label=record.get('label', ''),
+                    created_by=request.user,
+                )
+                processed.append({'record': index, 'predicted_class': predicted_class})
 
-            processed.append({'record': index, 'predicted_class': predicted_class})
-        else:
-            failed.append({'record': index, 'errors': serializer.errors})
+            except Exception as exc:
+                log_error(request.user, 'upload_alerts', f'Registro #{index}: {exc}')
+                failed.append({
+                    'record': index,
+                    'errors': {'_error': ['Error interno al procesar este registro. El resto del archivo se procesó normalmente.']},
+                })
+
+    except Exception as exc:
+        log_error(request.user, 'upload_alerts', str(exc))
+        context['error'] = (
+            'Ocurrió un error inesperado durante el procesamiento del archivo. '
+            'Verifique el formato e intente nuevamente.'
+        )
+        return render(request, 'predictor/upload_alerts.html', context)
 
     if processed:
         log_action(
@@ -251,7 +311,7 @@ def upload_alerts_view(request):
         )
         messages.success(
             request,
-            f'Alertas importadas correctamente: {len(processed)} de {len(records)} registros almacenados.'
+            f'Alertas importadas: {len(processed)} de {len(records)} registros procesados correctamente.'
         )
         return redirect('alert_list')
 
@@ -264,6 +324,33 @@ def upload_alerts_view(request):
         'errors': len(failed),
     }
     return render(request, 'predictor/upload_alerts.html', context)
+
+
+def _friendly_serializer_errors(errors: dict) -> dict:
+    """Convierte errores de serializer en mensajes amigables para el usuario."""
+    friendly = {}
+    field_names = {
+        'event_category': 'Categoría de evento',
+        'attack_type': 'Tipo de ataque',
+        'attack_signature': 'Firma de ataque',
+        'protocol': 'Protocolo',
+        'traffic_type': 'Tipo de tráfico',
+        'mitre_tactic': 'Táctica MITRE',
+        'kill_chain_stage': 'Etapa kill chain',
+        'failed_login_attempts': 'Intentos de login fallidos',
+        'request_rate_per_min': 'Tasa de peticiones/min',
+        'ids_ips_alert': 'Alerta IDS/IPS',
+        'malware_indicator': 'Indicador de malware',
+        'asset_criticality': 'Criticidad del activo',
+        'log_source': 'Fuente de log',
+        'firewall_action': 'Acción del firewall',
+        'severity': 'Severidad',
+        'label': 'Etiqueta',
+    }
+    for field, messages_list in errors.items():
+        label = field_names.get(field, field)
+        friendly[label] = [str(m) for m in messages_list]
+    return friendly
 
 
 @login_required
