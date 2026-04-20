@@ -95,3 +95,17 @@ def predict_alert(data: dict):
 
 def extract_valid_fields(data: dict) -> dict:
     return {field: data.get(field) for field in EXPECTED_FIELDS}
+
+
+# Pesos por clase para el cálculo del risk_score (0.0 → 1.0).
+# benigno = 0, a_investigar = 0.5, malicioso = 1.0
+_RISK_WEIGHTS = {'benigno': 0.0, 'a_investigar': 0.5, 'malicioso': 1.0}
+
+
+def calculate_risk_score(probabilities: dict) -> float:
+    """Devuelve un puntaje de riesgo entre 0.0 y 1.0 basado en las
+    probabilidades del modelo. A mayor probabilidad de 'malicioso', mayor score."""
+    return round(
+        sum(probabilities.get(cls, 0.0) * w for cls, w in _RISK_WEIGHTS.items()),
+        4,
+    )

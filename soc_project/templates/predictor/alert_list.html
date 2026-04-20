@@ -13,10 +13,25 @@
                 {{ total_count }} alerta{{ total_count|pluralize }} en total
             </p>
         </div>
-        <a href="{% url 'upload_alerts' %}"
-           class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium">
-            + Subir archivo
-        </a>
+        <div class="flex items-center gap-2">
+            {% if pending_count > 0 %}
+            <form method="post" action="{% url 'predict_pending' %}">
+                {% csrf_token %}
+                <button type="submit"
+                    class="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                    </svg>
+                    Clasificar pendientes
+                    <span class="bg-amber-700 text-amber-100 text-xs font-bold px-1.5 py-0.5 rounded-full">{{ pending_count }}</span>
+                </button>
+            </form>
+            {% endif %}
+            <a href="{% url 'upload_alerts' %}"
+               class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+                + Subir archivo
+            </a>
+        </div>
     </div>
 
     <!-- Django messages -->
@@ -47,7 +62,7 @@
     <!-- Filtros y búsqueda -->
     <form method="get" class="bg-slate-800 border border-slate-700 rounded-lg p-4">
         {% if mine == '1' %}<input type="hidden" name="mine" value="1">{% endif %}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
 
             <!-- Búsqueda texto -->
             <div class="lg:col-span-2">
@@ -66,6 +81,19 @@
                     {% for sv in severity_choices %}
                     <option value="{{ sv }}" {% if sv == severity_filter %}selected{% endif %}>{{ sv }}</option>
                     {% endfor %}
+                </select>
+            </div>
+
+            <!-- Filtro clasificación ML -->
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Clasificación ML</label>
+                <select name="predicted_class"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todas</option>
+                    <option value="malicioso"    {% if class_filter == 'malicioso' %}selected{% endif %}>Malicioso</option>
+                    <option value="a_investigar" {% if class_filter == 'a_investigar' %}selected{% endif %}>A investigar</option>
+                    <option value="benigno"      {% if class_filter == 'benigno' %}selected{% endif %}>Benigno</option>
+                    <option value="pending"      {% if class_filter == 'pending' %}selected{% endif %}>Pendiente</option>
                 </select>
             </div>
 
@@ -115,6 +143,8 @@
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-800/80">
                         <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">ID</th>
+                        <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Clasificación ML</th>
+                        <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Risk Score</th>
                         <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Severidad</th>
                         <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Categoría</th>
                         <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Tipo ataque</th>
@@ -130,6 +160,44 @@
                     {% for alert in page_obj %}
                     <tr class="hover:bg-slate-700/30 transition-colors">
                         <td class="px-4 py-3 text-xs font-mono text-slate-500">#{{ alert.id }}</td>
+
+                        <!-- Clasificación ML -->
+                        <td class="px-4 py-3">
+                            {% if alert.predicted_class == 'malicioso' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">Malicioso</span>
+                            {% elif alert.predicted_class == 'a_investigar' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">A investigar</span>
+                            {% elif alert.predicted_class == 'benigno' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Benigno</span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-600/50 text-slate-400 border border-slate-600">Pendiente</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Risk Score -->
+                        <td class="px-4 py-3">
+                            {% if alert.risk_score is not None %}
+                                {% if alert.risk_score >= 0.7 %}
+                                    <span class="inline-flex items-center gap-1 text-xs font-semibold text-red-400">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-red-400 inline-block"></span>
+                                        {{ alert.risk_score|floatformat:2 }}
+                                    </span>
+                                {% elif alert.risk_score >= 0.3 %}
+                                    <span class="inline-flex items-center gap-1 text-xs font-semibold text-amber-400">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>
+                                        {{ alert.risk_score|floatformat:2 }}
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+                                        {{ alert.risk_score|floatformat:2 }}
+                                    </span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-xs text-slate-600">—</span>
+                            {% endif %}
+                        </td>
+
                         <td class="px-4 py-3">
                             {% if alert.severity|lower == 'high' or alert.severity|lower == 'critical' or alert.severity|lower == 'alta' or alert.severity|lower == 'crítica' %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">{{ alert.severity }}</span>

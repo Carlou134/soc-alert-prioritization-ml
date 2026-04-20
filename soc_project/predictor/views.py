@@ -21,7 +21,7 @@ from accounts.models import (
 )
 from .forms import PredictionForm, JSONPredictionForm
 from .models import Alert, PredictionLog, log_error
-from .utils import predict_alert, extract_valid_fields
+from .utils import predict_alert, extract_valid_fields, calculate_risk_score
 from .serializers import PredictionRequestSerializer
 from .pipeline import (
     REQUIRED_COLUMNS,
@@ -259,6 +259,7 @@ def upload_alerts_view(request):
             try:
                 data = serializer.validated_data
                 predicted_class, probabilities = predict_alert(data)
+                risk_score = calculate_risk_score(probabilities)
 
                 PredictionLog.objects.create(
                     user=request.user,
@@ -284,9 +285,12 @@ def upload_alerts_view(request):
                     firewall_action=data.get('firewall_action', ''),
                     severity=data.get('severity', ''),
                     label=record.get('label', ''),
+                    predicted_class=predicted_class,
+                    risk_score=risk_score,
+                    probabilities=probabilities,
                     created_by=request.user,
                 )
-                processed.append({'record': index, 'predicted_class': predicted_class})
+                processed.append({'record': index, 'predicted_class': predicted_class, 'risk_score': risk_score})
 
             except Exception as exc:
                 log_error(request.user, 'upload_alerts', f'Registro #{index}: {exc}')
@@ -380,6 +384,13 @@ def alert_list_view(request):
     if severity_filter:
         qs = qs.filter(severity__iexact=severity_filter)
 
+    # Filtro por clase ML ('pending' → sin clasificar)
+    class_filter = request.GET.get('predicted_class', '').strip()
+    if class_filter == 'pending':
+        qs = qs.filter(predicted_class='')
+    elif class_filter:
+        qs = qs.filter(predicted_class=class_filter)
+
     # Filtro por usuario: admins pueden filtrar por cualquier usuario;
     # usuarios normales solo pueden aplicar el toggle "mine"
     user_filter = request.GET.get('user', '').strip()
@@ -400,6 +411,12 @@ def alert_list_view(request):
         .order_by('severity')
     )
 
+    # Contador de alertas pendientes (sin clasificar) para mostrar el botón
+    pending_base = Alert.objects.filter(predicted_class='')
+    if not is_admin:
+        pending_base = pending_base.filter(created_by=request.user)
+    pending_count = pending_base.count()
+
     paginator = Paginator(qs, 20)
     page_obj = paginator.get_page(request.GET.get('page'))
 
@@ -409,13 +426,66 @@ def alert_list_view(request):
         'mine': mine,
         'search': search,
         'severity_filter': severity_filter,
+        'class_filter': class_filter,
         'user_filter': user_filter,
         'date_from': date_from,
         'date_to': date_to,
         'severity_choices': severity_choices,
+        'pending_count': pending_count,
         'total_count': qs.count(),
     }
     return render(request, 'predictor/alert_list.html', context)
+
+
+@login_required
+def predict_pending_view(request):
+    """Clasifica todas las alertas sin predicción y asigna risk_score."""
+    if request.method != 'POST':
+        return redirect('alert_list')
+
+    is_admin = request.user.profile.is_admin
+    qs = Alert.objects.filter(predicted_class='')
+    if not is_admin:
+        qs = qs.filter(created_by=request.user)
+
+    classified = 0
+    for alert in qs.iterator():
+        data = {
+            'event_category': alert.event_category,
+            'attack_type': alert.attack_type,
+            'attack_signature': alert.attack_signature,
+            'protocol': alert.protocol,
+            'traffic_type': alert.traffic_type,
+            'mitre_tactic': alert.mitre_tactic,
+            'kill_chain_stage': alert.kill_chain_stage,
+            'failed_login_attempts': alert.failed_login_attempts,
+            'request_rate_per_min': alert.request_rate_per_min,
+            'ids_ips_alert': alert.ids_ips_alert,
+            'malware_indicator': alert.malware_indicator,
+            'asset_criticality': alert.asset_criticality,
+            'log_source': alert.log_source,
+            'firewall_action': alert.firewall_action,
+            'severity': alert.severity,
+        }
+        try:
+            predicted_class, probabilities = predict_alert(data)
+            alert.predicted_class = predicted_class
+            alert.risk_score = calculate_risk_score(probabilities)
+            alert.probabilities = probabilities
+            alert.save(update_fields=['predicted_class', 'risk_score', 'probabilities'])
+            classified += 1
+        except Exception as exc:
+            log_error(request.user, 'predict_pending', str(exc))
+
+    if classified:
+        messages.success(
+            request,
+            f'{classified} alerta{"s" if classified != 1 else ""} clasificada{"s" if classified != 1 else ""} correctamente.',
+        )
+    else:
+        messages.info(request, 'No había alertas pendientes de clasificar.')
+
+    return redirect('alert_list')
 
 
 def _normalize_keys(record):
@@ -707,6 +777,45 @@ def pipeline_export_view(request):
             'No se pudo generar el archivo de exportación. Intente nuevamente.',
         )
         return redirect('pipeline_preview')
+
+    # Guardar alertas en BD con predicciones ML
+    saved_count = 0
+    for record in clean:
+        try:
+            predicted_class, probabilities = predict_alert(record)
+            risk_score = calculate_risk_score(probabilities)
+            Alert.objects.create(
+                event_category=record.get('event_category', ''),
+                attack_type=record.get('attack_type', ''),
+                attack_signature=record.get('attack_signature', ''),
+                protocol=record.get('protocol', ''),
+                traffic_type=record.get('traffic_type', ''),
+                mitre_tactic=record.get('mitre_tactic', ''),
+                kill_chain_stage=record.get('kill_chain_stage', ''),
+                failed_login_attempts=int(record.get('failed_login_attempts') or 0),
+                request_rate_per_min=float(record.get('request_rate_per_min') or 0.0),
+                ids_ips_alert=record.get('ids_ips_alert', ''),
+                malware_indicator=record.get('malware_indicator', ''),
+                asset_criticality=record.get('asset_criticality', ''),
+                log_source=record.get('log_source', ''),
+                firewall_action=record.get('firewall_action', ''),
+                severity=record.get('severity', ''),
+                label=record.get('label', ''),
+                predicted_class=predicted_class,
+                risk_score=risk_score,
+                probabilities=probabilities,
+                created_by=request.user,
+            )
+            saved_count += 1
+        except Exception as exc:
+            log_error(request.user, 'pipeline_export_save', str(exc))
+
+    if saved_count:
+        messages.success(
+            request,
+            f'{saved_count} alerta{"s" if saved_count != 1 else ""} guardada{"s" if saved_count != 1 else ""} '
+            f'en la base de datos con clasificación ML y risk score.',
+        )
 
     log_action(
         request.user,
