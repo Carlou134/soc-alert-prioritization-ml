@@ -49,22 +49,130 @@ MODEL_FIELDS = [
     'severity',
 ]
 
+# ---------------------------------------------------------------------------
+# Mapeos de vocabulario: traducen valores del SOC real al esquema de entrenamiento
+# ---------------------------------------------------------------------------
+
+# El modelo fue entrenado con: unknown (74%), medium (26%), critical (0.04%)
+# high y low no existen en el dataset de entrenamiento → se mapean a unknown
+MAP_SEVERITY = {
+    'critical'     : 'critical',
+    'high'         : 'unknown',
+    'medium'       : 'medium',
+    'low'          : 'unknown',
+    'informational': 'unknown',
+    'unknown'      : 'unknown',
+    # Wazuh numérico
+    '15': 'critical', '12': 'critical',
+    '10': 'medium',   '7' : 'medium',
+    '3' : 'unknown',  '1' : 'unknown',
+}
+
+MAP_EVENT_CATEGORY = {
+    'malware'              : 'malware_activity',
+    'malware_activity'     : 'malware_activity',
+    'intrusion_attempt'    : 'intrusion_attempt',
+    'lateral_movement'     : 'lateral_movement',
+    'lateral movement'     : 'lateral_movement',
+    'reconnaissance'       : 'reconnaissance',
+    'command_and_control'  : 'command_and_control',
+    'command and control'  : 'command_and_control',
+    'data_exfiltration'    : 'data_exfiltration',
+    'exfiltration'         : 'data_exfiltration',
+    'suspicious_activity'  : 'suspicious_activity',
+    'suspicious activity'  : 'suspicious_activity',
+    'credential_access'    : 'credential_access',
+    'impact'               : 'impact',
+    'execution'            : 'execution',
+    'persistence'          : 'persistence',
+    'privilege_escalation' : 'privilege_escalation',
+    'evasion'              : 'evasion',
+    'web_attack'           : 'web_attack',
+}
+
+# firewall_action: el modelo solo vio allowed, blocked, monitored, unknown
+MAP_FIREWALL = {
+    'allow'     : 'allowed',
+    'allowed'   : 'allowed',
+    'deny'      : 'blocked',
+    'denied'    : 'blocked',
+    'block'     : 'blocked',
+    'blocked'   : 'blocked',
+    'quarantine': 'blocked',
+    'alert'     : 'monitored',
+    'monitor'   : 'monitored',
+    'monitored' : 'monitored',
+    'unknown'   : 'unknown',
+}
+
+# ids_ips_alert: el SOC real envía yes/no; el modelo conoce los valores textuales
+MAP_IDS_ALERT = {
+    'yes'                          : 'suspicious pattern',
+    'no'                           : 'no alert',
+    'suspicious pattern'           : 'suspicious pattern',
+    'no alert'                     : 'no alert',
+    'confirmed malicious indicator': 'confirmed malicious indicator',
+    'behavior anomaly'             : 'suspicious pattern',
+    'unknown'                      : 'unknown',
+}
+
+MAP_MITRE_TACTIC = {
+    'initial access'      : 'initial access',
+    'initialaccess'       : 'initial access',
+    'lateral movement'    : 'lateral movement',
+    'lateralmovement'     : 'lateral movement',
+    'command and control' : 'command and control',
+    'commandandcontrol'   : 'command and control',
+    'credential access'   : 'credential access',
+    'credentialaccess'    : 'credential access',
+    'execution'           : 'execution',
+    'exfiltration'        : 'exfiltration',
+    'impact'              : 'impact',
+    'reconnaissance'      : 'reconnaissance',
+    'discovery'           : 'discovery',
+    'persistence'         : 'persistence',
+    'privilege escalation': 'privilege escalation',
+    'privilegeescalation' : 'privilege escalation',
+    'defense evasion'     : 'defense evasion',
+    'defenseevasion'      : 'defense evasion',
+    'collection'          : 'collection',
+    'unknown'             : 'unknown',
+}
+
 
 def normalize_input(data: dict) -> dict:
-    normalized = {}
-    for field in MODEL_FIELDS:
-        value = data.get(field)
-        if isinstance(value, str):
-            value = value.strip().lower()
-        normalized[field] = value
-    return normalized
+    """
+    Traduce los valores crudos del SOC real al vocabulario que usó el modelo
+    durante el entrenamiento, luego retorna solo los MODEL_FIELDS.
+    """
+    raw = {k: str(v).strip().lower() for k, v in data.items() if v is not None}
+
+    return {
+        'event_category'       : MAP_EVENT_CATEGORY.get(
+                                     raw.get('event_category', ''), 'other'),
+        'protocol'             : raw.get('protocol', 'tcp'),
+        'traffic_type'         : raw.get('traffic_type', 'tcp'),
+        'mitre_tactic'         : MAP_MITRE_TACTIC.get(
+                                     raw.get('mitre_tactic', ''), 'unknown'),
+        'kill_chain_stage'     : raw.get('kill_chain_stage', 'unknown'),
+        'failed_login_attempts': int(float(raw.get('failed_login_attempts', 0))),
+        'request_rate_per_min' : float(raw.get('request_rate_per_min', 0.0)),
+        'ids_ips_alert'        : MAP_IDS_ALERT.get(
+                                     raw.get('ids_ips_alert', ''), 'unknown'),
+        'asset_criticality'    : raw.get('asset_criticality', 'medium'),
+        'log_source'           : raw.get('log_source', 'unknown'),
+        'firewall_action'      : MAP_FIREWALL.get(
+                                     raw.get('firewall_action', ''), 'unknown'),
+        'severity'             : MAP_SEVERITY.get(
+                                     raw.get('severity', ''), 'unknown'),
+    }
 
 
 def preprocess_input(data: dict) -> pd.DataFrame:
     clean_data = normalize_input(data)
     df = pd.DataFrame([clean_data])
 
-    for col in df.select_dtypes(include='object').columns:
+    for col in df.select_dtypes(include=['object', 'str']).columns:
         df[col] = df[col].astype(str).str.strip().str.lower()
 
     df_encoded = pd.get_dummies(df, drop_first=False)
