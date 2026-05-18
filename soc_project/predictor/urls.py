@@ -5,6 +5,7 @@ from .views import (
     history_view,
     predict_json_view,
     predict_view,
+    predict_pending_view,
     upload_alerts_view,
     pipeline_view,
     pipeline_upload_view,
@@ -22,6 +23,7 @@ urlpatterns = [
     path('upload-alerts/', upload_alerts_view, name='upload_alerts'),
     path('history/', history_view, name='history'),
     path('alerts/', alert_list_view, name='alert_list'),
+    path('alerts/predict-pending/', predict_pending_view, name='predict_pending'),
     # HU009 — Pipeline de normalización
     path('pipeline/', pipeline_view, name='pipeline'),
     path('pipeline/upload/', pipeline_upload_view, name='pipeline_upload'),

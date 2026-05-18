@@ -143,7 +143,7 @@ def clean_records(records: list) -> tuple:
     duplicates_removed = initial_count - len(df)
 
     # 3. Strip de columnas de texto
-    for col in df.select_dtypes(include='object').columns:
+    for col in df.select_dtypes(include=['object', 'str']).columns:
         df[col] = df[col].astype(str).str.strip()
 
     # 4. Normalizar columnas categóricas a minúsculas
@@ -157,7 +157,7 @@ def clean_records(records: list) -> tuple:
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
     # Reemplazar strings 'nan' que quedaron de conversiones anteriores
-    for col in df.select_dtypes(include='object').columns:
+    for col in df.select_dtypes(include=['object', 'str']).columns:
         df[col] = df[col].replace('nan', np.nan)
 
     # 6. Contar nulos antes de rellenar
