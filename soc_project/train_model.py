@@ -11,7 +11,7 @@ import os
 # ── Carga de datos ──────────────────────────────────────────────────────────
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(BASE_DIR, 'train_dataset_final.csv')
+file_path = os.path.join(BASE_DIR, 'microsoft_dataset_mitre_final.csv')
 df = pd.read_csv(file_path)
 print("Dimensiones iniciales:", df.shape)
 print(df.head())
@@ -93,10 +93,13 @@ print("Dimensiones luego de validar rangos:", df_clean.shape)
 
 # ── Preparación de features ──────────────────────────────────────────────────
 
-cols_excluir = ["label", "attack_type", "attack_signature", "malware_indicator"]
+cols_excluir = ["label", "attack_type", "attack_signature", "malware_indicator", "correlation_id"]
 
 X = df_clean.drop(columns=cols_excluir, errors="ignore")
 y = df_clean["label"]
+
+# groups para GroupShuffleSplit: garantiza que ningún incidente aparezca en train Y test
+groups = df_clean["correlation_id"].values if "correlation_id" in df_clean.columns else None
 
 X_encoded = pd.get_dummies(X, drop_first=False)
 
@@ -113,7 +116,7 @@ print(y.value_counts())
 
 # ── Feature engineering adicional ────────────────────────────────────────────
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GroupShuffleSplit
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (accuracy_score, classification_report,
                               f1_score, recall_score,
@@ -144,11 +147,23 @@ if "anomaly_score" in X_encoded.columns and "asset_criticality_high" in X_encode
 
 print("Features finales:", X_encoded.shape)
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X_encoded, y, test_size=0.2, random_state=42, stratify=y)
+if groups is not None:
+    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    train_idx, test_idx = next(gss.split(X_encoded, y, groups=groups))
+    X_train = X_encoded.iloc[train_idx]
+    X_test  = X_encoded.iloc[test_idx]
+    y_train = y.iloc[train_idx]
+    y_test  = y.iloc[test_idx]
+    print("Split por CorrelationId (sin leakage entre incidentes)")
+else:
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_encoded, y, test_size=0.2, random_state=42, stratify=y)
+    print("Fallback: train_test_split sin group constraint")
 
 print("X_train:", X_train.shape)
 print("X_test :", X_test.shape)
+print("Distribución train:", y_train.value_counts().to_dict())
+print("Distribución test :", y_test.value_counts().to_dict())
 
 # ── Stage 1: Malicioso vs (Benigno + A_Investigar) ───────────────────────────
 
@@ -188,7 +203,26 @@ rf_s2 = RandomForestClassifier(
     n_jobs=-1
 )
 rf_s2.fit(X_train_s2, y_train_s2)
-print(f"Stage 2 OOB Score: {rf_s2.oob_score_:.4f}")
+print(f"Stage 2 OOB Score (full): {rf_s2.oob_score_:.4f}")
+
+# Feature pruning: reentrenar Stage 2 sin features de baja importancia
+_fi_s2 = pd.Series(rf_s2.feature_importances_, index=X_encoded.columns)
+s2_cols = _fi_s2[_fi_s2 > 0.005].index.tolist()
+print(f"Stage 2 feature pruning: {len(X_encoded.columns)} → {len(s2_cols)} features (importancia > 0.005)")
+
+rf_s2 = RandomForestClassifier(
+    n_estimators=500,
+    max_depth=15,
+    min_samples_split=5,
+    min_samples_leaf=2,
+    max_features="sqrt",
+    random_state=42,
+    class_weight="balanced_subsample",
+    oob_score=True,
+    n_jobs=-1
+)
+rf_s2.fit(X_train_s2[s2_cols], y_train_s2)
+print(f"Stage 2 OOB Score (pruned): {rf_s2.oob_score_:.4f}")
 
 # ── Calibración Platt (sigmoid) sobre OOB probs de Stage 2 ───────────────────
 # Las probabilidades OOB son out-of-sample para cada árbol → sin leakage.
@@ -222,14 +256,14 @@ idx_ben_s2 = list(rf_s2_cal.classes_).index(0) if 0 in rf_s2_cal.classes_ else 0
 def predict_hierarchical(X, t1=0.5, t2=0.5):
     """Stage 1 → Malicioso si P(Malicioso) >= t1. Stage 2 calibrado → A_Investigar si P >= t2."""
     is_mal = rf_s1.predict_proba(X)[:, idx_mal_s1] >= t1
-    is_inv = rf_s2_cal.predict_proba(X)[:, idx_inv_s2] >= t2
+    is_inv = rf_s2_cal.predict_proba(X[s2_cols])[:, idx_inv_s2] >= t2
     return np.where(is_mal, 2, np.where(is_inv, 1, 0))
 
 
 def composite_proba(X):
     """Probabilidades compuestas: P(clase) = P(Stage1) * P(Stage2_calibrado|no-Malicioso)."""
     p_mal = rf_s1.predict_proba(X)[:, idx_mal_s1]
-    p_s2  = rf_s2_cal.predict_proba(X)
+    p_s2  = rf_s2_cal.predict_proba(X[s2_cols])
     out   = np.zeros((len(X), 3))
     out[:, 2] = p_mal
     out[:, 0] = (1 - p_mal) * p_s2[:, idx_ben_s2]
@@ -319,7 +353,7 @@ fi_s1 = pd.DataFrame({
 }).sort_values("importance", ascending=False)
 
 fi_s2 = pd.DataFrame({
-    "feature"   : X_encoded.columns,
+    "feature"   : s2_cols,
     "importance": rf_s2.feature_importances_
 }).sort_values("importance", ascending=False)
 
@@ -483,6 +517,25 @@ _NG = {0: "Benigno", 1: "A_Investigar", 2: "Malicioso"}
 alertas_enc = pd.get_dummies(alertas_test, drop_first=False)
 alertas_enc = alertas_enc.reindex(columns=X_encoded.columns, fill_value=0)
 
+# Features de incidente: alertas individuales se tratan como incidente de 1 evidencia
+if "incident_evidence_count" in alertas_enc.columns:
+    alertas_enc["incident_evidence_count"]   = 1
+    alertas_enc["incident_category_count"]   = 1
+    alertas_enc["incident_log_source_count"] = 1
+if "incident_max_anomaly" in alertas_enc.columns:
+    alertas_enc["incident_max_anomaly"]  = alertas_test["anomaly_score"].values
+    alertas_enc["incident_mean_anomaly"] = alertas_test["anomaly_score"].values
+if "incident_has_high_asset" in alertas_enc.columns:
+    alertas_enc["incident_has_high_asset"] = (
+        alertas_test["asset_criticality"].str.lower() == "high").astype(int).values
+if "incident_has_confirmed" in alertas_enc.columns:
+    alertas_enc["incident_has_confirmed"] = (
+        alertas_test["ids_ips_alert"].str.lower().str.contains("confirmed", na=False)
+    ).astype(int).values
+# OS desconocido para alertas de prueba (no tienen OSFamily)
+if "os_family_unknown" in alertas_enc.columns:
+    alertas_enc["os_family_unknown"] = 1
+
 _mc_t = [c for c in alertas_enc.columns if c.startswith("mitre_t")]
 alertas_enc["n_mitre_techniques"] = alertas_enc[_mc_t].sum(axis=1).astype(int)
 if "anomaly_score" in alertas_enc.columns and "asset_criticality_high" in alertas_enc.columns:
@@ -518,6 +571,7 @@ artifact = {
     "model_s1"         : rf_s1,
     "model_s2"         : rf_s2_cal,
     "training_columns" : X_encoded.columns.tolist(),
+    "s2_columns"       : s2_cols,
     "target_classes"   : [0, 1, 2],
     "thresholds"       : {"t1": best_t1, "t2": best_t2},
     "stage1_classes"   : rf_s1.classes_.tolist(),
