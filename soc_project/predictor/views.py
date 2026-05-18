@@ -693,6 +693,43 @@ def pipeline_normalize_view(request):
 
         request.session['pipeline_clean_records'] = clean
         request.session['pipeline_stats'] = stats
+        request.session['pipeline_already_saved'] = False
+
+        saved_count = 0
+        failed_count = 0
+        for record in clean:
+            try:
+                predicted_class, probabilities = predict_alert(record)
+                risk_score = calculate_risk_score(probabilities)
+                Alert.objects.create(
+                    event_category=record.get('event_category', ''),
+                    attack_type=record.get('attack_type', ''),
+                    attack_signature=record.get('attack_signature', ''),
+                    protocol=record.get('protocol', ''),
+                    traffic_type=record.get('traffic_type', ''),
+                    mitre_tactic=record.get('mitre_tactic', ''),
+                    kill_chain_stage=record.get('kill_chain_stage', ''),
+                    failed_login_attempts=int(record.get('failed_login_attempts') or 0),
+                    request_rate_per_min=float(record.get('request_rate_per_min') or 0.0),
+                    ids_ips_alert=record.get('ids_ips_alert', ''),
+                    malware_indicator=record.get('malware_indicator', ''),
+                    asset_criticality=record.get('asset_criticality', ''),
+                    log_source=record.get('log_source', ''),
+                    firewall_action=record.get('firewall_action', ''),
+                    severity=record.get('severity', ''),
+                    label=record.get('label', ''),
+                    predicted_class=predicted_class,
+                    risk_score=risk_score,
+                    probabilities=probabilities,
+                    created_by=request.user,
+                )
+                saved_count += 1
+            except Exception as exc:
+                log_error(request.user, 'pipeline_normalize_save', str(exc))
+                failed_count += 1
+
+        request.session['pipeline_saved_count'] = saved_count
+        request.session['pipeline_failed_count'] = failed_count
 
         log_action(
             request.user,
@@ -701,7 +738,8 @@ def pipeline_normalize_view(request):
                 f'Ejecutó pipeline de normalización sobre "{filename}". '
                 f'Registros procesados: {stats["total_clean"]}. '
                 f'Duplicados eliminados: {stats["duplicates_removed"]}. '
-                f'Nulos rellenados: {stats["nulls_filled"]}.'
+                f'Nulos rellenados: {stats["nulls_filled"]}. '
+                f'Alertas guardadas: {saved_count}.'
             ),
         )
         return redirect('pipeline_preview')
@@ -740,6 +778,8 @@ def pipeline_preview_view(request):
         'required_cols': REQUIRED_COLUMNS,
         'preview_rows': preview_rows,
         'total_records': len(clean),
+        'saved_count': request.session.get('pipeline_saved_count', 0),
+        'failed_count': request.session.get('pipeline_failed_count', 0),
     })
 
 
@@ -777,45 +817,6 @@ def pipeline_export_view(request):
             'No se pudo generar el archivo de exportación. Intente nuevamente.',
         )
         return redirect('pipeline_preview')
-
-    # Guardar alertas en BD con predicciones ML
-    saved_count = 0
-    for record in clean:
-        try:
-            predicted_class, probabilities = predict_alert(record)
-            risk_score = calculate_risk_score(probabilities)
-            Alert.objects.create(
-                event_category=record.get('event_category', ''),
-                attack_type=record.get('attack_type', ''),
-                attack_signature=record.get('attack_signature', ''),
-                protocol=record.get('protocol', ''),
-                traffic_type=record.get('traffic_type', ''),
-                mitre_tactic=record.get('mitre_tactic', ''),
-                kill_chain_stage=record.get('kill_chain_stage', ''),
-                failed_login_attempts=int(record.get('failed_login_attempts') or 0),
-                request_rate_per_min=float(record.get('request_rate_per_min') or 0.0),
-                ids_ips_alert=record.get('ids_ips_alert', ''),
-                malware_indicator=record.get('malware_indicator', ''),
-                asset_criticality=record.get('asset_criticality', ''),
-                log_source=record.get('log_source', ''),
-                firewall_action=record.get('firewall_action', ''),
-                severity=record.get('severity', ''),
-                label=record.get('label', ''),
-                predicted_class=predicted_class,
-                risk_score=risk_score,
-                probabilities=probabilities,
-                created_by=request.user,
-            )
-            saved_count += 1
-        except Exception as exc:
-            log_error(request.user, 'pipeline_export_save', str(exc))
-
-    if saved_count:
-        messages.success(
-            request,
-            f'{saved_count} alerta{"s" if saved_count != 1 else ""} guardada{"s" if saved_count != 1 else ""} '
-            f'en la base de datos con clasificación ML y risk score.',
-        )
 
     log_action(
         request.user,

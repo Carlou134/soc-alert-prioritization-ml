@@ -407,13 +407,32 @@
         </div>
         {% endif %}
 
-        <!-- Panel de exportación -->
+        <!-- Confirmación automática de guardado -->
+        {% if saved_count %}
+        <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-3 flex items-start gap-3">
+            <svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+            </svg>
+            <div>
+                <p class="text-sm font-semibold text-emerald-400">
+                    {{ saved_count }} alerta{{ saved_count|pluralize:"s" }} guardada{{ saved_count|pluralize:"s" }} en el sistema
+                </p>
+                <p class="text-xs text-emerald-300/70 mt-0.5">
+                    Clasificadas con ML y risk score asignado.
+                    {% if failed_count %}
+                    <span class="text-amber-400">{{ failed_count }} registro{{ failed_count|pluralize:"s" }} no pudo{{ failed_count|pluralize:"n" }} guardarse.</span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Descargar archivo (opcional) -->
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
             <div>
-                <h2 class="text-sm font-semibold text-white">Exportar Dataset Limpio</h2>
+                <h2 class="text-sm font-semibold text-white">Descargar dataset limpio</h2>
                 <p class="text-xs text-slate-400 mt-0.5">
-                    <strong class="text-white">{{ total_records }}</strong> registros normalizados y listos para el modelo ML.
-                    Elige el formato de exportación:
+                    Exporta el archivo normalizado para uso externo. No modifica la base de datos.
                 </p>
             </div>
 
@@ -423,11 +442,11 @@
                     {% csrf_token %}
                     <input type="hidden" name="format" value="csv">
                     <button type="submit"
-                        class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        class="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
                         </svg>
-                        Exportar dataset (.csv)
+                        Descargar .csv
                     </button>
                 </form>
 
@@ -440,7 +459,7 @@
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
                         </svg>
-                        Exportar dataset (.json)
+                        Descargar .json
                     </button>
                 </form>
 
@@ -481,7 +500,7 @@
                         <tr class="border-b border-slate-800 hover:bg-slate-800/40">
                             <td class="px-3 py-2 font-mono text-slate-600 text-xs">{{ forloop.counter }}</td>
                             {% for val in row %}
-                            <td class="px-3 py-2 font-mono text-slate-400 whitespace-nowrap max-w-[7rem] truncate" title="{{ val }}">
+                            <td class="px-3 py-2 font-mono text-slate-400 whitespace-nowrap max-w-28 truncate" title="{{ val }}">
                                 {% if val == '' or val == None %}
                                     <span class="text-slate-600">—</span>
                                 {% else %}
