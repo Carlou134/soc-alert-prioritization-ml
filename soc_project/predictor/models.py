@@ -31,28 +31,39 @@ def log_error(user, context: str, message: str) -> None:
 
 
 class Alert(models.Model):
-    # 16 campos del dataset
-    event_category = models.CharField(max_length=100)
-    attack_type = models.CharField(max_length=100)
-    attack_signature = models.CharField(max_length=200)
-    protocol = models.CharField(max_length=50)
-    traffic_type = models.CharField(max_length=100)
-    mitre_tactic = models.CharField(max_length=100)
-    kill_chain_stage = models.CharField(max_length=100)
+    # Campos requeridos por el modelo ML
+    event_category        = models.CharField(max_length=100)
+    protocol              = models.CharField(max_length=50)
+    traffic_type          = models.CharField(max_length=100)
+    mitre_tactic          = models.CharField(max_length=100)
+    kill_chain_stage      = models.CharField(max_length=100)
     failed_login_attempts = models.IntegerField(default=0)
-    request_rate_per_min = models.FloatField(default=0.0)
-    ids_ips_alert = models.CharField(max_length=100)
-    malware_indicator = models.CharField(max_length=100)
-    asset_criticality = models.CharField(max_length=100)
-    log_source = models.CharField(max_length=100)
-    firewall_action = models.CharField(max_length=100)
-    severity = models.CharField(max_length=50)
-    label = models.CharField(max_length=100, blank=True, default='')
+    request_rate_per_min  = models.FloatField(default=0.0)
+    ids_ips_alert         = models.CharField(max_length=100)
+    asset_criticality     = models.CharField(max_length=100)
+    log_source            = models.CharField(max_length=100)
+    firewall_action       = models.CharField(max_length=100)
+    severity              = models.CharField(max_length=50)
+
+    # Campos opcionales que mejoran la predicción
+    has_threat_family = models.IntegerField(default=0)          # 1 si hay familia de malware conocida
+    evidence_role     = models.CharField(max_length=50, blank=True, default='unknown')
+    os_family         = models.CharField(max_length=50, blank=True, default='unknown')
+    correlation_id    = models.CharField(max_length=200, blank=True, default='unknown')
+    mitre_techniques  = models.CharField(max_length=500, blank=True, default='')
+
+    # Campos de contexto — para display/búsqueda, no usados por el modelo ML
+    attack_type       = models.CharField(max_length=100, blank=True, default='')
+    attack_signature  = models.CharField(max_length=200, blank=True, default='')
+    malware_indicator = models.CharField(max_length=100, blank=True, default='')
+    label             = models.CharField(max_length=100, blank=True, default='')
 
     # Resultados ML — vacío ('') significa "pendiente de clasificar"
     predicted_class = models.CharField(max_length=100, blank=True, default='')
     risk_score = models.FloatField(null=True, blank=True)
     probabilities = models.JSONField(null=True, blank=True)
+    shap_values = models.JSONField(null=True, blank=True)
+    shap_explanation = models.TextField(null=True, blank=True)
 
     # Trazabilidad
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')

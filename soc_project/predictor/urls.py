@@ -1,6 +1,8 @@
 from django.urls import path
 from .views import (
     alert_list_view,
+    alert_shap_view,
+    alert_explain_view,
     dashboard_view,
     history_view,
     predict_json_view,
@@ -24,6 +26,8 @@ urlpatterns = [
     path('history/', history_view, name='history'),
     path('alerts/', alert_list_view, name='alert_list'),
     path('alerts/predict-pending/', predict_pending_view, name='predict_pending'),
+    path('alerts/<int:pk>/shap/', alert_shap_view, name='alert_shap'),
+    path('alerts/<int:pk>/explain/', alert_explain_view, name='alert_explain'),
     # HU009 — Pipeline de normalización
     path('pipeline/', pipeline_view, name='pipeline'),
     path('pipeline/upload/', pipeline_upload_view, name='pipeline_upload'),

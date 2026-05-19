@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+
+{% block title %}SHAP — Alerta #{{ alert.id }} — SOC Predictor{% endblock %}
+
+{% block content %}
+<style>
+.prose-shap h1,.prose-shap h2,.prose-shap h3 { color:#e2e8f0; font-weight:600; margin:1rem 0 .4rem; }
+.prose-shap h1 { font-size:1.1rem; }
+.prose-shap h2 { font-size:1rem; }
+.prose-shap h3 { font-size:.9rem; color:#cbd5e1; }
+.prose-shap p  { margin:.5rem 0; color:#cbd5e1; }
+.prose-shap strong { color:#f1f5f9; font-weight:600; }
+.prose-shap em { color:#94a3b8; font-style:italic; }
+.prose-shap ul,.prose-shap ol { margin:.5rem 0 .5rem 1.25rem; color:#cbd5e1; }
+.prose-shap li { margin:.2rem 0; }
+.prose-shap code { background:rgba(148,163,184,.1); color:#7dd3fc; padding:.1rem .3rem; border-radius:.25rem; font-size:.8rem; }
+.prose-shap blockquote { border-left:3px solid #6366f1; padding-left:.75rem; color:#94a3b8; margin:.5rem 0; }
+</style>
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center gap-4">
+        <a href="{% url 'alert_list' %}"
+           class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+            </svg>
+            Volver a alertas
+        </a>
+        <span class="text-slate-700">·</span>
+        <h1 class="text-lg font-semibold text-white">
+            Explicabilidad SHAP — Alerta <span class="text-violet-400">#{{ alert.id }}</span>
+        </h1>
+    </div>
+
+    <!-- Alert summary card -->
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+            <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Clasificación</p>
+            {% if alert.predicted_class == 'malicioso' %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-red-500/15 text-red-400 border border-red-500/25">Malicioso</span>
+            {% elif alert.predicted_class == 'a_investigar' %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/25">A investigar</span>
+            {% else %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">Benigno</span>
+            {% endif %}
+        </div>
+        <div>
+            <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Risk Score</p>
+            <p class="text-sm font-semibold {% if alert.risk_score >= 0.7 %}text-red-400{% elif alert.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
+                {{ alert.risk_score|floatformat:4 }}
+            </p>
+        </div>
+        <div>
+            <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Severidad</p>
+            <p class="text-sm text-slate-300">{{ alert.severity }}</p>
+        </div>
+        <div>
+            <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Categoría</p>
+            <p class="text-sm text-slate-300">{{ alert.event_category }}</p>
+        </div>
+        {% if alert.probabilities %}
+        <div class="col-span-2 md:col-span-4 pt-3 border-t border-slate-700/50">
+            <p class="text-xs text-slate-500 uppercase tracking-wide mb-2">Probabilidades del modelo</p>
+            <div class="flex items-center gap-4 flex-wrap">
+                <span class="text-xs text-emerald-400">Benigno: <strong>{{ alert.probabilities.benigno|floatformat:4 }}</strong></span>
+                <span class="text-xs text-amber-400">A investigar: <strong>{{ alert.probabilities.a_investigar|floatformat:4 }}</strong></span>
+                <span class="text-xs text-red-400">Malicioso: <strong>{{ alert.probabilities.malicioso|floatformat:4 }}</strong></span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Explanation intro -->
+    <div class="bg-violet-500/5 border border-violet-500/20 rounded-xl p-4">
+        <p class="text-sm text-slate-300">
+            <span class="font-semibold text-violet-400">¿Cómo leer estos gráficos?</span>
+            Las barras muestran el impacto de cada feature sobre la probabilidad de la clase correspondiente.
+            Las barras <span class="text-red-400 font-medium">rojas / naranjas</span> empujan la predicción hacia esa clase;
+            las barras <span class="text-emerald-400 font-medium">verdes / azules</span> la alejan.
+            El tamaño indica la magnitud del impacto.
+        </p>
+    </div>
+
+    <!-- Stage 1: Malicioso -->
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-sm font-semibold text-white">Etapa 1 — Detección de amenaza</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Features que más influyen en la probabilidad de <span class="text-red-400 font-medium">malicioso</span></p>
+            </div>
+            {% if alert.predicted_class == 'malicioso' %}
+            <span class="text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded font-medium">Etapa decisiva</span>
+            {% endif %}
+        </div>
+        <div class="relative" style="height: 420px;">
+            <canvas id="chartS1"></canvas>
+        </div>
+    </div>
+
+    <!-- Stage 2: A investigar vs Benigno -->
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-sm font-semibold text-white">Etapa 2 — Clasificación de investigación</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Features que más influyen en la probabilidad de <span class="text-amber-400 font-medium">a investigar</span> vs benigno</p>
+            </div>
+            {% if alert.predicted_class != 'malicioso' %}
+            <span class="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-1 rounded font-medium">Etapa decisiva</span>
+            {% else %}
+            <span class="text-xs bg-slate-700/50 text-slate-400 border border-slate-600 px-2 py-1 rounded">No determinante</span>
+            {% endif %}
+        </div>
+        <div class="relative" style="height: 420px;">
+            <canvas id="chartS2"></canvas>
+        </div>
+    </div>
+
+    <!-- Explicación IA -->
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-sm font-semibold text-white">Explicación en lenguaje natural</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Generada por IA — interpretación de los valores SHAP para el analista SOC</p>
+            </div>
+            {% if alert.shap_explanation %}
+            <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded">Guardada</span>
+            {% else %}
+            <span id="explain-badge" class="text-xs bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2 py-1 rounded">Generando...</span>
+            {% endif %}
+        </div>
+
+        <div id="explain-container">
+            {% if alert.shap_explanation %}
+            <div id="explain-static" class="prose-shap text-sm text-slate-300 leading-relaxed"
+                 data-markdown="{{ alert.shap_explanation|escape }}"></div>
+            {% else %}
+            <div id="explain-loading" class="flex items-center gap-2 text-sm text-slate-400">
+                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
+                Analizando valores SHAP...
+            </div>
+            <div id="explain-result" class="hidden prose-shap text-sm text-slate-300 leading-relaxed"></div>
+            <div id="explain-error" class="hidden text-sm text-red-400"></div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@13/marked.min.js"></script>
+<script>
+(function () {
+    const shap_s1 = {{ shap_s1|safe }};
+    const shap_s2 = {{ shap_s2|safe }};
+
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = 'rgba(148,163,184,0.1)';
+    Chart.defaults.font.family = 'Inter, sans-serif';
+    Chart.defaults.font.size = 11;
+
+    function buildChart(canvasId, shapData, positiveColor, negativeColor, neutralColor) {
+        const features = shapData.features.slice().reverse();
+        const labels   = features.map(f => f.name);
+        const values   = features.map(f => f.shap);
+        const colors   = values.map(v => v >= 0 ? positiveColor : negativeColor);
+
+        new Chart(document.getElementById(canvasId), {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: colors,
+                    borderWidth: 0,
+                    borderRadius: 3,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                const f = features[ctx.dataIndex];
+                                const sign = f.shap >= 0 ? '+' : '';
+                                return [`SHAP: ${sign}${f.shap.toFixed(5)}`, `Valor: ${f.value.toFixed ? f.value.toFixed(3) : f.value}`];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(148,163,184,0.08)' },
+                        ticks: { color: '#94a3b8' },
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: {
+                            color: '#cbd5e1',
+                            font: { size: 10.5 },
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    buildChart('chartS1', shap_s1, 'rgba(239,68,68,0.75)',  'rgba(16,185,129,0.75)');
+    buildChart('chartS2', shap_s2, 'rgba(245,158,11,0.75)', 'rgba(59,130,246,0.75)');
+
+    // Render markdown para explicación ya guardada en BD
+    const staticEl = document.getElementById('explain-static');
+    if (staticEl) {
+        staticEl.innerHTML = marked.parse(staticEl.dataset.markdown);
+    }
+})();
+
+{% if not alert.shap_explanation %}
+document.addEventListener('DOMContentLoaded', function () {
+    const badge   = document.getElementById('explain-badge');
+    const loading = document.getElementById('explain-loading');
+    const result  = document.getElementById('explain-result');
+    const error   = document.getElementById('explain-error');
+
+    fetch("{% url 'alert_explain' alert.pk %}", {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(res => res.json())
+    .then(data => {
+        loading.classList.add('hidden');
+        if (data.error) {
+            badge.textContent = 'Error';
+            badge.className = 'text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded';
+            error.textContent = data.error;
+            error.classList.remove('hidden');
+        } else {
+            badge.textContent = 'Guardada';
+            badge.className = 'text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded';
+            result.innerHTML = marked.parse(data.explanation);
+            result.classList.remove('hidden');
+        }
+    })
+    .catch(() => {
+        loading.classList.add('hidden');
+        badge.textContent = 'Error';
+        badge.className = 'text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded';
+        error.textContent = 'Error de conexión. Recargá la página para intentar nuevamente.';
+        error.classList.remove('hidden');
+    });
+});
+{% endif %}
+</script>
+{% endblock %}

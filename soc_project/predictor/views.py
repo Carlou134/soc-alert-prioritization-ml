@@ -3,6 +3,8 @@ import csv
 import json
 from collections import Counter
 
+from django.http import JsonResponse
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -21,13 +23,17 @@ from accounts.models import (
 )
 from .forms import PredictionForm, JSONPredictionForm
 from .models import Alert, PredictionLog, log_error
-from .utils import predict_alert, extract_valid_fields, calculate_risk_score
+from .utils import predict_alert, predict_batch, extract_valid_fields, calculate_risk_score, calculate_shap_values, compute_shap_safe
 from .serializers import PredictionRequestSerializer
 from .pipeline import (
     REQUIRED_COLUMNS,
+    OPTIONAL_COLUMNS,
+    DISPLAY_COLUMNS,
     NUMERIC_COLUMNS,
+    COLUMN_METADATA,
     parse_file,
     validate_columns,
+    validate_column_types,
     apply_mapping,
     clean_records,
     export_to_csv,
@@ -260,6 +266,7 @@ def upload_alerts_view(request):
                 data = serializer.validated_data
                 predicted_class, probabilities = predict_alert(data)
                 risk_score = calculate_risk_score(probabilities)
+                shap_data = compute_shap_safe(data)
 
                 PredictionLog.objects.create(
                     user=request.user,
@@ -270,8 +277,6 @@ def upload_alerts_view(request):
                 )
                 Alert.objects.create(
                     event_category=data.get('event_category', ''),
-                    attack_type=data.get('attack_type', ''),
-                    attack_signature=data.get('attack_signature', ''),
                     protocol=data.get('protocol', ''),
                     traffic_type=data.get('traffic_type', ''),
                     mitre_tactic=data.get('mitre_tactic', ''),
@@ -279,15 +284,23 @@ def upload_alerts_view(request):
                     failed_login_attempts=data.get('failed_login_attempts', 0),
                     request_rate_per_min=data.get('request_rate_per_min', 0.0),
                     ids_ips_alert=data.get('ids_ips_alert', ''),
-                    malware_indicator=data.get('malware_indicator', ''),
                     asset_criticality=data.get('asset_criticality', ''),
                     log_source=data.get('log_source', ''),
                     firewall_action=data.get('firewall_action', ''),
                     severity=data.get('severity', ''),
+                    has_threat_family=data.get('has_threat_family', 0),
+                    evidence_role=data.get('evidence_role', 'unknown'),
+                    os_family=data.get('os_family', 'unknown'),
+                    correlation_id=data.get('correlation_id', 'unknown'),
+                    mitre_techniques=data.get('mitre_techniques', ''),
+                    attack_type=record.get('attack_type', ''),
+                    attack_signature=record.get('attack_signature', ''),
+                    malware_indicator=record.get('malware_indicator', ''),
                     label=record.get('label', ''),
                     predicted_class=predicted_class,
                     risk_score=risk_score,
                     probabilities=probabilities,
+                    shap_values=shap_data,
                     created_by=request.user,
                 )
                 processed.append({'record': index, 'predicted_class': predicted_class, 'risk_score': risk_score})
@@ -417,7 +430,7 @@ def alert_list_view(request):
         pending_base = pending_base.filter(created_by=request.user)
     pending_count = pending_base.count()
 
-    paginator = Paginator(qs, 20)
+    paginator = Paginator(qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     context = {
@@ -451,28 +464,31 @@ def predict_pending_view(request):
     classified = 0
     for alert in qs.iterator():
         data = {
-            'event_category': alert.event_category,
-            'attack_type': alert.attack_type,
-            'attack_signature': alert.attack_signature,
-            'protocol': alert.protocol,
-            'traffic_type': alert.traffic_type,
-            'mitre_tactic': alert.mitre_tactic,
-            'kill_chain_stage': alert.kill_chain_stage,
-            'failed_login_attempts': alert.failed_login_attempts,
-            'request_rate_per_min': alert.request_rate_per_min,
-            'ids_ips_alert': alert.ids_ips_alert,
-            'malware_indicator': alert.malware_indicator,
-            'asset_criticality': alert.asset_criticality,
-            'log_source': alert.log_source,
-            'firewall_action': alert.firewall_action,
-            'severity': alert.severity,
+            'event_category'        : alert.event_category,
+            'protocol'              : alert.protocol,
+            'traffic_type'          : alert.traffic_type,
+            'mitre_tactic'          : alert.mitre_tactic,
+            'kill_chain_stage'      : alert.kill_chain_stage,
+            'failed_login_attempts' : alert.failed_login_attempts,
+            'request_rate_per_min'  : alert.request_rate_per_min,
+            'ids_ips_alert'         : alert.ids_ips_alert,
+            'asset_criticality'     : alert.asset_criticality,
+            'log_source'            : alert.log_source,
+            'firewall_action'       : alert.firewall_action,
+            'severity'              : alert.severity,
+            'has_threat_family'     : alert.has_threat_family,
+            'evidence_role'         : alert.evidence_role,
+            'os_family'             : alert.os_family,
+            'correlation_id'        : alert.correlation_id,
+            'mitre_techniques'      : alert.mitre_techniques,
         }
         try:
             predicted_class, probabilities = predict_alert(data)
             alert.predicted_class = predicted_class
             alert.risk_score = calculate_risk_score(probabilities)
             alert.probabilities = probabilities
-            alert.save(update_fields=['predicted_class', 'risk_score', 'probabilities'])
+            alert.shap_values = compute_shap_safe(data)
+            alert.save(update_fields=['predicted_class', 'risk_score', 'probabilities', 'shap_values'])
             classified += 1
         except Exception as exc:
             log_error(request.user, 'predict_pending', str(exc))
@@ -592,11 +608,15 @@ def pipeline_upload_view(request):
             return _render_upload_error('El archivo no contiene registros.')
 
         detected_cols, missing_cols = validate_columns(records)
+        missing_optional = [c for c in OPTIONAL_COLUMNS if c not in detected_cols]
+        missing_display  = [c for c in DISPLAY_COLUMNS  if c not in detected_cols]
 
-        request.session['pipeline_records'] = records
-        request.session['pipeline_filename'] = file.name
-        request.session['pipeline_columns'] = detected_cols
-        request.session['pipeline_missing'] = missing_cols
+        request.session['pipeline_records']         = records
+        request.session['pipeline_filename']        = file.name
+        request.session['pipeline_columns']         = detected_cols
+        request.session['pipeline_missing']         = missing_cols
+        request.session['pipeline_missing_optional'] = missing_optional
+        request.session['pipeline_missing_display']  = missing_display
     except Exception as exc:
         log_error(request.user, 'pipeline_upload', str(exc))
         return _render_upload_error(
@@ -604,47 +624,130 @@ def pipeline_upload_view(request):
             'CSV o JSON válido e intente nuevamente.'
         )
 
-    if missing_cols:
-        return redirect('pipeline_map')
-    return redirect('pipeline_normalize')
+    return redirect('pipeline_map')
+
+
+def _map_ctx(detected_cols, filename, missing_required, missing_optional, missing_display, prev_mapping, type_warnings):
+    """Construye el contexto del template para el paso de mapeo."""
+    def _rows(cols):
+        result = []
+        for col in cols:
+            meta = COLUMN_METADATA.get(col, {})
+            result.append({
+                'name':        col,
+                'desc':        meta.get('desc', ''),
+                'example':     meta.get('example', ''),
+                'dtype':       meta.get('type', 'str'),
+                'prev_source': prev_mapping.get(col, ''),
+                'warning':     type_warnings.get(col),
+            })
+        return result
+
+    req_rows  = _rows(missing_required)
+    opt_rows  = _rows(missing_optional)
+    disp_rows = _rows(missing_display)
+
+    sections = [
+        {
+            'rows':           req_rows,
+            'title':          'Columnas requeridas — el modelo no puede predecir sin estas',
+            'header_class':   'bg-red-500/10 border-red-500/20',
+            'dot_class':      'bg-red-400',
+            'title_class':    'text-red-400',
+            'col_name_class': 'text-red-400',
+        },
+        {
+            'rows':           opt_rows,
+            'title':          'Columnas opcionales — mejoran la predicción ML',
+            'header_class':   'bg-amber-500/10 border-amber-500/20',
+            'dot_class':      'bg-amber-400',
+            'title_class':    'text-amber-400',
+            'col_name_class': 'text-amber-400',
+        },
+        {
+            'rows':           disp_rows,
+            'title':          'Columnas de visualización — solo para la tabla de alertas, no afectan la predicción',
+            'header_class':   'bg-slate-700/40 border-slate-600',
+            'dot_class':      'bg-slate-400',
+            'title_class':    'text-slate-400',
+            'col_name_class': 'text-slate-400',
+        },
+    ]
+
+    return {
+        'stage':           'map',
+        'detected_cols':   detected_cols,
+        'filename':        filename,
+        'required_rows':   req_rows,
+        'optional_rows':   opt_rows,
+        'display_rows':    disp_rows,
+        'sections':        sections,
+        'type_warnings':   type_warnings,
+    }
 
 
 @login_required
 def pipeline_map_view(request):
-    """Paso 2: Formulario dinámico de mapping de columnas."""
+    """Paso 2: Mapeo de columnas — requeridas, opcionales y de visualización."""
     records = request.session.get('pipeline_records')
     if not records:
         return redirect('pipeline')
 
-    detected_cols = request.session.get('pipeline_columns', [])
-    missing_cols = request.session.get('pipeline_missing', [])
-    filename = request.session.get('pipeline_filename', '')
+    detected_cols    = request.session.get('pipeline_columns', [])
+    missing_required = request.session.get('pipeline_missing', [])
+    missing_optional = request.session.get('pipeline_missing_optional', [])
+    missing_display  = request.session.get('pipeline_missing_display', [])
+    filename         = request.session.get('pipeline_filename', '')
+
+    all_missing = missing_required + missing_optional + missing_display
+
+    def _build_col_rows(cols, prev_mapping, type_warnings):
+        rows = []
+        for col in cols:
+            meta = COLUMN_METADATA.get(col, {})
+            rows.append({
+                'name':         col,
+                'desc':         meta.get('desc', ''),
+                'example':      meta.get('example', ''),
+                'dtype':        meta.get('type', 'str'),
+                'prev_source':  prev_mapping.get(col, ''),
+                'warning':      type_warnings.get(col),
+            })
+        return rows
 
     if request.method == 'POST':
         mapping = {}
-        for col in missing_cols:
+        for col in all_missing:
             source = request.POST.get(f'map_{col}', '').strip()
             if source and source != '__skip__':
                 mapping[col] = source
 
-        mapped_records = apply_mapping(records, mapping)
-        new_detected, new_missing = validate_columns(mapped_records)
+        type_warnings = validate_column_types(records, mapping)
+        prev_mapping  = {col: request.POST.get(f'map_{col}', '') for col in all_missing}
 
-        request.session['pipeline_records'] = mapped_records
-        request.session['pipeline_mapping'] = mapping
-        request.session['pipeline_columns'] = new_detected
-        request.session['pipeline_missing'] = new_missing
+        if type_warnings and not request.POST.get('force_continue'):
+            return render(request, 'predictor/pipeline.html', _map_ctx(
+                detected_cols, filename, missing_required, missing_optional, missing_display,
+                prev_mapping, type_warnings,
+            ))
+
+        mapped_records = apply_mapping(records, mapping)
+        new_detected, new_missing        = validate_columns(mapped_records)
+        new_missing_optional = [c for c in OPTIONAL_COLUMNS if c not in new_detected]
+        new_missing_display  = [c for c in DISPLAY_COLUMNS  if c not in new_detected]
+
+        request.session['pipeline_records']          = mapped_records
+        request.session['pipeline_mapping']          = mapping
+        request.session['pipeline_columns']          = new_detected
+        request.session['pipeline_missing']          = new_missing
+        request.session['pipeline_missing_optional'] = new_missing_optional
+        request.session['pipeline_missing_display']  = new_missing_display
 
         return redirect('pipeline_normalize')
 
-    return render(request, 'predictor/pipeline.html', {
-        'stage': 'map',
-        'detected_cols': detected_cols,
-        'missing_cols': missing_cols,
-        'filename': filename,
-        'numeric_cols': NUMERIC_COLUMNS,
-        'required_cols': REQUIRED_COLUMNS,
-    })
+    return render(request, 'predictor/pipeline.html', _map_ctx(
+        detected_cols, filename, missing_required, missing_optional, missing_display, {}, {},
+    ))
 
 
 @login_required
@@ -693,6 +796,63 @@ def pipeline_normalize_view(request):
 
         request.session['pipeline_clean_records'] = clean
         request.session['pipeline_stats'] = stats
+        request.session['pipeline_already_saved'] = False
+
+        # Batch prediction — aprovecha correlation_id para features reales por incidente.
+        # Si falla (datos corruptos, columnas inesperadas), cae al fallback por registro.
+        try:
+            batch_results = predict_batch(clean)
+        except Exception as exc:
+            log_error(request.user, 'pipeline_normalize_predict', str(exc))
+            batch_results = None
+
+        saved_count = 0
+        failed_count = 0
+        for i, record in enumerate(clean):
+            try:
+                if batch_results is not None:
+                    predicted_class, probabilities = batch_results[i]
+                else:
+                    predicted_class, probabilities = predict_alert(record)
+                risk_score = calculate_risk_score(probabilities)
+                shap_data = compute_shap_safe(record)
+                Alert.objects.create(
+                    event_category=record.get('event_category', ''),
+                    protocol=record.get('protocol', ''),
+                    traffic_type=record.get('traffic_type', ''),
+                    mitre_tactic=record.get('mitre_tactic', ''),
+                    kill_chain_stage=record.get('kill_chain_stage', ''),
+                    failed_login_attempts=int(record.get('failed_login_attempts') or 0),
+                    request_rate_per_min=float(record.get('request_rate_per_min') or 0.0),
+                    ids_ips_alert=record.get('ids_ips_alert', ''),
+                    asset_criticality=record.get('asset_criticality', ''),
+                    log_source=record.get('log_source', ''),
+                    firewall_action=record.get('firewall_action', ''),
+                    severity=record.get('severity', ''),
+                    has_threat_family=int(record.get('has_threat_family') or 0),
+                    evidence_role=record.get('evidence_role', 'unknown'),
+                    os_family=record.get('os_family', 'unknown'),
+                    correlation_id=record.get('correlation_id', 'unknown'),
+                    mitre_techniques=record.get('mitre_techniques', ''),
+                    attack_type=record.get('attack_type', ''),
+                    attack_signature=record.get('attack_signature', ''),
+                    malware_indicator=record.get('malware_indicator', ''),
+                    label=record.get('label', ''),
+                    predicted_class=predicted_class,
+                    risk_score=risk_score,
+                    probabilities=probabilities,
+                    shap_values=shap_data,
+                    created_by=request.user,
+                )
+                saved_count += 1
+            except Exception as exc:
+                log_error(request.user, 'pipeline_normalize_save', str(exc))
+                failed_count += 1
+
+        request.session['pipeline_saved_count'] = saved_count
+        request.session['pipeline_failed_count'] = failed_count
+        request.session['pipeline_already_saved'] = True
+        request.session.modified = True
 
         log_action(
             request.user,
@@ -701,7 +861,8 @@ def pipeline_normalize_view(request):
                 f'Ejecutó pipeline de normalización sobre "{filename}". '
                 f'Registros procesados: {stats["total_clean"]}. '
                 f'Duplicados eliminados: {stats["duplicates_removed"]}. '
-                f'Nulos rellenados: {stats["nulls_filled"]}.'
+                f'Nulos rellenados: {stats["nulls_filled"]}. '
+                f'Alertas guardadas: {saved_count}.'
             ),
         )
         return redirect('pipeline_preview')
@@ -730,7 +891,7 @@ def pipeline_preview_view(request):
 
     preview_rows = [
         [record.get(col, '') for col in REQUIRED_COLUMNS]
-        for record in clean[:20]
+        for record in clean[:10]
     ]
 
     return render(request, 'predictor/pipeline.html', {
@@ -740,6 +901,8 @@ def pipeline_preview_view(request):
         'required_cols': REQUIRED_COLUMNS,
         'preview_rows': preview_rows,
         'total_records': len(clean),
+        'saved_count': request.session.get('pipeline_saved_count', 0),
+        'failed_count': request.session.get('pipeline_failed_count', 0),
     })
 
 
@@ -778,45 +941,6 @@ def pipeline_export_view(request):
         )
         return redirect('pipeline_preview')
 
-    # Guardar alertas en BD con predicciones ML
-    saved_count = 0
-    for record in clean:
-        try:
-            predicted_class, probabilities = predict_alert(record)
-            risk_score = calculate_risk_score(probabilities)
-            Alert.objects.create(
-                event_category=record.get('event_category', ''),
-                attack_type=record.get('attack_type', ''),
-                attack_signature=record.get('attack_signature', ''),
-                protocol=record.get('protocol', ''),
-                traffic_type=record.get('traffic_type', ''),
-                mitre_tactic=record.get('mitre_tactic', ''),
-                kill_chain_stage=record.get('kill_chain_stage', ''),
-                failed_login_attempts=int(record.get('failed_login_attempts') or 0),
-                request_rate_per_min=float(record.get('request_rate_per_min') or 0.0),
-                ids_ips_alert=record.get('ids_ips_alert', ''),
-                malware_indicator=record.get('malware_indicator', ''),
-                asset_criticality=record.get('asset_criticality', ''),
-                log_source=record.get('log_source', ''),
-                firewall_action=record.get('firewall_action', ''),
-                severity=record.get('severity', ''),
-                label=record.get('label', ''),
-                predicted_class=predicted_class,
-                risk_score=risk_score,
-                probabilities=probabilities,
-                created_by=request.user,
-            )
-            saved_count += 1
-        except Exception as exc:
-            log_error(request.user, 'pipeline_export_save', str(exc))
-
-    if saved_count:
-        messages.success(
-            request,
-            f'{saved_count} alerta{"s" if saved_count != 1 else ""} guardada{"s" if saved_count != 1 else ""} '
-            f'en la base de datos con clasificación ML y risk score.',
-        )
-
     log_action(
         request.user,
         ACTION_PIPELINE_EXPORT,
@@ -827,4 +951,74 @@ def pipeline_export_view(request):
         ),
     )
 
-    return response
+
+@login_required
+def alert_shap_view(request, pk):
+    from django.shortcuts import get_object_or_404
+    import json as _json
+
+    alert = get_object_or_404(Alert, pk=pk)
+
+    if not alert.predicted_class:
+        messages.warning(request, 'Esta alerta no está clasificada. Clasificala primero para ver la explicabilidad.')
+        return redirect('alert_list')
+
+    shap_data = alert.shap_values
+
+    # Alertas clasificadas antes de esta versión no tienen SHAP guardado — lo calculamos on-the-fly.
+    if shap_data is None:
+        data = {
+            'event_category'       : alert.event_category,
+            'protocol'             : alert.protocol,
+            'traffic_type'         : alert.traffic_type,
+            'mitre_tactic'         : alert.mitre_tactic,
+            'kill_chain_stage'     : alert.kill_chain_stage,
+            'failed_login_attempts': alert.failed_login_attempts,
+            'request_rate_per_min' : alert.request_rate_per_min,
+            'ids_ips_alert'        : alert.ids_ips_alert,
+            'asset_criticality'    : alert.asset_criticality,
+            'log_source'           : alert.log_source,
+            'firewall_action'      : alert.firewall_action,
+            'severity'             : alert.severity,
+            'has_threat_family'    : alert.has_threat_family,
+            'evidence_role'        : alert.evidence_role,
+            'os_family'            : alert.os_family,
+            'correlation_id'       : alert.correlation_id,
+            'mitre_techniques'     : alert.mitre_techniques,
+        }
+        shap_data = calculate_shap_values(data)
+
+    return render(request, 'predictor/alert_shap.html', {
+        'alert'  : alert,
+        'shap_s1': _json.dumps(shap_data['s1']),
+        'shap_s2': _json.dumps(shap_data['s2']),
+    })
+
+
+@login_required
+def alert_explain_view(request, pk):
+    from django.shortcuts import get_object_or_404
+    from .claude_service import generate_shap_explanation
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    alert = get_object_or_404(Alert, pk=pk)
+
+    if not alert.predicted_class:
+        return JsonResponse({'error': 'La alerta no está clasificada.'}, status=400)
+
+    if not alert.shap_values:
+        return JsonResponse({'error': 'Esta alerta no tiene valores SHAP calculados.'}, status=400)
+
+    # Si ya existe explicación guardada, la devolvemos sin llamar a la API
+    if alert.shap_explanation:
+        return JsonResponse({'explanation': alert.shap_explanation, 'cached': True})
+
+    try:
+        explanation = generate_shap_explanation(alert)
+        alert.shap_explanation = explanation
+        alert.save(update_fields=['shap_explanation'])
+        return JsonResponse({'explanation': explanation, 'cached': False})
+    except Exception as exc:
+        return JsonResponse({'error': f'Error al generar la explicación: {exc}'}, status=500)
