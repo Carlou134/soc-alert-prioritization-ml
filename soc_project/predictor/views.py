@@ -21,7 +21,7 @@ from accounts.models import (
 )
 from .forms import PredictionForm, JSONPredictionForm
 from .models import Alert, PredictionLog, log_error
-from .utils import predict_alert, predict_batch, extract_valid_fields, calculate_risk_score
+from .utils import predict_alert, predict_batch, extract_valid_fields, calculate_risk_score, calculate_shap_values, compute_shap_safe
 from .serializers import PredictionRequestSerializer
 from .pipeline import (
     REQUIRED_COLUMNS,
@@ -264,6 +264,7 @@ def upload_alerts_view(request):
                 data = serializer.validated_data
                 predicted_class, probabilities = predict_alert(data)
                 risk_score = calculate_risk_score(probabilities)
+                shap_data = compute_shap_safe(data)
 
                 PredictionLog.objects.create(
                     user=request.user,
@@ -297,6 +298,7 @@ def upload_alerts_view(request):
                     predicted_class=predicted_class,
                     risk_score=risk_score,
                     probabilities=probabilities,
+                    shap_values=shap_data,
                     created_by=request.user,
                 )
                 processed.append({'record': index, 'predicted_class': predicted_class, 'risk_score': risk_score})
@@ -426,7 +428,7 @@ def alert_list_view(request):
         pending_base = pending_base.filter(created_by=request.user)
     pending_count = pending_base.count()
 
-    paginator = Paginator(qs, 20)
+    paginator = Paginator(qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     context = {
@@ -483,7 +485,8 @@ def predict_pending_view(request):
             alert.predicted_class = predicted_class
             alert.risk_score = calculate_risk_score(probabilities)
             alert.probabilities = probabilities
-            alert.save(update_fields=['predicted_class', 'risk_score', 'probabilities'])
+            alert.shap_values = compute_shap_safe(data)
+            alert.save(update_fields=['predicted_class', 'risk_score', 'probabilities', 'shap_values'])
             classified += 1
         except Exception as exc:
             log_error(request.user, 'predict_pending', str(exc))
@@ -810,6 +813,7 @@ def pipeline_normalize_view(request):
                 else:
                     predicted_class, probabilities = predict_alert(record)
                 risk_score = calculate_risk_score(probabilities)
+                shap_data = compute_shap_safe(record)
                 Alert.objects.create(
                     event_category=record.get('event_category', ''),
                     protocol=record.get('protocol', ''),
@@ -835,6 +839,7 @@ def pipeline_normalize_view(request):
                     predicted_class=predicted_class,
                     risk_score=risk_score,
                     probabilities=probabilities,
+                    shap_values=shap_data,
                     created_by=request.user,
                 )
                 saved_count += 1
@@ -943,5 +948,48 @@ def pipeline_export_view(request):
             f'Formato: {export_format.upper()}.'
         ),
     )
+
+
+@login_required
+def alert_shap_view(request, pk):
+    from django.shortcuts import get_object_or_404
+    import json as _json
+
+    alert = get_object_or_404(Alert, pk=pk)
+
+    if not alert.predicted_class:
+        messages.warning(request, 'Esta alerta no está clasificada. Clasificala primero para ver la explicabilidad.')
+        return redirect('alert_list')
+
+    shap_data = alert.shap_values
+
+    # Alertas clasificadas antes de esta versión no tienen SHAP guardado — lo calculamos on-the-fly.
+    if shap_data is None:
+        data = {
+            'event_category'       : alert.event_category,
+            'protocol'             : alert.protocol,
+            'traffic_type'         : alert.traffic_type,
+            'mitre_tactic'         : alert.mitre_tactic,
+            'kill_chain_stage'     : alert.kill_chain_stage,
+            'failed_login_attempts': alert.failed_login_attempts,
+            'request_rate_per_min' : alert.request_rate_per_min,
+            'ids_ips_alert'        : alert.ids_ips_alert,
+            'asset_criticality'    : alert.asset_criticality,
+            'log_source'           : alert.log_source,
+            'firewall_action'      : alert.firewall_action,
+            'severity'             : alert.severity,
+            'has_threat_family'    : alert.has_threat_family,
+            'evidence_role'        : alert.evidence_role,
+            'os_family'            : alert.os_family,
+            'correlation_id'       : alert.correlation_id,
+            'mitre_techniques'     : alert.mitre_techniques,
+        }
+        shap_data = calculate_shap_values(data)
+
+    return render(request, 'predictor/alert_shap.html', {
+        'alert'  : alert,
+        'shap_s1': _json.dumps(shap_data['s1']),
+        'shap_s2': _json.dumps(shap_data['s2']),
+    })
 
     return response

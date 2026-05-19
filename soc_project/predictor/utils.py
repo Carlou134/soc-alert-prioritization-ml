@@ -466,6 +466,92 @@ def predict_batch(records: list) -> list:
 
 
 # ---------------------------------------------------------------------------
+# SHAP Explainability
+# ---------------------------------------------------------------------------
+
+_shap_exp_s1 = None
+_shap_exp_s2 = None
+
+
+def _get_shap_explainers():
+    global _shap_exp_s1, _shap_exp_s2
+    if _shap_exp_s1 is None:
+        import shap
+        _shap_exp_s1 = shap.TreeExplainer(rf_s1)
+        _shap_exp_s2 = shap.TreeExplainer(rf_s2_cal.rf)
+    return _shap_exp_s1, _shap_exp_s2
+
+
+def _display_feature_name(name: str) -> str:
+    categorical_prefixes = {
+        'event_category_': 'Event Category',
+        'protocol_': 'Protocol',
+        'traffic_type_': 'Traffic Type',
+        'mitre_tactic_': 'MITRE Tactic',
+        'kill_chain_stage_': 'Kill Chain Stage',
+        'ids_ips_alert_': 'IDS/IPS Alert',
+        'asset_criticality_': 'Asset Criticality',
+        'log_source_': 'Log Source',
+        'firewall_action_': 'Firewall Action',
+        'severity_': 'Severity',
+        'evidence_role_': 'Evidence Role',
+        'os_family_': 'OS Family',
+    }
+    for prefix, label in categorical_prefixes.items():
+        if name.startswith(prefix):
+            value = name[len(prefix):].replace('_', ' ').title()
+            return f'{label} = {value}'
+    if name.startswith('mitre_t') and len(name) > 7:
+        return f'MITRE {name[6:].upper()}'
+    return name.replace('_', ' ').title()
+
+
+def calculate_shap_values(data: dict, top_n: int = 15) -> dict:
+    """
+    SHAP values for a single alert using the hierarchical model.
+    SHAP 0.51 returns sv of shape (n_samples, n_features, n_classes).
+    """
+    X = preprocess_input(data)
+    exp_s1, exp_s2 = _get_shap_explainers()
+
+    sv_s1 = exp_s1.shap_values(X)
+    sv_mal = sv_s1[0, :, _idx_mal_s1]
+    base_s1 = float(exp_s1.expected_value[_idx_mal_s1])
+
+    s1_features = sorted(
+        [{'name': _display_feature_name(n), 'value': float(v), 'shap': float(s)}
+         for n, v, s in zip(training_columns, X.iloc[0].values, sv_mal)],
+        key=lambda x: abs(x['shap']),
+        reverse=True,
+    )[:top_n]
+
+    X_s2 = X[s2_columns]
+    sv_s2 = exp_s2.shap_values(X_s2)
+    sv_inv = sv_s2[0, :, _idx_inv_s2]
+    base_s2 = float(exp_s2.expected_value[_idx_inv_s2])
+
+    s2_features = sorted(
+        [{'name': _display_feature_name(n), 'value': float(v), 'shap': float(s)}
+         for n, v, s in zip(s2_columns, X_s2.iloc[0].values, sv_inv)],
+        key=lambda x: abs(x['shap']),
+        reverse=True,
+    )[:top_n]
+
+    return {
+        's1': {'features': s1_features, 'base_value': base_s1},
+        's2': {'features': s2_features, 'base_value': base_s2},
+    }
+
+
+def compute_shap_safe(data: dict):
+    """Wrapper seguro — devuelve el dict de SHAP o None si falla. Nunca propaga excepciones."""
+    try:
+        return calculate_shap_values(data)
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Risk score
 # ---------------------------------------------------------------------------
 

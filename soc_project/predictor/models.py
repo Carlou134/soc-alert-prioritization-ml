@@ -62,6 +62,7 @@ class Alert(models.Model):
     predicted_class = models.CharField(max_length=100, blank=True, default='')
     risk_score = models.FloatField(null=True, blank=True)
     probabilities = models.JSONField(null=True, blank=True)
+    shap_values = models.JSONField(null=True, blank=True)
 
     # Trazabilidad
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')
