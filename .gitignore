@@ -18,5 +18,5 @@ db.sqlite3
 .DS_Store
 .claude
 .atl/
-predictor/ml/
-!predictor/ml/soc_model.pkl
+soc_project/predictor/ml/
+!soc_project/predictor/ml/soc_model.pkl
