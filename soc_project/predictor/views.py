@@ -611,12 +611,13 @@ def pipeline_upload_view(request):
         missing_optional = [c for c in OPTIONAL_COLUMNS if c not in detected_cols]
         missing_display  = [c for c in DISPLAY_COLUMNS  if c not in detected_cols]
 
-        request.session['pipeline_records']         = records
-        request.session['pipeline_filename']        = file.name
-        request.session['pipeline_columns']         = detected_cols
-        request.session['pipeline_missing']         = missing_cols
+        request.session['pipeline_records']          = records
+        request.session['pipeline_filename']         = file.name
+        request.session['pipeline_columns']          = detected_cols
+        request.session['pipeline_missing']          = missing_cols
         request.session['pipeline_missing_optional'] = missing_optional
         request.session['pipeline_missing_display']  = missing_display
+        request.session['pipeline_already_saved']    = False
     except Exception as exc:
         log_error(request.user, 'pipeline_upload', str(exc))
         return _render_upload_error(
@@ -765,6 +766,9 @@ def pipeline_normalize_view(request):
     missing_cols = [col for col in REQUIRED_COLUMNS if col not in detected_cols]
 
     if request.method == 'POST':
+        if request.session.get('pipeline_already_saved'):
+            return redirect('pipeline_preview')
+
         try:
             clean, stats = clean_records(records)
         except Exception as exc:
@@ -796,7 +800,6 @@ def pipeline_normalize_view(request):
 
         request.session['pipeline_clean_records'] = clean
         request.session['pipeline_stats'] = stats
-        request.session['pipeline_already_saved'] = False
 
         # Batch prediction — aprovecha correlation_id para features reales por incidente.
         # Si falla (datos corruptos, columnas inesperadas), cae al fallback por registro.
