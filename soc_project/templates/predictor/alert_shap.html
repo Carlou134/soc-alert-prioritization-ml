@@ -3,6 +3,19 @@
 {% block title %}SHAP — Alerta #{{ alert.id }} — SOC Predictor{% endblock %}
 
 {% block content %}
+<style>
+.prose-shap h1,.prose-shap h2,.prose-shap h3 { color:#e2e8f0; font-weight:600; margin:1rem 0 .4rem; }
+.prose-shap h1 { font-size:1.1rem; }
+.prose-shap h2 { font-size:1rem; }
+.prose-shap h3 { font-size:.9rem; color:#cbd5e1; }
+.prose-shap p  { margin:.5rem 0; color:#cbd5e1; }
+.prose-shap strong { color:#f1f5f9; font-weight:600; }
+.prose-shap em { color:#94a3b8; font-style:italic; }
+.prose-shap ul,.prose-shap ol { margin:.5rem 0 .5rem 1.25rem; color:#cbd5e1; }
+.prose-shap li { margin:.2rem 0; }
+.prose-shap code { background:rgba(148,163,184,.1); color:#7dd3fc; padding:.1rem .3rem; border-radius:.25rem; font-size:.8rem; }
+.prose-shap blockquote { border-left:3px solid #6366f1; padding-left:.75rem; color:#94a3b8; margin:.5rem 0; }
+</style>
 <div class="space-y-6">
 
     <!-- Header -->
@@ -103,11 +116,44 @@
         </div>
     </div>
 
+    <!-- Explicación IA -->
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-sm font-semibold text-white">Explicación en lenguaje natural</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Generada por IA — interpretación de los valores SHAP para el analista SOC</p>
+            </div>
+            {% if alert.shap_explanation %}
+            <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded">Guardada</span>
+            {% else %}
+            <span id="explain-badge" class="text-xs bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2 py-1 rounded">Generando...</span>
+            {% endif %}
+        </div>
+
+        <div id="explain-container">
+            {% if alert.shap_explanation %}
+            <div id="explain-static" class="prose-shap text-sm text-slate-300 leading-relaxed"
+                 data-markdown="{{ alert.shap_explanation|escape }}"></div>
+            {% else %}
+            <div id="explain-loading" class="flex items-center gap-2 text-sm text-slate-400">
+                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
+                Analizando valores SHAP...
+            </div>
+            <div id="explain-result" class="hidden prose-shap text-sm text-slate-300 leading-relaxed"></div>
+            <div id="explain-error" class="hidden text-sm text-red-400"></div>
+            {% endif %}
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@13/marked.min.js"></script>
 <script>
 (function () {
     const shap_s1 = {{ shap_s1|safe }};
@@ -171,6 +217,51 @@
 
     buildChart('chartS1', shap_s1, 'rgba(239,68,68,0.75)',  'rgba(16,185,129,0.75)');
     buildChart('chartS2', shap_s2, 'rgba(245,158,11,0.75)', 'rgba(59,130,246,0.75)');
+
+    // Render markdown para explicación ya guardada en BD
+    const staticEl = document.getElementById('explain-static');
+    if (staticEl) {
+        staticEl.innerHTML = marked.parse(staticEl.dataset.markdown);
+    }
 })();
+
+{% if not alert.shap_explanation %}
+document.addEventListener('DOMContentLoaded', function () {
+    const badge   = document.getElementById('explain-badge');
+    const loading = document.getElementById('explain-loading');
+    const result  = document.getElementById('explain-result');
+    const error   = document.getElementById('explain-error');
+
+    fetch("{% url 'alert_explain' alert.pk %}", {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(res => res.json())
+    .then(data => {
+        loading.classList.add('hidden');
+        if (data.error) {
+            badge.textContent = 'Error';
+            badge.className = 'text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded';
+            error.textContent = data.error;
+            error.classList.remove('hidden');
+        } else {
+            badge.textContent = 'Guardada';
+            badge.className = 'text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded';
+            result.innerHTML = marked.parse(data.explanation);
+            result.classList.remove('hidden');
+        }
+    })
+    .catch(() => {
+        loading.classList.add('hidden');
+        badge.textContent = 'Error';
+        badge.className = 'text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded';
+        error.textContent = 'Error de conexión. Recargá la página para intentar nuevamente.';
+        error.classList.remove('hidden');
+    });
+});
+{% endif %}
 </script>
 {% endblock %}

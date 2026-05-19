@@ -1,0 +1,72 @@
+import anthropic
+from django.conf import settings
+
+_client = None
+
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    return _client
+
+
+def _build_prompt(alert, shap_data: dict) -> str:
+    predicted = alert.predicted_class
+    risk = round(alert.risk_score or 0, 4)
+    probabilities = alert.probabilities or {}
+
+    s1 = shap_data.get('s1', {})
+    s2 = shap_data.get('s2', {})
+
+    s1_features = s1.get('features', [])[:8]
+    s2_features = s2.get('features', [])[:8]
+
+    def fmt_features(features):
+        lines = []
+        for f in features:
+            direction = "↑ empuja hacia la clase" if f['shap'] > 0 else "↓ aleja de la clase"
+            lines.append(f"  - {f['name']}: SHAP={f['shap']:+.4f} ({direction})")
+        return "\n".join(lines) if lines else "  (sin datos)"
+
+    return f"""Eres un experto en ciberseguridad analizando alertas SOC. Tu tarea es explicar en español, de forma clara y concisa, los valores SHAP de una alerta analizada por un modelo de Machine Learning jerárquico de dos etapas.
+
+DATOS DE LA ALERTA:
+- Clasificación final: {predicted}
+- Risk Score: {risk}
+- Probabilidades: Benigno={probabilities.get('benigno', 0):.3f} | A investigar={probabilities.get('a_investigar', 0):.3f} | Malicioso={probabilities.get('malicioso', 0):.3f}
+- Severidad: {alert.severity}
+- Categoría del evento: {alert.event_category}
+- Táctica MITRE: {alert.mitre_tactic}
+- Acción del firewall: {alert.firewall_action}
+- Alerta IDS/IPS: {alert.ids_ips_alert}
+
+VALORES SHAP — ETAPA 1 (detección de amenaza, clase: malicioso):
+{fmt_features(s1_features)}
+
+VALORES SHAP — ETAPA 2 (clasificación, clase: a_investigar):
+{fmt_features(s2_features)}
+
+INSTRUCCIONES:
+1. Explica en 2-3 párrafos qué significan estos valores SHAP para esta alerta específica.
+2. Identifica los factores más incriminantes y los más exonerantes.
+3. Da una recomendación concreta para el analista SOC (investigar, ignorar, escalar, etc.).
+4. Usa lenguaje técnico pero comprensible. No uses listas extensas, preferiblemente usa párrafos fluidos.
+5. Máximo 350 palabras."""
+
+
+def generate_shap_explanation(alert) -> str:
+    """
+    Genera explicación en lenguaje natural de los valores SHAP de una alerta.
+    Lanza excepción si la API falla — el caller decide cómo manejarlo.
+    """
+    shap_data = alert.shap_values or {}
+    prompt = _build_prompt(alert, shap_data)
+
+    message = _get_client().messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    return message.content[0].text

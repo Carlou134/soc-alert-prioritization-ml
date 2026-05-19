@@ -63,6 +63,7 @@ class Alert(models.Model):
     risk_score = models.FloatField(null=True, blank=True)
     probabilities = models.JSONField(null=True, blank=True)
     shap_values = models.JSONField(null=True, blank=True)
+    shap_explanation = models.TextField(null=True, blank=True)
 
     # Trazabilidad
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')

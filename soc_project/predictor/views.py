@@ -3,6 +3,8 @@ import csv
 import json
 from collections import Counter
 
+from django.http import JsonResponse
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -992,4 +994,31 @@ def alert_shap_view(request, pk):
         'shap_s2': _json.dumps(shap_data['s2']),
     })
 
-    return response
+
+@login_required
+def alert_explain_view(request, pk):
+    from django.shortcuts import get_object_or_404
+    from .claude_service import generate_shap_explanation
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    alert = get_object_or_404(Alert, pk=pk)
+
+    if not alert.predicted_class:
+        return JsonResponse({'error': 'La alerta no está clasificada.'}, status=400)
+
+    if not alert.shap_values:
+        return JsonResponse({'error': 'Esta alerta no tiene valores SHAP calculados.'}, status=400)
+
+    # Si ya existe explicación guardada, la devolvemos sin llamar a la API
+    if alert.shap_explanation:
+        return JsonResponse({'explanation': alert.shap_explanation, 'cached': True})
+
+    try:
+        explanation = generate_shap_explanation(alert)
+        alert.shap_explanation = explanation
+        alert.save(update_fields=['shap_explanation'])
+        return JsonResponse({'explanation': explanation, 'cached': False})
+    except Exception as exc:
+        return JsonResponse({'error': f'Error al generar la explicación: {exc}'}, status=500)
