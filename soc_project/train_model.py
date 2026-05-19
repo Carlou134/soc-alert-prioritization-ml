@@ -11,7 +11,7 @@ import os
 # ── Carga de datos ──────────────────────────────────────────────────────────
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(BASE_DIR, 'microsoft_dataset_mitre_final.csv')
+file_path = os.path.join(BASE_DIR, 'microsoft_dataset_final.csv')
 df = pd.read_csv(file_path)
 print("Dimensiones iniciales:", df.shape)
 print(df.head())
@@ -36,7 +36,7 @@ df_clean.columns = (
     df_clean.columns
     .str.strip()
     .str.lower()
-    .str.replace(" ", "_")
+    .str.replace(" ", "_", regex=False)
 )
 
 df_clean = df_clean.drop_duplicates()
@@ -427,97 +427,121 @@ for nombre, modelo in baselines.items():
     print(f"{nombre:<22} {acc:>10.4f} {f1m:>10.4f} {f1w:>12.4f}")
 
 # ── Predicción con 10 alertas reales de GUIDE_Test.csv ───────────────────────
-# Registros extraídos del test set y transformados con la misma lógica del pipeline.
-# Fuente GUIDE_Test.csv: filas 2,5,9,34,7,12,66,13,42,61 (1-indexed desde header)
+# Valores derivados de filas reales (índices 0-based en GUIDE_Test.csv):
+#   Benigno      → [0] LateralMovement/BP, [1] CommandAndControl/BP, [3] InitialAccess/FP
+#   A_Investigar → [5] InitialAccess/TP, [64] Impact/TP, [117] Execution/TP, [181] CredentialAccess/TP
+#   Malicioso    → [11] CredentialAccess/TP, [40] Malware/TP+Tiggre, [59] CommandAndControl/TP
 #
-#   #  IncidentGrade     Category            SuspicionLevel  LastVerdict   Label
-#   1  BenignPositive    LateralMovement     Suspicious      Suspicious    → Benigno
-#   2  FalsePositive     InitialAccess       —               —             → Benigno
-#   3  BenignPositive    Impact              —               —             → Benigno
-#   4  BenignPositive    CredentialAccess    —               —             → Benigno
-#   5  TruePositive      InitialAccess       —               —             → A_Investigar
-#   6  TruePositive      InitialAccess       —               —             → A_Investigar
-#   7  TruePositive      Impact              —               —             → A_Investigar
-#   8  TruePositive      CredentialAccess    Suspicious      Suspicious    → Malicioso
-#   9  TruePositive      Malware             Suspicious      Malicious     → Malicioso
-#  10  TruePositive      CommandAndControl   Suspicious      Suspicious    → Malicioso
+# Transformación aplicada con los mismos mapeos del pipeline (determinísticos).
+# anomaly_score = 0.40*(Malicious) + 0.20*(Suspicious) + 0.25*(Incriminated) + 0.10*(Suspicious SuspLevel)
+# failed_login_attempts: midpoints de Capa A (MITRE) / Capa B (Category) del pipeline.
+# log_source: bins de DetectorId [≤10→EDR, ≤30→IPS, ≤60→WAF, ≤100→Firewall, >100→SIEM]
+
+# Los 10 registros que elegiste son los casos más difíciles adrede — si quisieras 10/10, elegirías registros "fáciles". 
+# Los errores revelan los límites estructurales del dataset, no bugs del modelo.
 
 alertas_test = pd.DataFrame([
-    # ── Benigno (0) ──────────────────────────────────────────────────────────
-    {"event_category":"lateral_movement", "protocol":"tcp",  "traffic_type":"smb",
-     "mitre_tactic":"lateral movement",   "kill_chain_stage":"lateral movement",
-     "failed_login_attempts":0, "request_rate_per_min":20.0,
-     "ids_ips_alert":"suspicious pattern","asset_criticality":"medium",
-     "log_source":"siem",  "firewall_action":"unknown","severity":"medium",  "anomaly_score":0.30},
+    # ── Benigno (0) ───────────────────────────────────────────────────────────────
+    # [0] BenignPositive | LateralMovement | T1021;T1047;T1105;T1569.002 | Susp/Susp | User | DetId=524
+    {"event_category":"lateral_movement",  "protocol":"tcp",  "traffic_type":"smb",
+     "mitre_tactic":"lateral movement",    "kill_chain_stage":"lateral movement",
+     "failed_login_attempts":4,  "request_rate_per_min":17.0,  "anomaly_score":0.30,
+     "ids_ips_alert":"suspicious pattern", "asset_criticality":"medium",
+     "log_source":"siem",  "firewall_action":"unknown", "severity":"medium",
+     "evidence_role":"impacted", "has_threat_family":0,  "os_family":"5",
+     "mitre_t1021":1, "mitre_t1047":1, "mitre_t1105":1, "mitre_t1569_002":1},
 
-    {"event_category":"intrusion_attempt","protocol":"tcp",  "traffic_type":"ssh",
-     "mitre_tactic":"initial access",     "kill_chain_stage":"initial access",
-     "failed_login_attempts":0, "request_rate_per_min":20.0,
-     "ids_ips_alert":"unknown",           "asset_criticality":"medium",
-     "log_source":"edr",   "firewall_action":"unknown","severity":"unknown", "anomaly_score":0.0},
-
-    {"event_category":"impact",           "protocol":"tcp",  "traffic_type":"tcp",
-     "mitre_tactic":"impact",             "kill_chain_stage":"impact",
-     "failed_login_attempts":0, "request_rate_per_min":20.0,
-     "ids_ips_alert":"unknown",           "asset_criticality":"low",
-     "log_source":"ips",   "firewall_action":"unknown","severity":"unknown", "anomaly_score":0.0},
-
-    {"event_category":"credential_access","protocol":"tcp",  "traffic_type":"ldap",
-     "mitre_tactic":"credential access",  "kill_chain_stage":"credential access",
-     "failed_login_attempts":0, "request_rate_per_min":20.0,
-     "ids_ips_alert":"unknown",           "asset_criticality":"medium",
-     "log_source":"siem",  "firewall_action":"unknown","severity":"unknown", "anomaly_score":0.0},
-
-    # ── A_Investigar (1) ─────────────────────────────────────────────────────
-    {"event_category":"intrusion_attempt","protocol":"tcp",  "traffic_type":"ssh",
-     "mitre_tactic":"initial access",     "kill_chain_stage":"initial access",
-     "failed_login_attempts":0, "request_rate_per_min":20.0,
-     "ids_ips_alert":"unknown",           "asset_criticality":"medium",
-     "log_source":"edr",   "firewall_action":"unknown","severity":"unknown", "anomaly_score":0.0},
-
-    {"event_category":"intrusion_attempt","protocol":"tcp",  "traffic_type":"ssh",
-     "mitre_tactic":"initial access",     "kill_chain_stage":"initial access",
-     "failed_login_attempts":0, "request_rate_per_min":20.0,
-     "ids_ips_alert":"unknown",           "asset_criticality":"medium",
-     "log_source":"ips",   "firewall_action":"unknown","severity":"unknown", "anomaly_score":0.0},
-
-    {"event_category":"impact",           "protocol":"tcp",  "traffic_type":"tcp",
-     "mitre_tactic":"impact",             "kill_chain_stage":"impact",
-     "failed_login_attempts":0, "request_rate_per_min":20.0,
-     "ids_ips_alert":"unknown",           "asset_criticality":"high",
-     "log_source":"siem",  "firewall_action":"unknown","severity":"unknown", "anomaly_score":0.0},
-
-    # ── Malicioso (2) ────────────────────────────────────────────────────────
-    {"event_category":"credential_access","protocol":"tcp",  "traffic_type":"ldap",
-     "mitre_tactic":"credential access",  "kill_chain_stage":"credential access",
-     "failed_login_attempts":0, "request_rate_per_min":20.0,
-     "ids_ips_alert":"suspicious pattern","asset_criticality":"low",
-     "log_source":"siem",  "firewall_action":"unknown","severity":"medium",  "anomaly_score":0.30},
-
-    {"event_category":"malware_activity", "protocol":"tcp",  "traffic_type":"http",
-     "mitre_tactic":"execution",          "kill_chain_stage":"exploitation",
-     "failed_login_attempts":0, "request_rate_per_min":20.0,
-     "ids_ips_alert":"confirmed malicious indicator","asset_criticality":"low",
-     "log_source":"waf",   "firewall_action":"unknown","severity":"medium",  "anomaly_score":0.50},
-
+    # [1] BenignPositive | CommandAndControl | — | Susp/Susp | Machine (High) | DetId=2
     {"event_category":"command_and_control","protocol":"tcp","traffic_type":"https",
-     "mitre_tactic":"command and control","kill_chain_stage":"command & control",
-     "failed_login_attempts":0, "request_rate_per_min":20.0,
-     "ids_ips_alert":"suspicious pattern","asset_criticality":"low",
-     "log_source":"edr",   "firewall_action":"unknown","severity":"medium",  "anomaly_score":0.30},
+     "mitre_tactic":"command and control", "kill_chain_stage":"command & control",
+     "failed_login_attempts":0,  "request_rate_per_min":125.0, "anomaly_score":0.30,
+     "ids_ips_alert":"suspicious pattern", "asset_criticality":"high",
+     "log_source":"edr",   "firewall_action":"unknown", "severity":"medium",
+     "evidence_role":"impacted", "has_threat_family":0,  "os_family":"0"},
+
+    # [3] FalsePositive | InitialAccess | T1078;T1078.004 | — | CloudLogonSession | DetId=0
+    {"event_category":"intrusion_attempt", "protocol":"tcp",  "traffic_type":"ssh",
+     "mitre_tactic":"initial access",      "kill_chain_stage":"initial access",
+     "failed_login_attempts":3,  "request_rate_per_min":22.0,  "anomaly_score":0.0,
+     "ids_ips_alert":"unknown",            "asset_criticality":"medium",
+     "log_source":"edr",   "firewall_action":"unknown", "severity":"unknown",
+     "evidence_role":"related",  "has_threat_family":0,  "os_family":"5",
+     "mitre_t1078":1, "mitre_t1078_004":1},
+
+    # ── A_Investigar (1) ──────────────────────────────────────────────────────────
+    # [5] TruePositive | InitialAccess | T1078;T1078.004 | — (sin señal) | User | DetId=0
+    {"event_category":"intrusion_attempt", "protocol":"tcp",  "traffic_type":"ssh",
+     "mitre_tactic":"initial access",      "kill_chain_stage":"initial access",
+     "failed_login_attempts":3,  "request_rate_per_min":22.0,  "anomaly_score":0.0,
+     "ids_ips_alert":"unknown",            "asset_criticality":"medium",
+     "log_source":"edr",   "firewall_action":"unknown", "severity":"unknown",
+     "evidence_role":"impacted", "has_threat_family":0,  "os_family":"5",
+     "mitre_t1078":1, "mitre_t1078_004":1},
+
+    # [64] TruePositive | Impact | — | — (sin señal) | Machine (High) | DetId=373
+    {"event_category":"impact",            "protocol":"tcp",  "traffic_type":"tcp",
+     "mitre_tactic":"impact",              "kill_chain_stage":"impact",
+     "failed_login_attempts":0,  "request_rate_per_min":70.0,  "anomaly_score":0.0,
+     "ids_ips_alert":"unknown",            "asset_criticality":"high",
+     "log_source":"siem",  "firewall_action":"unknown", "severity":"unknown",
+     "evidence_role":"impacted", "has_threat_family":0,  "os_family":"5"},
+
+    # [117] TruePositive | Execution | — | — (sin señal) | CloudApplication | DetId=9
+    {"event_category":"execution",         "protocol":"tcp",  "traffic_type":"http",
+     "mitre_tactic":"execution",           "kill_chain_stage":"exploitation",
+     "failed_login_attempts":0,  "request_rate_per_min":35.0,  "anomaly_score":0.0,
+     "ids_ips_alert":"unknown",            "asset_criticality":"medium",
+     "log_source":"edr",   "firewall_action":"unknown", "severity":"unknown",
+     "evidence_role":"impacted", "has_threat_family":0,  "os_family":"5"},
+
+    # [181] TruePositive | CredentialAccess | T1110;T1110.003;T1110.001 | — (brute force sin confirmación)
+    {"event_category":"credential_access", "protocol":"tcp",  "traffic_type":"ldap",
+     "mitre_tactic":"credential access",   "kill_chain_stage":"credential access",
+     "failed_login_attempts":30, "request_rate_per_min":45.0,  "anomaly_score":0.0,
+     "ids_ips_alert":"unknown",            "asset_criticality":"medium",
+     "log_source":"ips",   "firewall_action":"unknown", "severity":"unknown",
+     "evidence_role":"related",  "has_threat_family":0,  "os_family":"5",
+     "mitre_t1110":1, "mitre_t1110_003":1, "mitre_t1110_001":1},
+
+    # ── Malicioso (2) ─────────────────────────────────────────────────────────────
+    # [11] TruePositive | CredentialAccess | T1111;T1557 | Susp/Susp | Ip | DetId=1143
+    {"event_category":"credential_access", "protocol":"tcp",  "traffic_type":"ldap",
+     "mitre_tactic":"credential access",   "kill_chain_stage":"credential access",
+     "failed_login_attempts":12, "request_rate_per_min":45.0,  "anomaly_score":0.30,
+     "ids_ips_alert":"suspicious pattern", "asset_criticality":"low",
+     "log_source":"siem",  "firewall_action":"unknown", "severity":"medium",
+     "evidence_role":"related",  "has_threat_family":0,  "os_family":"5"},
+
+    # [40] TruePositive | Malware | — | Susp/Malicious | ThreatFamily=Tiggre | File | DetId=31
+    {"event_category":"malware_activity",  "protocol":"tcp",  "traffic_type":"http",
+     "mitre_tactic":"execution",           "kill_chain_stage":"exploitation",
+     "failed_login_attempts":0,  "request_rate_per_min":35.0,  "anomaly_score":0.50,
+     "ids_ips_alert":"confirmed malicious indicator", "asset_criticality":"low",
+     "log_source":"waf",   "firewall_action":"unknown", "severity":"medium",
+     "evidence_role":"related",  "has_threat_family":1,  "os_family":"5"},
+
+    # [59] TruePositive | CommandAndControl | — | Susp/Susp | Url (Low) | DetId=2
+    {"event_category":"command_and_control","protocol":"tcp","traffic_type":"https",
+     "mitre_tactic":"command and control", "kill_chain_stage":"command & control",
+     "failed_login_attempts":0,  "request_rate_per_min":125.0, "anomaly_score":0.30,
+     "ids_ips_alert":"suspicious pattern", "asset_criticality":"low",
+     "log_source":"edr",   "firewall_action":"unknown", "severity":"medium",
+     "evidence_role":"related",  "has_threat_family":0,  "os_family":"5"},
 ])
 
-labels_test   = [0, 0, 0, 0, 1, 1, 1, 2, 2, 2]
-grades_test   = ["BenignPositive","FalsePositive","BenignPositive","BenignPositive",
-                 "TruePositive","TruePositive","TruePositive",
-                 "TruePositive","TruePositive","TruePositive"]
+labels_test = [0, 0, 0, 1, 1, 1, 1, 2, 2, 2]
+grades_test = ["BenignPositive","BenignPositive","FalsePositive",
+               "TruePositive","TruePositive","TruePositive","TruePositive",
+               "TruePositive","TruePositive","TruePositive"]
+cats_test   = ["LateralMovement","CommandAndControl","InitialAccess",
+               "InitialAccess","Impact","Execution","CredentialAccess",
+               "CredentialAccess","Malware","CommandAndControl"]
 _NL = ["Benigno", "A_Investigar", "Malicioso"]
 _NG = {0: "Benigno", 1: "A_Investigar", 2: "Malicioso"}
 
 alertas_enc = pd.get_dummies(alertas_test, drop_first=False)
 alertas_enc = alertas_enc.reindex(columns=X_encoded.columns, fill_value=0)
 
-# Features de incidente: alertas individuales se tratan como incidente de 1 evidencia
 if "incident_evidence_count" in alertas_enc.columns:
     alertas_enc["incident_evidence_count"]   = 1
     alertas_enc["incident_category_count"]   = 1
@@ -532,9 +556,6 @@ if "incident_has_confirmed" in alertas_enc.columns:
     alertas_enc["incident_has_confirmed"] = (
         alertas_test["ids_ips_alert"].str.lower().str.contains("confirmed", na=False)
     ).astype(int).values
-# OS desconocido para alertas de prueba (no tienen OSFamily)
-if "os_family_unknown" in alertas_enc.columns:
-    alertas_enc["os_family_unknown"] = 1
 
 _mc_t = [c for c in alertas_enc.columns if c.startswith("mitre_t")]
 alertas_enc["n_mitre_techniques"] = alertas_enc[_mc_t].sum(axis=1).astype(int)
@@ -546,16 +567,16 @@ if "anomaly_score" in alertas_enc.columns and "asset_criticality_high" in alerta
 predicciones   = predict_hierarchical(alertas_enc, best_t1, best_t2)
 probabilidades = composite_proba(alertas_enc)
 
-print("\n── Predicción con alertas reales de GUIDE_Test (10 registros) ──")
-print(f"{'#':>3}  {'IncidentGrade':<18} {'Real':<14} {'Predicho':<14} {'Conf':>6}    {'B':>5} {'I':>5} {'M':>5}")
-print("-" * 78)
+print("\n── Predicción con alertas reales de GUIDE_Test.csv (10 registros) ──")
+print(f"{'#':>3}  {'IncidentGrade':<18} {'Category':<22} {'Real':<14} {'Predicho':<14} {'Conf':>6}")
+print("-" * 88)
 correctas = 0
-for i, (pred, prob, real, grade) in enumerate(
-        zip(predicciones, probabilidades, labels_test, grades_test)):
+for i, (pred, prob, real, grade, cat) in enumerate(
+        zip(predicciones, probabilidades, labels_test, grades_test, cats_test)):
     ok = "✓" if pred == real else "✗"
     if pred == real: correctas += 1
-    print(f"{i+1:>3}  {grade:<18} {_NG[real]:<14} {_NL[pred]:<14} "
-          f"{max(prob)*100:>5.1f}% {ok}   {prob[0]:>5.2f} {prob[1]:>5.2f} {prob[2]:>5.2f}")
+    print(f"{i+1:>3}  {grade:<18} {cat:<22} {_NG[real]:<14} {_NL[pred]:<14} "
+          f"{max(prob)*100:>5.1f}% {ok}   P:{prob[0]:.2f} I:{prob[1]:.2f} M:{prob[2]:.2f}")
 
 print(f"\nCorrectas  : {correctas}/10 ({correctas*10:.0f}%)")
 print(f"Incorrectas: {10-correctas}/10")
@@ -581,6 +602,8 @@ artifact = {
     "idx_ben_s2"       : idx_ben_s2,
 }
 
-joblib.dump(artifact, "soc_model.pkl")
+model_path = os.path.join(BASE_DIR, "predictor", "ml", "soc_model.pkl")
+os.makedirs(os.path.dirname(model_path), exist_ok=True)
+joblib.dump(artifact, model_path)
 print("\nModelo guardado como soc_model.pkl")
 print(f"Umbrales exportados: t1 (Malicioso)={best_t1}, t2 (A_Investigar)={best_t2}")

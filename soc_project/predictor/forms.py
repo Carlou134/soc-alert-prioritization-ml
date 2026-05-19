@@ -78,16 +78,22 @@ LOG_SOURCE_CHOICES = [
 ]
 FIREWALL_CHOICES = [('', '---'), ('allow', 'Allow'), ('blocked', 'Blocked'), ('unknown', 'Unknown')]
 SEVERITY_CHOICES = [('', '---'), ('low', 'Low'), ('medium', 'Medium'), ('critical', 'Critical'), ('unknown', 'Unknown')]
+EVIDENCE_ROLE_CHOICES = [
+    ('', '---'),
+    ('attacker', 'Attacker'),
+    ('impacted', 'Impacted'),
+    ('related', 'Related'),
+    ('unknown', 'Unknown'),
+]
 
 
 class PredictionForm(forms.Form):
+    # ── Campos requeridos — determinan el resultado de la predicción ─────────
     event_category = forms.ChoiceField(
         label='Categoría del evento',
         choices=EVENT_CATEGORY_CHOICES,
         widget=forms.Select(attrs={'class': SELECT_CLASS})
     )
-    attack_type = forms.CharField(label='Tipo de ataque', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
-    attack_signature = forms.CharField(label='Firma del ataque', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
     protocol = forms.ChoiceField(
         label='Protocolo',
         choices=PROTOCOL_CHOICES,
@@ -113,7 +119,6 @@ class PredictionForm(forms.Form):
         choices=IDS_IPS_CHOICES,
         widget=forms.Select(attrs={'class': SELECT_CLASS})
     )
-    malware_indicator = forms.CharField(label='Indicador de malware', widget=forms.TextInput(attrs={'class': INPUT_CLASS}))
     asset_criticality = forms.ChoiceField(
         label='Criticidad del activo',
         choices=CRITICALITY_CHOICES,
@@ -145,6 +150,33 @@ class PredictionForm(forms.Form):
         widget=forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.1'})
     )
 
+    # ── Campos opcionales — mejoran la predicción significativamente ─────────
+    has_threat_family = forms.IntegerField(
+        label='Familia de malware conocida',
+        min_value=0, max_value=1, required=False, initial=0,
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASS}),
+        help_text='1 si hay una familia de malware identificada (ThreatFamily), 0 si no.'
+    )
+    evidence_role = forms.ChoiceField(
+        label='Rol de evidencia',
+        choices=EVIDENCE_ROLE_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': SELECT_CLASS}),
+        help_text='Rol de la entidad en el incidente.'
+    )
+    os_family = forms.CharField(
+        label='Sistema operativo',
+        required=False,
+        widget=forms.TextInput(attrs={'class': INPUT_CLASS, 'placeholder': 'ej: windows, linux, unknown'}),
+        help_text='Sistema operativo del activo afectado.'
+    )
+    mitre_techniques = forms.CharField(
+        label='Técnicas MITRE',
+        required=False,
+        widget=forms.TextInput(attrs={'class': INPUT_CLASS, 'placeholder': 'ej: T1110;T1078.004'}),
+        help_text='Códigos ATT&CK separados por ";" — mejoran el score de Stage 2.'
+    )
+
 
 class JSONPredictionForm(forms.Form):
     payload = forms.CharField(
@@ -154,20 +186,21 @@ class JSONPredictionForm(forms.Form):
             'placeholder': (
                 '{\n'
                 '  "event_category": "intrusion_attempt",\n'
-                '  "attack_type": "brute force",\n'
-                '  "attack_signature": "SSH Brute Force",\n'
                 '  "protocol": "tcp",\n'
                 '  "traffic_type": "ssh",\n'
                 '  "mitre_tactic": "initial access",\n'
                 '  "kill_chain_stage": "initial access",\n'
                 '  "ids_ips_alert": "suspicious pattern",\n'
-                '  "malware_indicator": "no",\n'
                 '  "asset_criticality": "high",\n'
                 '  "log_source": "firewall",\n'
                 '  "firewall_action": "blocked",\n'
                 '  "severity": "critical",\n'
                 '  "failed_login_attempts": 15,\n'
-                '  "request_rate_per_min": 320.5\n'
+                '  "request_rate_per_min": 320.5,\n'
+                '  "has_threat_family": 0,\n'
+                '  "evidence_role": "impacted",\n'
+                '  "os_family": "windows",\n'
+                '  "mitre_techniques": "T1078;T1110.003"\n'
                 '}'
             )
         })
@@ -184,10 +217,10 @@ class JSONPredictionForm(forms.Form):
             raise forms.ValidationError('El JSON debe ser un objeto.')
 
         required_fields = [
-            'event_category', 'attack_type', 'attack_signature', 'protocol',
-            'traffic_type', 'mitre_tactic', 'kill_chain_stage', 'ids_ips_alert',
-            'malware_indicator', 'asset_criticality', 'log_source', 'firewall_action',
-            'severity', 'failed_login_attempts', 'request_rate_per_min',
+            'event_category', 'protocol', 'traffic_type', 'mitre_tactic',
+            'kill_chain_stage', 'ids_ips_alert', 'asset_criticality',
+            'log_source', 'firewall_action', 'severity',
+            'failed_login_attempts', 'request_rate_per_min',
         ]
         missing = [f for f in required_fields if f not in data or data[f] is None]
         if missing:

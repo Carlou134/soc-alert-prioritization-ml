@@ -1,0 +1,31 @@
+event_category,protocol,traffic_type,mitre_tactic,kill_chain_stage,severity,ids_ips_alert,asset_criticality,log_source,firewall_action,failed_login_attempts,request_rate_per_min,has_threat_family,evidence_role,os_family,correlation_id,mitre_techniques,attack_type,attack_signature,malware_indicator,label
+suspicious_activity,tcp,tcp,discovery,unknown,medium,suspicious pattern,high,edr,unknown,0,29.83,0,impacted,5,14425,,Suspicious Activity,Anomalous Behavior Alert,Suspicious,malicioso
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,medium,edr,unknown,3,21.93,0,impacted,5,390,T1078
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,medium,edr,unknown,5,18.91,0,impacted,5,74,T1078
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,high,edr,unknown,7,13.34,0,impacted,5,280,T1133,Initial Compromise,External Remote Services Access,,benigno
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,low,edr,unknown,8,20.31,0,related,5,105868,T1566.002,Initial Compromise,Unauthorized Initial Access Attempt,,benigno
+impact,tcp,tcp,impact,impact,unknown,unknown,low,ips,unknown,0,56.71,0,related,5,1996,,Impact,System or Data Impact Activity,,benigno
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,high,siem,unknown,9,21.0,0,impacted,5,19552,,Initial Compromise,Unauthorized Initial Access Attempt,,a_investigar
+suspicious_activity,tcp,tcp,discovery,unknown,medium,suspicious pattern,low,edr,unknown,0,26.44,0,related,5,179374,,Suspicious Activity,Anomalous Behavior Alert,Suspicious,malicioso
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,medium,ips,unknown,3,10.22,0,related,5,385034,,Initial Compromise,Unauthorized Initial Access Attempt,,benigno
+command_and_control,tcp,https,command and control,command & control,medium,suspicious pattern,low,edr,unknown,0,88.77,0,related,5,209,,C2 Communication,Beaconing to C2 Infrastructure,Suspicious,malicioso
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,medium,edr,unknown,1,5.49,0,impacted,5,406899,T1078
+suspicious_activity,tcp,tcp,discovery,unknown,medium,suspicious pattern,medium,edr,unknown,0,32.76,0,impacted,5,8041,,Suspicious Activity,Anomalous Behavior Alert,Suspicious,malicioso
+command_and_control,tcp,https,command and control,command & control,medium,suspicious pattern,low,edr,unknown,0,68.29,0,related,5,21103,,C2 Communication,Beaconing to C2 Infrastructure,Suspicious,malicioso
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,confirmed malicious indicator,low,edr,unknown,5,8.19,0,related,5,1227,T1566.002,Initial Compromise,Unauthorized Initial Access Attempt,Yes,malicioso
+suspicious_activity,tcp,tcp,discovery,unknown,medium,suspicious pattern,medium,edr,unknown,0,16.73,0,related,5,11967,,Suspicious Activity,Anomalous Behavior Alert,Suspicious,malicioso
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,low,edr,unknown,5,10.79,0,related,5,149,T1078
+data_exfiltration,udp,dns,exfiltration,exfiltration,unknown,unknown,low,siem,unknown,0,89.29,0,impacted,5,121278,,Data Exfiltration,Data Exfiltration Attempt,,benigno
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,medium,edr,unknown,4,23.22,0,impacted,5,313,T1078
+suspicious_activity,tcp,tcp,discovery,unknown,unknown,unknown,low,siem,unknown,0,11.36,0,related,5,196829,,Suspicious Activity,Anomalous Behavior Alert,,a_investigar
+impact,tcp,tcp,impact,impact,unknown,unknown,low,ips,unknown,0,64.98,0,related,5,181,,Impact,System or Data Impact Activity,,benigno
+command_and_control,tcp,https,command and control,command & control,medium,suspicious pattern,low,edr,unknown,0,192.36,0,related,5,317177,,C2 Communication,Beaconing to C2 Infrastructure,Suspicious,malicioso
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,medium,edr,unknown,1,18.27,0,impacted,5,38,,Initial Compromise,Unauthorized Initial Access Attempt,,a_investigar
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,low,edr,unknown,7,19.82,0,related,5,27892,T1566,Initial Compromise,Phishing Campaign,,benigno
+command_and_control,tcp,https,command and control,command & control,medium,suspicious pattern,high,edr,unknown,0,67.46,0,impacted,0,182115,,C2 Communication,Beaconing to C2 Infrastructure,Suspicious,malicioso
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,medium,edr,unknown,5,16.03,0,related,5,273,T1078
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,medium,edr,unknown,1,27.69,0,related,5,210,T1078
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,confirmed malicious indicator,low,edr,unknown,4,20.24,0,related,5,50028,T1566.002,Initial Compromise,Unauthorized Initial Access Attempt,Yes,malicioso
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,unknown,low,edr,unknown,9,10.83,0,related,5,133,,Initial Compromise,Unauthorized Initial Access Attempt,,a_investigar
+intrusion_attempt,tcp,ssh,initial access,initial access,unknown,confirmed malicious indicator,medium,edr,unknown,6,18.44,0,impacted,5,84303,T1566.002,Initial Compromise,Unauthorized Initial Access Attempt,Yes,benigno
+command_and_control,tcp,https,command and control,command & control,unknown,unknown,high,siem,unknown,0,114.43,0,impacted,5,181205,,C2 Communication,Beaconing to C2 Infrastructure,,benigno

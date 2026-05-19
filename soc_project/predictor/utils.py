@@ -1,60 +1,51 @@
+# -*- coding: utf-8 -*-
+import re
+import __main__
 from pathlib import Path
+
 import joblib
+import numpy as np
 import pandas as pd
 
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH = BASE_DIR / 'ml' / 'soc_model.pkl'
 
-artifact = joblib.load(MODEL_PATH)
-model = artifact['model']
+
+class _CalibratedS2:
+    """
+    Wrapper Platt: raw RF probs → LogisticRegression sigmoid → calibrated probs.
+    Debe estar definida aquí e inyectada en __main__ antes de joblib.load()
+    porque fue serializada desde __main__ en train_model.py.
+    """
+    def __init__(self, rf, lr):
+        self.rf = rf
+        self.lr = lr
+        self.classes_ = lr.classes_
+
+    def predict_proba(self, X):
+        return self.lr.predict_proba(self.rf.predict_proba(X))
+
+
+# Necesario para que pickle resuelva _CalibratedS2 que fue guardada desde __main__
+__main__._CalibratedS2 = _CalibratedS2
+
+artifact         = joblib.load(MODEL_PATH)
+rf_s1            = artifact['model_s1']
+rf_s2_cal        = artifact['model_s2']
 training_columns = artifact['training_columns']
+s2_columns       = artifact['s2_columns']
+_t1              = artifact['thresholds']['t1']
+_t2              = artifact['thresholds']['t2']
+_idx_mal_s1      = artifact['idx_mal_s1']
+_idx_inv_s2      = artifact['idx_inv_s2']
+_idx_ben_s2      = artifact['idx_ben_s2']
 
-# Campos que el analista envía en cada alerta (validados por el serializer)
-EXPECTED_FIELDS = [
-    'event_category',
-    'attack_type',
-    'attack_signature',
-    'protocol',
-    'traffic_type',
-    'mitre_tactic',
-    'kill_chain_stage',
-    'failed_login_attempts',
-    'request_rate_per_min',
-    'ids_ips_alert',
-    'malware_indicator',
-    'asset_criticality',
-    'log_source',
-    'firewall_action',
-    'severity',
-]
-
-# Campos que el modelo usa para predecir.
-# Origen: train_model.py línea 141-143:
-#   cols_excluir = ["label", "attack_type", "attack_signature", "malware_indicator"]
-#   X = df_clean.drop(columns=cols_excluir, errors="ignore")
-# → attack_type, attack_signature y malware_indicator fueron excluidos del entrenamiento.
-# → ids_ips_alert y severity SÍ fueron incluidos en X (no están en cols_excluir).
-MODEL_FIELDS = [
-    'event_category',
-    'protocol',
-    'traffic_type',
-    'mitre_tactic',
-    'kill_chain_stage',
-    'failed_login_attempts',
-    'request_rate_per_min',
-    'ids_ips_alert',
-    'asset_criticality',
-    'log_source',
-    'firewall_action',
-    'severity',
-]
+CLASS_LABELS = {0: 'benigno', 1: 'a_investigar', 2: 'malicioso'}
 
 # ---------------------------------------------------------------------------
-# Mapeos de vocabulario: traducen valores del SOC real al esquema de entrenamiento
+# Vocabulary maps
 # ---------------------------------------------------------------------------
 
-# El modelo fue entrenado con: unknown (74%), medium (26%), critical (0.04%)
-# high y low no existen en el dataset de entrenamiento → se mapean a unknown
 MAP_SEVERITY = {
     'critical'     : 'critical',
     'high'         : 'unknown',
@@ -62,157 +53,426 @@ MAP_SEVERITY = {
     'low'          : 'unknown',
     'informational': 'unknown',
     'unknown'      : 'unknown',
-    # Wazuh numérico
     '15': 'critical', '12': 'critical',
     '10': 'medium',   '7' : 'medium',
     '3' : 'unknown',  '1' : 'unknown',
 }
 
 MAP_EVENT_CATEGORY = {
-    'malware'              : 'malware_activity',
-    'malware_activity'     : 'malware_activity',
-    'intrusion_attempt'    : 'intrusion_attempt',
-    'lateral_movement'     : 'lateral_movement',
-    'lateral movement'     : 'lateral_movement',
-    'reconnaissance'       : 'reconnaissance',
-    'command_and_control'  : 'command_and_control',
-    'command and control'  : 'command_and_control',
-    'data_exfiltration'    : 'data_exfiltration',
-    'exfiltration'         : 'data_exfiltration',
-    'suspicious_activity'  : 'suspicious_activity',
-    'suspicious activity'  : 'suspicious_activity',
-    'credential_access'    : 'credential_access',
-    'impact'               : 'impact',
-    'execution'            : 'execution',
-    'persistence'          : 'persistence',
-    'privilege_escalation' : 'privilege_escalation',
-    'evasion'              : 'evasion',
-    'web_attack'           : 'web_attack',
+    'malware'             : 'malware_activity',
+    'malwareactivity'     : 'malware_activity',
+    'malware_activity'    : 'malware_activity',
+    'intrusionattempt'    : 'intrusion_attempt',
+    'intrusion_attempt'   : 'intrusion_attempt',
+    'initialaccess'       : 'intrusion_attempt',
+    'initial_access'      : 'intrusion_attempt',
+    'lateralmovement'     : 'lateral_movement',
+    'lateral_movement'    : 'lateral_movement',
+    'reconnaissance'      : 'reconnaissance',
+    'commandandcontrol'   : 'command_and_control',
+    'command_and_control' : 'command_and_control',
+    'dataexfiltration'    : 'data_exfiltration',
+    'data_exfiltration'   : 'data_exfiltration',
+    'exfiltration'        : 'data_exfiltration',
+    'suspiciousactivity'  : 'suspicious_activity',
+    'suspicious_activity' : 'suspicious_activity',
+    'credentialaccess'    : 'credential_access',
+    'credential_access'   : 'credential_access',
+    'impact'              : 'impact',
+    'execution'           : 'execution',
+    'persistence'         : 'persistence',
+    'privilegeescalation' : 'privilege_escalation',
+    'privilege_escalation': 'privilege_escalation',
+    'defenseevasion'      : 'evasion',
+    'defense_evasion'     : 'evasion',
+    'evasion'             : 'evasion',
+    'web_attack'          : 'web_attack',
+    'webattack'           : 'web_attack',
+    'datacollection'      : 'data_collection',
+    'data_collection'     : 'data_collection',
+    'collection'          : 'data_collection',
+    'resourcedevelopment' : 'resource_development',
+    'resource_development': 'resource_development',
 }
 
-# firewall_action: el modelo solo vio allowed, blocked, monitored, unknown
 MAP_FIREWALL = {
-    'allow'     : 'allowed',
-    'allowed'   : 'allowed',
-    'deny'      : 'blocked',
-    'denied'    : 'blocked',
-    'block'     : 'blocked',
-    'blocked'   : 'blocked',
-    'quarantine': 'blocked',
-    'alert'     : 'monitored',
-    'monitor'   : 'monitored',
-    'monitored' : 'monitored',
-    'unknown'   : 'unknown',
+    'allow'              : 'allowed',
+    'allowed'            : 'allowed',
+    'deny'               : 'blocked',
+    'denied'             : 'blocked',
+    'block'              : 'blocked',
+    'blocked'            : 'blocked',
+    'quarantine'         : 'blocked',
+    'alertandblock'      : 'blocked',
+    'containaccount'     : 'blocked',
+    'isolatedevice'      : 'blocked',
+    'stopvirtualmachines': 'blocked',
+    'alert'              : 'monitored',
+    'monitor'            : 'monitored',
+    'monitored'          : 'monitored',
+    'unknown'            : 'unknown',
 }
 
-# ids_ips_alert: el SOC real envía yes/no; el modelo conoce los valores textuales
 MAP_IDS_ALERT = {
     'yes'                          : 'suspicious pattern',
     'no'                           : 'no alert',
-    'suspicious pattern'           : 'suspicious pattern',
+    'nothreatsfound'               : 'no alert',
+    'noalert'                      : 'no alert',
     'no alert'                     : 'no alert',
-    'confirmed malicious indicator': 'confirmed malicious indicator',
+    'benign'                       : 'no alert',
+    'suspicious'                   : 'suspicious pattern',
+    'suspiciouspattern'            : 'suspicious pattern',
+    'suspicious pattern'           : 'suspicious pattern',
+    'behavioranomaly'              : 'suspicious pattern',
     'behavior anomaly'             : 'suspicious pattern',
+    'malicious'                    : 'confirmed malicious indicator',
+    'confirmedmaliciousindicator'  : 'confirmed malicious indicator',
+    'confirmed malicious indicator': 'confirmed malicious indicator',
     'unknown'                      : 'unknown',
 }
 
 MAP_MITRE_TACTIC = {
-    'initial access'      : 'initial access',
     'initialaccess'       : 'initial access',
-    'lateral movement'    : 'lateral movement',
+    'initial_access'      : 'initial access',
     'lateralmovement'     : 'lateral movement',
-    'command and control' : 'command and control',
+    'lateral_movement'    : 'lateral movement',
     'commandandcontrol'   : 'command and control',
-    'credential access'   : 'credential access',
+    'command_and_control' : 'command and control',
     'credentialaccess'    : 'credential access',
+    'credential_access'   : 'credential access',
     'execution'           : 'execution',
     'exfiltration'        : 'exfiltration',
     'impact'              : 'impact',
     'reconnaissance'      : 'reconnaissance',
     'discovery'           : 'discovery',
     'persistence'         : 'persistence',
-    'privilege escalation': 'privilege escalation',
     'privilegeescalation' : 'privilege escalation',
-    'defense evasion'     : 'defense evasion',
+    'privilege_escalation': 'privilege escalation',
     'defenseevasion'      : 'defense evasion',
+    'defense_evasion'     : 'defense evasion',
     'collection'          : 'collection',
+    'resourcedevelopment' : 'resource development',
+    'resource_development': 'resource development',
     'unknown'             : 'unknown',
 }
 
+MAP_EVIDENCE_ROLE = {
+    'attacker': 'attacker',
+    'impacted': 'impacted',
+    'related' : 'related',
+    'caller'  : 'related',
+    'receiver': 'related',
+    'victim'  : 'impacted',
+}
 
-def normalize_input(data: dict) -> dict:
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _norm(val: str) -> str:
+    """strip + lowercase + quita espacios — para lookup en diccionarios (regla 1)."""
+    return str(val).strip().lower().replace(' ', '')
+
+
+def _parse_mitre_techniques(raw: str) -> list:
     """
-    Traduce los valores crudos del SOC real al vocabulario que usó el modelo
-    durante el entrenamiento, luego retorna solo los MODEL_FIELDS.
+    'T1110;T1078.004;T1003' → ['mitre_t1110', 'mitre_t1078_004', 'mitre_t1003']
+    Solo retorna columnas que existan en training_columns.
     """
-    raw = {k: str(v).strip().lower() for k, v in data.items() if v is not None}
-
-    return {
-        'event_category'       : MAP_EVENT_CATEGORY.get(
-                                     raw.get('event_category', ''), 'other'),
-        'protocol'             : raw.get('protocol', 'tcp'),
-        'traffic_type'         : raw.get('traffic_type', 'tcp'),
-        'mitre_tactic'         : MAP_MITRE_TACTIC.get(
-                                     raw.get('mitre_tactic', ''), 'unknown'),
-        'kill_chain_stage'     : raw.get('kill_chain_stage', 'unknown'),
-        'failed_login_attempts': int(float(raw.get('failed_login_attempts', 0))),
-        'request_rate_per_min' : float(raw.get('request_rate_per_min', 0.0)),
-        'ids_ips_alert'        : MAP_IDS_ALERT.get(
-                                     raw.get('ids_ips_alert', ''), 'unknown'),
-        'asset_criticality'    : raw.get('asset_criticality', 'medium'),
-        'log_source'           : raw.get('log_source', 'unknown'),
-        'firewall_action'      : MAP_FIREWALL.get(
-                                     raw.get('firewall_action', ''), 'unknown'),
-        'severity'             : MAP_SEVERITY.get(
-                                     raw.get('severity', ''), 'unknown'),
-    }
+    if not raw or str(raw).strip().lower() in ('', 'none', 'nan', 'unknown'):
+        return []
+    mitre_in_train = {c for c in training_columns if c.startswith('mitre_t')}
+    cols = []
+    for part in str(raw).split(';'):
+        m = re.search(r't\d{4}(?:\.\d{3})?', part.strip().lower())
+        if m:
+            col = 'mitre_' + m.group(0).replace('.', '_')
+            if col in mitre_in_train:
+                cols.append(col)
+    return cols
 
 
-def preprocess_input(data: dict) -> pd.DataFrame:
-    clean_data = normalize_input(data)
-    df = pd.DataFrame([clean_data])
+def _compute_anomaly_score(ids_ips_alert: str, severity: str, firewall_action: str) -> float:
+    """
+    Réplica exacta de la fórmula del pipeline de entrenamiento (regla 7).
+    Opera sobre valores ya normalizados (post-mapeo).
 
-    for col in df.select_dtypes(include=['object', 'str']).columns:
-        df[col] = df[col].astype(str).str.strip().str.lower()
+    Equivalencia con training:
+      0.40 * (LastVerdict == "Malicious")       → ids == "confirmed malicious indicator"
+      0.20 * (LastVerdict == "Suspicious")      → ids == "suspicious pattern"
+      0.25 * (SuspicionLevel == "Incriminated") → severity == "critical"
+      0.10 * (SuspicionLevel == "Suspicious")   → severity == "medium"
+      0.05 * (ActionGrouped in [block, ...])    → firewall_action == "blocked"
+    """
+    return float(min(
+        0.40 * (ids_ips_alert == 'confirmed malicious indicator') +
+        0.20 * (ids_ips_alert == 'suspicious pattern') +
+        0.25 * (severity == 'critical') +
+        0.10 * (severity == 'medium') +
+        0.05 * (firewall_action == 'blocked'),
+        1.0,
+    ))
 
-    df_encoded = pd.get_dummies(df, drop_first=False)
-    df_encoded = df_encoded.reindex(columns=training_columns, fill_value=0)
 
-    return df_encoded
+# ---------------------------------------------------------------------------
+# Input fields
+# ---------------------------------------------------------------------------
 
-
-# Mapeo de clases numéricas del modelo a etiquetas legibles.
-# El modelo fue entrenado con labels 0, 1, 2 (columna numérica en el CSV).
-CLASS_LABELS = {0: 'benigno', 1: 'a_investigar', 2: 'malicioso'}
-
-
-def predict_alert(data: dict):
-    X = preprocess_input(data)
-    prediction_raw = model.predict(X)[0]
-    prediction = CLASS_LABELS.get(int(prediction_raw), str(prediction_raw))
-
-    probabilities = {}
-    if hasattr(model, 'predict_proba'):
-        probs = model.predict_proba(X)[0]
-        for cls, prob in zip(model.classes_, probs):
-            label = CLASS_LABELS.get(int(cls), str(cls))
-            probabilities[label] = float(prob)
-
-    return prediction, probabilities
+EXPECTED_FIELDS = [
+    'event_category', 'protocol', 'traffic_type', 'mitre_tactic',
+    'kill_chain_stage', 'severity', 'ids_ips_alert', 'asset_criticality',
+    'log_source', 'firewall_action', 'failed_login_attempts', 'request_rate_per_min',
+    'has_threat_family', 'evidence_role', 'os_family',
+    'correlation_id', 'mitre_techniques',
+]
 
 
 def extract_valid_fields(data: dict) -> dict:
     return {field: data.get(field) for field in EXPECTED_FIELDS}
 
 
-# Pesos por clase para el cálculo del risk_score (0.0 → 1.0).
-# benigno = 0, a_investigar = 0.5, malicioso = 1.0
+# ---------------------------------------------------------------------------
+# Normalization (regla 1: strip + lower + no-spaces antes de cada lookup)
+# ---------------------------------------------------------------------------
+
+def normalize_input(data: dict) -> dict:
+    """
+    Traduce valores crudos al vocabulario de entrenamiento.
+    malware_indicator excluido del output (regla 2).
+    anomaly_score siempre se computa con la fórmula del training (regla 7).
+    """
+    raw = {k: str(v).strip() for k, v in data.items() if v is not None}
+
+    ids_mapped = MAP_IDS_ALERT.get(_norm(raw.get('ids_ips_alert', '')), 'unknown')
+    sev_mapped = MAP_SEVERITY.get(_norm(raw.get('severity', '')), 'unknown')
+    fw_mapped  = MAP_FIREWALL.get(_norm(raw.get('firewall_action', '')), 'unknown')
+
+    return {
+        'event_category'        : MAP_EVENT_CATEGORY.get(_norm(raw.get('event_category', '')), 'other'),
+        'protocol'              : raw.get('protocol', 'tcp').lower(),
+        'traffic_type'          : raw.get('traffic_type', 'tcp').lower(),
+        'mitre_tactic'          : MAP_MITRE_TACTIC.get(_norm(raw.get('mitre_tactic', '')), 'unknown'),
+        'kill_chain_stage'      : raw.get('kill_chain_stage', 'unknown').strip().lower(),
+        'failed_login_attempts' : int(float(raw.get('failed_login_attempts', 0))),
+        'request_rate_per_min'  : float(raw.get('request_rate_per_min', 0.0)),
+        'ids_ips_alert'         : ids_mapped,
+        'asset_criticality'     : raw.get('asset_criticality', 'medium').strip().lower(),
+        'log_source'            : raw.get('log_source', 'unknown').strip().lower(),
+        'firewall_action'       : fw_mapped,
+        'severity'              : sev_mapped,
+        'has_threat_family'     : int(bool(int(float(raw.get('has_threat_family', 0))))),
+        'evidence_role'         : MAP_EVIDENCE_ROLE.get(_norm(raw.get('evidence_role', '')), 'unknown'),
+        'os_family'             : raw.get('os_family', 'unknown').strip().lower(),
+        'anomaly_score'         : _compute_anomaly_score(ids_mapped, sev_mapped, fw_mapped),
+        # privados — no entran al DataFrame del modelo
+        '_correlation_id'       : raw.get('correlation_id', 'unknown'),
+        '_mitre_techniques_raw' : raw.get('mitre_techniques', ''),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Feature engineering + encoding
+# ---------------------------------------------------------------------------
+
+def preprocess_input(data: dict) -> pd.DataFrame:
+    """
+    Pipeline completo para una alerta individual.
+
+    Regla 3: failed_login_attempts/request_rate_per_min se usan tal cual.
+             Si el caller no los tiene, pasan como 0 (señal débil pero válida).
+    Regla 4: incident_* se inicializan con defaults conservadores (1 alerta = 1 incidente).
+             Para batch con correlation_id, usar preprocess_batch().
+    Regla 5: reindex(training_columns, fill_value=0) alinea el encoding.
+    Regla 6: Stage 2 se llama con X[s2_columns], no con training_columns completo.
+    """
+    clean = normalize_input(data)
+    mitre_raw      = clean.pop('_mitre_techniques_raw')
+    correlation_id = clean.pop('_correlation_id')
+    anomaly_score  = clean['anomaly_score']
+    asset_crit     = clean.get('asset_criticality', 'unknown')
+    ids_val        = clean.get('ids_ips_alert', 'unknown')
+
+    df = pd.DataFrame([clean])
+
+    # Columnas MITRE binarias — solo técnicas presentes en training (regla 5)
+    for col in _parse_mitre_techniques(mitre_raw):
+        df[col] = 1
+
+    # n_mitre_techniques — solo columnas binarias de técnicas (mitre_tNNNN), no mitre_tactic
+    mitre_present = [c for c in df.columns if re.match(r'^mitre_t\d', c)]
+    df['n_mitre_techniques'] = df[mitre_present].sum(axis=1).astype(int) if mitre_present else 0
+
+    # One-hot encoding → alinear con training_columns (regla 5)
+    df_enc = pd.get_dummies(df, drop_first=False)
+    df_enc = df_enc.reindex(columns=training_columns, fill_value=0)
+
+    # anomaly_x_asset_high — feature cruzada, requiere dummies ya aplicados
+    if 'anomaly_score' in df_enc.columns and 'asset_criticality_high' in df_enc.columns:
+        df_enc['anomaly_x_asset_high'] = (
+            df_enc['anomaly_score'] * df_enc['asset_criticality_high']
+        ).astype(float)
+
+    # Incident features — defaults para alerta individual (regla 4)
+    # Para batch con CorrelationId completo, usar preprocess_batch().
+    _defaults = {
+        'incident_evidence_count'  : 1,
+        'incident_max_anomaly'     : anomaly_score,
+        'incident_mean_anomaly'    : anomaly_score,
+        'incident_category_count'  : 1,
+        'incident_log_source_count': 1,
+        'incident_has_high_asset'  : 1 if asset_crit == 'high' else 0,
+        'incident_has_confirmed'   : 1 if ids_val == 'confirmed malicious indicator' else 0,
+    }
+    for col, val in _defaults.items():
+        if col in df_enc.columns:
+            df_enc[col] = val
+
+    return df_enc
+
+
+def preprocess_batch(records: list) -> pd.DataFrame:
+    """
+    Feature engineering para un lote de alertas agrupadas por correlation_id.
+    Calcula incident_* reales desde el contexto del incidente completo (regla 4).
+    Cada alerta recibe las features del incidente al que pertenece.
+    """
+    normalized = []
+    for rec in records:
+        clean = normalize_input(rec)
+        clean['correlation_id'] = clean.pop('_correlation_id')
+        clean['_mitre_raw'] = clean.pop('_mitre_techniques_raw')
+        normalized.append(clean)
+
+    df_base = pd.DataFrame(normalized)
+
+    # Incident features por correlation_id
+    agg = (
+        df_base.groupby('correlation_id')
+        .agg(
+            incident_evidence_count   = ('anomaly_score', 'count'),
+            incident_max_anomaly      = ('anomaly_score', 'max'),
+            incident_mean_anomaly     = ('anomaly_score', 'mean'),
+            incident_category_count   = ('event_category', 'nunique'),
+            incident_log_source_count = ('log_source', 'nunique'),
+            incident_has_high_asset   = ('asset_criticality',
+                                         lambda x: int((x == 'high').any())),
+            incident_has_confirmed    = ('ids_ips_alert',
+                                         lambda x: int(
+                                             (x == 'confirmed malicious indicator').any()
+                                         )),
+        )
+        .reset_index()
+    )
+    df_base = df_base.merge(agg, on='correlation_id', how='left')
+
+    # Columnas MITRE binarias
+    mitre_in_train = {c for c in training_columns if c.startswith('mitre_t')}
+    for i, row in df_base.iterrows():
+        for col in _parse_mitre_techniques(row.get('_mitre_raw', '')):
+            if col in mitre_in_train:
+                df_base.loc[i, col] = 1
+
+    mitre_present = [c for c in df_base.columns if re.match(r'^mitre_t\d', c)]
+    df_base['n_mitre_techniques'] = df_base[mitre_present].sum(axis=1).astype(int) if mitre_present else 0
+
+    # Limpiar columnas auxiliares antes del encoding
+    df_base = df_base.drop(columns=['correlation_id', '_mitre_raw'], errors='ignore')
+
+    df_enc = pd.get_dummies(df_base, drop_first=False)
+    df_enc = df_enc.reindex(columns=training_columns, fill_value=0)
+
+    if 'anomaly_score' in df_enc.columns and 'asset_criticality_high' in df_enc.columns:
+        df_enc['anomaly_x_asset_high'] = (
+            df_enc['anomaly_score'] * df_enc['asset_criticality_high']
+        ).astype(float)
+
+    # Sobreescribir incident features con los valores reales (ya están en df_enc desde agg)
+    for col in ['incident_evidence_count', 'incident_max_anomaly', 'incident_mean_anomaly',
+                'incident_category_count', 'incident_log_source_count',
+                'incident_has_high_asset', 'incident_has_confirmed']:
+        if col in df_base.columns and col in df_enc.columns:
+            df_enc[col] = df_base[col].values
+
+    return df_enc
+
+
+# ---------------------------------------------------------------------------
+# Predicción jerárquica
+# ---------------------------------------------------------------------------
+
+def _composite_proba(X: pd.DataFrame) -> np.ndarray:
+    """
+    Probabilidades compuestas siguiendo composite_proba() de train_model.py.
+    Stage 2 usa s2_columns, no training_columns (regla 6).
+    """
+    p_mal = rf_s1.predict_proba(X)[:, _idx_mal_s1]
+    p_s2  = rf_s2_cal.predict_proba(X[s2_columns])
+    out   = np.zeros((len(X), 3))
+    out[:, 2] = p_mal
+    out[:, 0] = (1 - p_mal) * p_s2[:, _idx_ben_s2]
+    out[:, 1] = (1 - p_mal) * p_s2[:, _idx_inv_s2]
+    return out
+
+
+def predict_alert(data: dict) -> tuple:
+    """Predicción jerárquica sobre una alerta individual."""
+    X = preprocess_input(data)
+
+    p_mal  = rf_s1.predict_proba(X)[:, _idx_mal_s1]
+    is_mal = p_mal >= _t1
+    p_inv  = rf_s2_cal.predict_proba(X[s2_columns])[:, _idx_inv_s2]
+    is_inv = p_inv >= _t2
+
+    raw_pred   = int(np.where(is_mal, 2, np.where(is_inv, 1, 0))[0])
+    prediction = CLASS_LABELS[raw_pred]
+
+    proba = _composite_proba(X)[0]
+    probabilities = {
+        'benigno'     : round(float(proba[0]), 4),
+        'a_investigar': round(float(proba[1]), 4),
+        'malicioso'   : round(float(proba[2]), 4),
+    }
+
+    return prediction, probabilities
+
+
+def predict_batch(records: list) -> list:
+    """
+    Predicción jerárquica sobre un lote de alertas.
+    Usa preprocess_batch() para calcular incident features reales por correlation_id.
+    Retorna lista de (predicted_class, probabilities) en el mismo orden que records.
+    """
+    X = preprocess_batch(records)
+
+    p_mal  = rf_s1.predict_proba(X)[:, _idx_mal_s1]
+    is_mal = p_mal >= _t1
+    p_inv  = rf_s2_cal.predict_proba(X[s2_columns])[:, _idx_inv_s2]
+    is_inv = p_inv >= _t2
+
+    raw_preds = np.where(is_mal, 2, np.where(is_inv, 1, 0))
+    probas    = _composite_proba(X)
+
+    results = []
+    for raw_pred, proba in zip(raw_preds, probas):
+        results.append((
+            CLASS_LABELS[int(raw_pred)],
+            {
+                'benigno'     : round(float(proba[0]), 4),
+                'a_investigar': round(float(proba[1]), 4),
+                'malicioso'   : round(float(proba[2]), 4),
+            },
+        ))
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Risk score
+# ---------------------------------------------------------------------------
+
 _RISK_WEIGHTS = {'benigno': 0.0, 'a_investigar': 0.5, 'malicioso': 1.0}
 
 
 def calculate_risk_score(probabilities: dict) -> float:
-    """Devuelve un puntaje de riesgo entre 0.0 y 1.0 basado en las
-    probabilidades del modelo. A mayor probabilidad de 'malicioso', mayor score."""
     return round(
         sum(probabilities.get(cls, 0.0) * w for cls, w in _RISK_WEIGHTS.items()),
         4,
