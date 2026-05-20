@@ -6,22 +6,28 @@
 <div class="space-y-6">
 
     <!-- Page header -->
-    <div>
-        <h1 class="text-lg font-semibold text-white">Dashboard</h1>
-        <p class="text-sm text-slate-400 mt-0.5">Resumen de predicciones del sistema SOC.</p>
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-lg font-semibold text-white">Dashboard</h1>
+            <p class="text-sm text-slate-400 mt-0.5">Estado de seguridad en tiempo real.</p>
+        </div>
+        <a href="{% url 'alert_list' %}"
+           class="text-xs text-blue-400 hover:text-blue-300 font-medium">
+            Ver todas las alertas →
+        </a>
     </div>
 
     <!-- KPIs -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-            <p class="text-xs text-slate-400 uppercase tracking-wide">Total</p>
-            <p class="text-3xl font-bold text-white mt-2 font-mono">{{ total_predictions }}</p>
-            <p class="text-xs text-slate-500 mt-1">Predicciones totales</p>
+            <p class="text-xs text-slate-400 uppercase tracking-wide">Total alertas</p>
+            <p class="text-3xl font-bold text-white mt-2 font-mono">{{ total_alerts }}</p>
+            <p class="text-xs text-slate-500 mt-1">Ingestadas en el sistema</p>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-            <p class="text-xs text-slate-400 uppercase tracking-wide">Benignos</p>
-            <p class="text-3xl font-bold text-emerald-500 mt-2 font-mono">{{ total_benigno }}</p>
-            <p class="text-xs text-slate-500 mt-1">Sin amenaza detectada</p>
+            <p class="text-xs text-slate-400 uppercase tracking-wide">Pendientes</p>
+            <p class="text-3xl font-bold text-slate-300 mt-2 font-mono">{{ total_pending }}</p>
+            <p class="text-xs text-slate-500 mt-1">Sin clasificar por ML</p>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
             <p class="text-xs text-slate-400 uppercase tracking-wide">A investigar</p>
@@ -39,7 +45,7 @@
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
             <div class="flex items-center justify-between mb-4">
-                <p class="text-sm font-semibold text-white">Predicciones por clase</p>
+                <p class="text-sm font-semibold text-white">Alertas por clase ML</p>
                 <span class="text-xs text-slate-500 font-mono">BARRAS</span>
             </div>
             <div class="h-64">
@@ -48,19 +54,41 @@
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
             <div class="flex items-center justify-between mb-4">
-                <p class="text-sm font-semibold text-white">Origen de predicciones</p>
-                <span class="text-xs text-slate-500 font-mono">DISTRIBUCIÓN</span>
+                <p class="text-sm font-semibold text-white">Top tácticas MITRE ATT&amp;CK</p>
+                <span class="text-xs text-slate-500 font-mono">TOP 6</span>
             </div>
             <div class="h-64">
-                <canvas id="sourceChart"></canvas>
+                <canvas id="tacticChart"></canvas>
             </div>
         </div>
     </div>
 
-    <!-- Chart row 2 -->
+    <!-- Charts row 2 -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+            <div class="flex items-center justify-between mb-4">
+                <p class="text-sm font-semibold text-white">Distribución por severidad</p>
+                <span class="text-xs text-slate-500 font-mono">DONUT</span>
+            </div>
+            <div class="h-64">
+                <canvas id="severityChart"></canvas>
+            </div>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+            <div class="flex items-center justify-between mb-4">
+                <p class="text-sm font-semibold text-white">Etapas Kill Chain</p>
+                <span class="text-xs text-slate-500 font-mono">BARRAS</span>
+            </div>
+            <div class="h-64">
+                <canvas id="killchainChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart row 3 -->
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
         <div class="flex items-center justify-between mb-4">
-            <p class="text-sm font-semibold text-white">Tendencia diaria</p>
+            <p class="text-sm font-semibold text-white">Tendencia de ingesta diaria</p>
             <span class="text-xs text-slate-500 font-mono">LÍNEA DE TIEMPO</span>
         </div>
         <div class="h-64">
@@ -68,43 +96,101 @@
         </div>
     </div>
 
-    <!-- Recent predictions table -->
+    <!-- Recent alerts table -->
     <div class="bg-slate-800 border border-slate-700 rounded-lg">
         <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
-            <p class="text-sm font-semibold text-white">Últimas predicciones</p>
-            <a href="{% url 'history' %}" class="text-xs text-blue-400 hover:text-blue-300 font-medium">
-                Ver historial →
+            <p class="text-sm font-semibold text-white">Últimas alertas</p>
+            <a href="{% url 'alert_list' %}" class="text-xs text-blue-400 hover:text-blue-300 font-medium">
+                Ver todas →
             </a>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-left">
+            <table class="w-full text-left text-sm">
                 <thead>
                     <tr class="border-b border-slate-700">
                         <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Fecha</th>
-                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Clase</th>
-                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Origen</th>
-                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Host afectado</th>
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Severidad</th>
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Clasificación ML</th>
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Risk Score</th>
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Tipo ataque</th>
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Táctica MITRE</th>
+                        <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide"></th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for item in recent_predictions %}
-                    <tr class="border-b border-slate-800 hover:bg-slate-800/50 {% if item.predicted_class == 'malicioso' %}border-l-4 border-l-red-500{% endif %}">
-                        <td class="px-5 py-3 text-xs font-mono text-slate-400">{{ item.created_at|date:"Y-m-d H:i" }}</td>
+                <tbody class="divide-y divide-slate-700/50">
+                    {% for alert in recent_alerts %}
+                    <tr class="hover:bg-slate-700/30 transition-colors {% if alert.predicted_class == 'malicioso' %}border-l-2 border-l-red-500{% endif %}">
+                        <td class="px-5 py-3 text-xs font-mono text-slate-400 whitespace-nowrap">{{ alert.created_at|date:"Y-m-d H:i" }}</td>
+
+                        <!-- Severidad -->
                         <td class="px-5 py-3">
-                            {% if item.predicted_class == 'benigno' %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">benigno</span>
-                            {% elif item.predicted_class == 'a_investigar' %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">a_investigar</span>
+                            {% if alert.severity|lower == 'high' or alert.severity|lower == 'critical' or alert.severity|lower == 'alta' or alert.severity|lower == 'crítica' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">{{ alert.severity }}</span>
+                            {% elif alert.severity|lower == 'medium' or alert.severity|lower == 'media' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">{{ alert.severity }}</span>
                             {% else %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">malicioso</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-600/50 text-slate-300 border border-slate-600">{{ alert.severity }}</span>
                             {% endif %}
                         </td>
-                        <td class="px-5 py-3 text-sm text-slate-400 capitalize">{{ item.source }}</td>
-                        <td class="px-5 py-3 text-xs font-mono text-slate-400">{{ item.input_data.host_affected|default:"—" }}</td>
+
+                        <!-- Clasificación ML -->
+                        <td class="px-5 py-3">
+                            {% if alert.predicted_class == 'malicioso' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">Malicioso</span>
+                            {% elif alert.predicted_class == 'a_investigar' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">A investigar</span>
+                            {% elif alert.predicted_class == 'benigno' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Benigno</span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-600/50 text-slate-400 border border-slate-600">Pendiente</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Risk Score -->
+                        <td class="px-5 py-3">
+                            {% if alert.risk_score is not None %}
+                                {% if alert.risk_score >= 0.7 %}
+                                    <span class="inline-flex items-center gap-1 text-xs font-semibold text-red-400">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-red-400 inline-block"></span>
+                                        {{ alert.risk_score|floatformat:2 }}
+                                    </span>
+                                {% elif alert.risk_score >= 0.3 %}
+                                    <span class="inline-flex items-center gap-1 text-xs font-semibold text-amber-400">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>
+                                        {{ alert.risk_score|floatformat:2 }}
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+                                        {{ alert.risk_score|floatformat:2 }}
+                                    </span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-xs text-slate-600">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-5 py-3 text-slate-300 text-xs whitespace-nowrap">{{ alert.attack_type|default:"—" }}</td>
+                        <td class="px-5 py-3 text-slate-400 text-xs whitespace-nowrap">{{ alert.mitre_tactic }}</td>
+
+                        <!-- Acción SHAP -->
+                        <td class="px-5 py-3">
+                            {% if alert.predicted_class %}
+                            <a href="{% url 'alert_shap' alert.pk %}"
+                               class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-colors">
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5" />
+                                </svg>
+                                SHAP
+                            </a>
+                            {% else %}
+                            <span class="text-xs text-slate-600">—</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="px-5 py-8 text-sm text-slate-500 text-center">No hay predicciones aún.</td>
+                        <td colspan="7" class="px-5 py-8 text-sm text-slate-500 text-center">No hay alertas todavía.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -119,19 +205,32 @@
     Chart.defaults.color = '#94a3b8';
     Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.5)';
 
-    const classLabels = JSON.parse('{{ class_labels|safe|escapejs }}'.replace(/'/g, '"'));
-    const classData = JSON.parse('{{ class_data|safe|escapejs }}');
-    const sourceLabels = JSON.parse('{{ source_labels|safe|escapejs }}'.replace(/'/g, '"'));
-    const sourceData = JSON.parse('{{ source_data|safe|escapejs }}');
-    const dailyLabels = JSON.parse('{{ daily_labels|safe|escapejs }}'.replace(/'/g, '"'));
-    const dailyTotals = JSON.parse('{{ daily_totals|safe|escapejs }}');
+    const classLabels    = {{ class_labels_json|safe }};
+    const classData      = {{ class_data_json|safe }};
+    const tacticLabels   = {{ tactic_labels_json|safe }};
+    const tacticData     = {{ tactic_data_json|safe }};
+    const severityLabels = {{ severity_labels_json|safe }};
+    const severityData   = {{ severity_data_json|safe }};
+    const killchainLabels = {{ killchain_labels_json|safe }};
+    const killchainData   = {{ killchain_data_json|safe }};
+    const dailyLabels    = {{ daily_labels_json|safe }};
+    const dailyTotals    = {{ daily_totals_json|safe }};
 
+    function severityColor(label) {
+        const l = label.toLowerCase();
+        if (l === 'critical' || l === 'crítica') return 'rgba(239, 68, 68, 0.85)';
+        if (l === 'high'     || l === 'alta')    return 'rgba(249, 115, 22, 0.85)';
+        if (l === 'medium'   || l === 'media')   return 'rgba(245, 158, 11, 0.85)';
+        return 'rgba(100, 116, 139, 0.75)';
+    }
+
+    // Bar — class distribution
     new Chart(document.getElementById('classChart'), {
         type: 'bar',
         data: {
             labels: classLabels,
             datasets: [{
-                label: 'Cantidad',
+                label: 'Alertas',
                 data: classData,
                 backgroundColor: [
                     'rgba(16, 185, 129, 0.8)',
@@ -148,22 +247,44 @@
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { display: false } },
-                y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true }
+                y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } }
             }
         }
     });
 
-    new Chart(document.getElementById('sourceChart'), {
+    // Horizontal bar — MITRE tactics
+    new Chart(document.getElementById('tacticChart'), {
+        type: 'bar',
+        data: {
+            labels: tacticLabels,
+            datasets: [{
+                label: 'Alertas',
+                data: tacticData,
+                backgroundColor: 'rgba(99, 102, 241, 0.75)',
+                borderRadius: 4,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } },
+                y: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Donut — severity distribution
+    new Chart(document.getElementById('severityChart'), {
         type: 'doughnut',
         data: {
-            labels: sourceLabels,
+            labels: severityLabels,
             datasets: [{
-                data: sourceData,
-                backgroundColor: [
-                    'rgba(59, 130, 246, 0.8)',
-                    'rgba(99, 102, 241, 0.8)',
-                    'rgba(168, 85, 247, 0.8)'
-                ],
+                data: severityData,
+                backgroundColor: severityLabels.map(severityColor),
                 borderWidth: 2,
                 borderColor: '#1e293b'
             }]
@@ -180,12 +301,38 @@
         }
     });
 
+    // Horizontal bar — kill chain stages
+    new Chart(document.getElementById('killchainChart'), {
+        type: 'bar',
+        data: {
+            labels: killchainLabels,
+            datasets: [{
+                label: 'Alertas',
+                data: killchainData,
+                backgroundColor: 'rgba(20, 184, 166, 0.75)',
+                borderRadius: 4,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } },
+                y: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Line — daily ingestion
     new Chart(document.getElementById('dailyChart'), {
         type: 'line',
         data: {
             labels: dailyLabels,
             datasets: [{
-                label: 'Predicciones',
+                label: 'Alertas ingestadas',
                 data: dailyTotals,
                 borderColor: 'rgba(59, 130, 246, 1)',
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -201,7 +348,7 @@
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { display: false } },
-                y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true }
+                y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } }
             }
         }
     });
