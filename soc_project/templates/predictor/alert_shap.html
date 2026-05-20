@@ -281,6 +281,42 @@
         </div>
     </div>
 
+    <!-- Ajuste manual de prioridad -->
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+        <div>
+            <h2 class="text-sm font-semibold text-white">Ajuste manual de prioridad</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Nivel 2 — override basado en contexto operacional</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5">Prioridad del analista</label>
+                <select id="prioritySelect"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value=""         {% if not alert.analyst_priority %}selected{% endif %}>— Sin ajuste (usar ML)</option>
+                    <option value="critical"  {% if alert.analyst_priority == 'critical' %}selected{% endif %}>▲ Crítica</option>
+                    <option value="high"      {% if alert.analyst_priority == 'high'     %}selected{% endif %}>▲ Alta</option>
+                    <option value="medium"    {% if alert.analyst_priority == 'medium'   %}selected{% endif %}>◆ Media</option>
+                    <option value="low"       {% if alert.analyst_priority == 'low'      %}selected{% endif %}>▼ Baja</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5">Nota del analista <span class="text-slate-600">(opcional)</span></label>
+                <input type="text" id="priorityNote" value="{{ alert.analyst_note|default:'' }}"
+                    placeholder="Justificación del ajuste…"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-200 placeholder-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button id="prioritySave"
+                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                Guardar prioridad
+            </button>
+            <span id="priorityStatus" class="text-xs text-slate-500"></span>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
@@ -396,5 +432,44 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 {% endif %}
+
+// Ajuste manual de prioridad
+document.getElementById('prioritySave').addEventListener('click', function () {
+    const priority = document.getElementById('prioritySelect').value;
+    const note     = document.getElementById('priorityNote').value.trim();
+    const status   = document.getElementById('priorityStatus');
+    const btn      = this;
+
+    btn.disabled = true;
+    btn.textContent = 'Guardando…';
+    status.textContent = '';
+
+    fetch("{% url 'alert_set_priority' alert.pk %}", {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ priority, note }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.textContent = 'Guardar prioridad';
+        if (data.ok) {
+            status.textContent = '✓ Guardado';
+            status.className = 'text-xs text-emerald-400';
+        } else {
+            status.textContent = data.error || 'Error al guardar';
+            status.className = 'text-xs text-red-400';
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.textContent = 'Guardar prioridad';
+        status.textContent = 'Error de conexión';
+        status.className = 'text-xs text-red-400';
+    });
+});
 </script>
 {% endblock %}

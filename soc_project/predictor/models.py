@@ -65,6 +65,16 @@ class Alert(models.Model):
     shap_values = models.JSONField(null=True, blank=True)
     shap_explanation = models.TextField(null=True, blank=True)
 
+    # Ajuste manual de prioridad por analista nivel 2
+    ANALYST_PRIORITY_CHOICES = [
+        ('critical', 'Crítica'),
+        ('high',     'Alta'),
+        ('medium',   'Media'),
+        ('low',      'Baja'),
+    ]
+    analyst_priority = models.CharField(max_length=20, blank=True, default='')
+    analyst_note     = models.TextField(blank=True, default='')
+
     # Trazabilidad
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')
     created_at = models.DateTimeField(auto_now_add=True)

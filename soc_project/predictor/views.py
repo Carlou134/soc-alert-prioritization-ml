@@ -430,6 +430,13 @@ def alert_list_view(request):
     elif class_filter:
         qs = qs.filter(predicted_class=class_filter)
 
+    # Filtro por prioridad del analista ('none' → sin ajuste)
+    priority_filter = request.GET.get('analyst_priority', '').strip()
+    if priority_filter == 'none':
+        qs = qs.filter(analyst_priority='')
+    elif priority_filter:
+        qs = qs.filter(analyst_priority=priority_filter)
+
     # Filtro por usuario: admins pueden filtrar por cualquier usuario;
     # usuarios normales solo pueden aplicar el toggle "mine"
     user_filter = request.GET.get('user', '').strip()
@@ -479,9 +486,10 @@ def alert_list_view(request):
         'date_from': date_from,
         'date_to': date_to,
         'severity_choices': severity_choices,
-        'pending_count': pending_count,
-        'total_count': qs.count(),
-        'order': order,
+        'pending_count':    pending_count,
+        'total_count':      qs.count(),
+        'order':            order,
+        'priority_filter':  priority_filter,
     }
     return render(request, 'predictor/alert_list.html', context)
 
@@ -989,6 +997,32 @@ def pipeline_export_view(request):
             f'Formato: {export_format.upper()}.'
         ),
     )
+
+
+@login_required
+def alert_set_priority_view(request, pk):
+    from django.shortcuts import get_object_or_404
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    alert = get_object_or_404(Alert, pk=pk)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    priority = data.get('priority', '').strip()
+    note     = data.get('note', '').strip()
+
+    if priority not in {'', 'low', 'medium', 'high', 'critical'}:
+        return JsonResponse({'error': 'Prioridad inválida'}, status=400)
+
+    alert.analyst_priority = priority
+    alert.analyst_note     = note
+    alert.save(update_fields=['analyst_priority', 'analyst_note'])
+
+    return JsonResponse({'ok': True, 'priority': priority})
 
 
 @login_required
