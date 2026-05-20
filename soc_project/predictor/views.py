@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 from django.db.models.functions import TruncDate
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
@@ -444,6 +444,15 @@ def alert_list_view(request):
     if date_to:
         qs = qs.filter(created_at__date__lte=date_to)
 
+    order = request.GET.get('order', 'date_desc').strip()
+    _order_map = {
+        'risk_desc': F('risk_score').desc(nulls_last=True),
+        'risk_asc':  F('risk_score').asc(nulls_last=True),
+        'date_desc': '-created_at',
+        'date_asc':  'created_at',
+    }
+    qs = qs.order_by(_order_map.get(order, '-created_at'))
+
     severity_choices = (
         Alert.objects.values_list('severity', flat=True)
         .distinct()
@@ -472,6 +481,7 @@ def alert_list_view(request):
         'severity_choices': severity_choices,
         'pending_count': pending_count,
         'total_count': qs.count(),
+        'order': order,
     }
     return render(request, 'predictor/alert_list.html', context)
 
