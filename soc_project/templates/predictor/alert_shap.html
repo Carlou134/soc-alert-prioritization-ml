@@ -71,6 +71,139 @@
         {% endif %}
     </div>
 
+    <!-- Full alert detail -->
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-5">
+        <h2 class="text-sm font-semibold text-white">Detalle completo de la alerta</h2>
+
+        <!-- Red y tráfico -->
+        <div>
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Red y tráfico</p>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Protocolo</p>
+                    <p class="text-sm text-slate-200 font-mono">{{ alert.protocol|default:"—" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Tipo de tráfico</p>
+                    <p class="text-sm text-slate-200">{{ alert.traffic_type|default:"—" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Fuente de log</p>
+                    <p class="text-sm text-slate-200">{{ alert.log_source|default:"—" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Acción firewall</p>
+                    <p class="text-sm text-slate-200">{{ alert.firewall_action|default:"—" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Alerta IDS/IPS</p>
+                    <p class="text-sm text-slate-200">{{ alert.ids_ips_alert|default:"—" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Req / min</p>
+                    <p class="text-sm text-slate-200 font-mono">{{ alert.request_rate_per_min }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Intentos login fallidos</p>
+                    <p class="text-sm font-mono {% if alert.failed_login_attempts > 0 %}text-amber-400{% else %}text-slate-200{% endif %}">
+                        {{ alert.failed_login_attempts }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="border-t border-slate-700/50"></div>
+
+        <!-- Contexto de ataque -->
+        <div>
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Contexto de ataque</p>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Tipo de ataque</p>
+                    <p class="text-sm text-slate-200">{{ alert.attack_type|default:"—" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Firma de ataque</p>
+                    <p class="text-sm text-slate-200">{{ alert.attack_signature|default:"—" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Indicador malware</p>
+                    <p class="text-sm text-slate-200">{{ alert.malware_indicator|default:"—" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Familia de amenaza</p>
+                    <p class="text-sm {% if alert.has_threat_family %}text-red-400 font-medium{% else %}text-slate-200{% endif %}">
+                        {% if alert.has_threat_family %}Sí{% else %}No{% endif %}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Táctica MITRE</p>
+                    <p class="text-sm text-slate-200">{{ alert.mitre_tactic|default:"—" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Kill chain stage</p>
+                    <p class="text-sm text-slate-200">{{ alert.kill_chain_stage|default:"—" }}</p>
+                </div>
+                {% if alert.mitre_techniques %}
+                <div class="col-span-2">
+                    <p class="text-xs text-slate-500 mb-0.5">Técnicas MITRE</p>
+                    <p class="text-sm text-slate-200 font-mono">{{ alert.mitre_techniques }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="border-t border-slate-700/50"></div>
+
+        <!-- Activo y entorno -->
+        <div>
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Activo y entorno</p>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Criticidad del activo</p>
+                    <p class="text-sm text-slate-200">{{ alert.asset_criticality|default:"—" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">OS family</p>
+                    <p class="text-sm text-slate-200">{{ alert.os_family|default:"—" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Rol de evidencia</p>
+                    <p class="text-sm text-slate-200">{{ alert.evidence_role|default:"—" }}</p>
+                </div>
+                {% if alert.correlation_id and alert.correlation_id != 'unknown' %}
+                <div class="col-span-2">
+                    <p class="text-xs text-slate-500 mb-0.5">Correlation ID</p>
+                    <p class="text-sm text-slate-200 font-mono break-all">{{ alert.correlation_id }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="border-t border-slate-700/50"></div>
+
+        <!-- Trazabilidad -->
+        <div>
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Trazabilidad</p>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Subida por</p>
+                    <p class="text-sm text-slate-200">{{ alert.created_by.username }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Fecha de ingesta</p>
+                    <p class="text-sm text-slate-200 font-mono">{{ alert.created_at|date:"Y-m-d H:i:s" }}</p>
+                </div>
+                {% if alert.label %}
+                <div>
+                    <p class="text-xs text-slate-500 mb-0.5">Label original</p>
+                    <p class="text-sm text-slate-200">{{ alert.label }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
     <!-- Explanation intro -->
     <div class="bg-violet-500/5 border border-violet-500/20 rounded-xl p-4">
         <p class="text-sm text-slate-300">
