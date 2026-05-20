@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 from django.db.models.functions import TruncDate
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
@@ -42,52 +42,78 @@ from .pipeline import (
 
 @login_required
 def dashboard_view(request):
-    user_logs = PredictionLog.objects.filter(user=request.user)
+    alerts = Alert.objects.all()
 
-    total_predictions = user_logs.count()
-    total_malicioso = user_logs.filter(predicted_class='malicioso').count()
-    total_investigar = user_logs.filter(predicted_class='a_investigar').count()
-    total_benigno = user_logs.filter(predicted_class='benigno').count()
+    total_alerts     = alerts.count()
+    total_pending    = alerts.filter(predicted_class='').count()
+    total_malicioso  = alerts.filter(predicted_class='malicioso').count()
+    total_investigar = alerts.filter(predicted_class='a_investigar').count()
+    total_benigno    = alerts.filter(predicted_class='benigno').count()
 
-    recent_predictions = user_logs.order_by('-created_at')[:5]
+    recent_alerts = alerts.order_by('-created_at')[:6]
 
-    class_counts = Counter(user_logs.values_list('predicted_class', flat=True))
-    source_counts = Counter(user_logs.values_list('source', flat=True))
+    tactic_qs = (
+        alerts
+        .exclude(mitre_tactic='')
+        .values('mitre_tactic')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:6]
+    )
+    tactic_labels = [item['mitre_tactic'] for item in tactic_qs]
+    tactic_counts  = [item['total'] for item in tactic_qs]
+
+    severity_qs = (
+        alerts
+        .exclude(severity='')
+        .values('severity')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    severity_labels = [item['severity'] for item in severity_qs]
+    severity_counts  = [item['total'] for item in severity_qs]
+
+    killchain_qs = (
+        alerts
+        .exclude(kill_chain_stage='')
+        .values('kill_chain_stage')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    killchain_labels = [item['kill_chain_stage'] for item in killchain_qs]
+    killchain_counts  = [item['total'] for item in killchain_qs]
 
     daily_data = (
-        user_logs
+        alerts
         .annotate(day=TruncDate('created_at'))
         .values('day')
         .annotate(total=Count('id'))
         .order_by('day')
     )
-
     daily_labels = [item['day'].strftime('%Y-%m-%d') for item in daily_data if item['day']]
     daily_totals = [item['total'] for item in daily_data]
 
     context = {
-        'total_predictions': total_predictions,
-        'total_malicioso': total_malicioso,
+        'total_alerts':     total_alerts,
+        'total_pending':    total_pending,
+        'total_malicioso':  total_malicioso,
         'total_investigar': total_investigar,
-        'total_benigno': total_benigno,
-        'recent_predictions': recent_predictions,
+        'total_benigno':    total_benigno,
+        'recent_alerts':    recent_alerts,
 
-        'class_labels': ['benigno', 'a_investigar', 'malicioso'],
-        'class_data': [
-            class_counts.get('benigno', 0),
-            class_counts.get('a_investigar', 0),
-            class_counts.get('malicioso', 0),
-        ],
+        'class_labels_json': json.dumps(['Benigno', 'A investigar', 'Malicioso']),
+        'class_data_json':   json.dumps([total_benigno, total_investigar, total_malicioso]),
 
-        'source_labels': ['manual', 'json', 'api'],
-        'source_data': [
-            source_counts.get('manual', 0),
-            source_counts.get('json', 0),
-            source_counts.get('api', 0),
-        ],
+        'tactic_labels_json': json.dumps(tactic_labels),
+        'tactic_data_json':   json.dumps(tactic_counts),
 
-        'daily_labels': daily_labels,
-        'daily_totals': daily_totals,
+        'severity_labels_json': json.dumps(severity_labels),
+        'severity_data_json':   json.dumps(severity_counts),
+
+        'killchain_labels_json': json.dumps(killchain_labels),
+        'killchain_data_json':   json.dumps(killchain_counts),
+
+        'daily_labels_json': json.dumps(daily_labels),
+        'daily_totals_json': json.dumps(daily_totals),
     }
     return render(request, 'predictor/dashboard.html', context)
 
@@ -418,6 +444,15 @@ def alert_list_view(request):
     if date_to:
         qs = qs.filter(created_at__date__lte=date_to)
 
+    order = request.GET.get('order', 'date_desc').strip()
+    _order_map = {
+        'risk_desc': F('risk_score').desc(nulls_last=True),
+        'risk_asc':  F('risk_score').asc(nulls_last=True),
+        'date_desc': '-created_at',
+        'date_asc':  'created_at',
+    }
+    qs = qs.order_by(_order_map.get(order, '-created_at'))
+
     severity_choices = (
         Alert.objects.values_list('severity', flat=True)
         .distinct()
@@ -446,6 +481,7 @@ def alert_list_view(request):
         'severity_choices': severity_choices,
         'pending_count': pending_count,
         'total_count': qs.count(),
+        'order': order,
     }
     return render(request, 'predictor/alert_list.html', context)
 
