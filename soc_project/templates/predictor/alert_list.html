@@ -200,6 +200,7 @@
                             {% if order == 'date_asc' %}<span class="ml-1">↑</span>{% else %}<span class="ml-1">↓</span>{% endif %}
                         </th>
                         <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Estado</th>
+                        <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Asignado a</th>
                         <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Acciones</th>
                     </tr>
                 </thead>
@@ -296,6 +297,18 @@
                             </div>
                         </td>
 
+                        <!-- Asignado a -->
+                        <td class="px-4 py-3">
+                            {% if alert.assigned_to %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                                    {{ alert.assigned_to.username }}
+                                </span>
+                            {% else %}
+                                <span class="text-xs text-slate-600">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Acciones -->
                         <td class="px-4 py-3">
                             {% if alert.predicted_class %}
                             <a href="{% url 'alert_shap' alert.pk %}"

@@ -10,6 +10,7 @@ ACTION_USER_DEACTIVATED = 'user_deactivated'
 ACTION_USER_ROLE_CHANGED = 'user_role_changed'
 ACTION_PIPELINE_NORMALIZATION = 'pipeline_normalization'
 ACTION_PIPELINE_EXPORT = 'pipeline_export'
+ACTION_ALERT_ASSIGNED = 'alert_assigned'
 
 ACTION_LABELS = {
     ACTION_UPLOAD_ALERTS: 'Subida de alertas',
@@ -20,6 +21,7 @@ ACTION_LABELS = {
     ACTION_USER_ROLE_CHANGED: 'Cambio de rol',
     ACTION_PIPELINE_NORMALIZATION: 'Pipeline de normalización',
     ACTION_PIPELINE_EXPORT: 'Exportación de dataset',
+    ACTION_ALERT_ASSIGNED: 'Asignación de alerta',
 }
 
 
@@ -49,8 +51,10 @@ def log_action(user, action, description):
 class UserProfile(models.Model):
     ROLE_CHOICES = [
         ('admin', 'Administrador'),
-        ('analyst_n1', 'Analista Nivel 1'),
+        ('analyst_n3', 'Analista Nivel 3'),
         ('analyst_n2', 'Analista Nivel 2'),
+        ('analyst_n1', 'Analista Nivel 1'),
+        ('trainee', 'Practicante'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -66,3 +70,23 @@ class UserProfile(models.Model):
     @property
     def is_admin(self):
         return self.role == 'admin'
+
+    @property
+    def is_analyst_n3(self):
+        return self.role == 'analyst_n3'
+
+    @property
+    def is_analyst_n2(self):
+        return self.role == 'analyst_n2'
+
+    @property
+    def is_analyst_n1(self):
+        return self.role == 'analyst_n1'
+
+    @property
+    def is_trainee(self):
+        return self.role == 'trainee'
+
+    @property
+    def can_assign_alerts(self):
+        return self.role in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1')
