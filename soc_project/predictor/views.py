@@ -4,6 +4,7 @@ import json
 from collections import Counter
 
 from django.http import JsonResponse
+from django.utils import timezone
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -430,6 +431,11 @@ def alert_list_view(request):
     elif class_filter:
         qs = qs.filter(predicted_class=class_filter)
 
+    # Filtro por estado de investigación
+    status_filter = request.GET.get('investigation_status', '').strip()
+    if status_filter:
+        qs = qs.filter(investigation_status=status_filter)
+
     # Filtro por prioridad del analista ('none' → sin ajuste)
     priority_filter = request.GET.get('analyst_priority', '').strip()
     if priority_filter == 'none':
@@ -490,6 +496,7 @@ def alert_list_view(request):
         'total_count':      qs.count(),
         'order':            order,
         'priority_filter':  priority_filter,
+        'status_filter':    status_filter,
     }
     return render(request, 'predictor/alert_list.html', context)
 
@@ -1000,6 +1007,43 @@ def pipeline_export_view(request):
 
 
 @login_required
+def alert_set_status_view(request, pk):
+    from django.shortcuts import get_object_or_404
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    alert = get_object_or_404(Alert, pk=pk)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    status_value = data.get('status', '').strip()
+    notes        = data.get('notes', '').strip()
+
+    valid = {'new', 'investigating', 'investigated', 'false_positive'}
+    if status_value not in valid:
+        return JsonResponse({'error': 'Estado inválido'}, status=400)
+
+    alert.investigation_status = status_value
+    alert.investigation_notes  = notes
+    alert.investigated_by      = request.user
+    alert.investigated_at      = timezone.now()
+    alert.save(update_fields=[
+        'investigation_status', 'investigation_notes',
+        'investigated_by', 'investigated_at',
+    ])
+
+    return JsonResponse({
+        'ok':       True,
+        'status':   status_value,
+        'by':       request.user.username,
+        'at':       alert.investigated_at.strftime('%Y-%m-%d %H:%M'),
+    })
+
+
+@login_required
 def alert_set_priority_view(request, pk):
     from django.shortcuts import get_object_or_404
     if request.method != 'POST':
@@ -1062,9 +1106,10 @@ def alert_shap_view(request, pk):
         shap_data = calculate_shap_values(data)
 
     return render(request, 'predictor/alert_shap.html', {
-        'alert'  : alert,
-        'shap_s1': _json.dumps(shap_data['s1']),
-        'shap_s2': _json.dumps(shap_data['s2']),
+        'alert'         : alert,
+        'shap_s1'       : _json.dumps(shap_data['s1']),
+        'shap_s2'       : _json.dumps(shap_data['s2']),
+        'status_choices': Alert.INVESTIGATION_STATUS_CHOICES,
     })
 
 

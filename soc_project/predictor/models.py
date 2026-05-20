@@ -65,6 +65,26 @@ class Alert(models.Model):
     shap_values = models.JSONField(null=True, blank=True)
     shap_explanation = models.TextField(null=True, blank=True)
 
+    # Estado de investigación — gestionado por analista nivel 1
+    INVESTIGATION_STATUS_CHOICES = [
+        ('new',            'Nueva'),
+        ('investigating',  'En investigación'),
+        ('investigated',   'Investigada'),
+        ('false_positive', 'Falso positivo'),
+    ]
+    investigation_status = models.CharField(
+        max_length=20,
+        choices=INVESTIGATION_STATUS_CHOICES,
+        default='new',
+    )
+    investigation_notes  = models.TextField(blank=True, default='')
+    investigated_by      = models.ForeignKey(
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='investigated_alerts',
+    )
+    investigated_at      = models.DateTimeField(null=True, blank=True)
+
     # Ajuste manual de prioridad por analista nivel 2
     ANALYST_PRIORITY_CHOICES = [
         ('critical', 'Crítica'),

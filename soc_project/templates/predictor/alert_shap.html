@@ -281,6 +281,59 @@
         </div>
     </div>
 
+    <!-- Estado de investigación -->
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+        <div>
+            <h2 class="text-sm font-semibold text-white">Estado de investigación</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Nivel 1 — marcá el estado después de revisar la alerta</p>
+        </div>
+
+        <div class="flex items-center gap-4 flex-wrap">
+            {% for value, label in status_choices %}
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="investigation_status" value="{{ value }}"
+                    {% if alert.investigation_status == value %}checked{% endif %}
+                    class="status-radio accent-blue-500 cursor-pointer">
+                <span class="text-sm
+                    {% if value == 'investigated'   %}text-emerald-400
+                    {% elif value == 'investigating' %}text-blue-400
+                    {% elif value == 'false_positive'%}text-violet-400
+                    {% else %}text-slate-400{% endif %}">
+                    {{ label }}
+                </span>
+            </label>
+            {% endfor %}
+        </div>
+
+        <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">
+                Justificación / acciones realizadas
+                <span class="text-slate-600">(requerida para Investigada o Falso positivo)</span>
+            </label>
+            <textarea id="investigationNotes" rows="3"
+                placeholder="Describir qué revisaste, qué encontraste y por qué tomaste esta decisión…"
+                class="w-full bg-slate-700 border border-slate-600 text-slate-200 placeholder-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none">{{ alert.investigation_notes }}</textarea>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button id="statusSave"
+                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                Guardar estado
+            </button>
+            <span id="statusFeedback" class="text-xs text-slate-500"></span>
+        </div>
+
+        {% if alert.investigated_by %}
+        <div class="pt-3 border-t border-slate-700/50">
+            <p class="text-xs text-slate-500">
+                Última actualización por
+                <span class="text-slate-300 font-medium">{{ alert.investigated_by.username }}</span>
+                el <span class="text-slate-300 font-mono">{{ alert.investigated_at|date:"Y-m-d H:i" }}</span>
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
     <!-- Ajuste manual de prioridad -->
     <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
         <div>
@@ -432,6 +485,62 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 {% endif %}
+
+// Estado de investigación
+document.getElementById('statusSave').addEventListener('click', function () {
+    const selected = document.querySelector('.status-radio:checked');
+    if (!selected) return;
+
+    const status   = selected.value;
+    const notes    = document.getElementById('investigationNotes').value.trim();
+    const feedback = document.getElementById('statusFeedback');
+    const btn      = this;
+
+    if ((status === 'investigated' || status === 'false_positive') && !notes) {
+        feedback.textContent = 'Justificación requerida para este estado.';
+        feedback.className = 'text-xs text-red-400';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Guardando…';
+    feedback.textContent = '';
+
+    fetch("{% url 'alert_set_status' alert.pk %}", {
+        method:  'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ status, notes }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.textContent = 'Guardar estado';
+        if (data.ok) {
+            feedback.textContent = '✓ Guardado';
+            feedback.className = 'text-xs text-emerald-400';
+            setTimeout(() => { feedback.textContent = ''; }, 2500);
+
+            // Actualiza trazabilidad en pantalla sin recargar
+            let trace = document.getElementById('traceInfo');
+            if (!trace) {
+                trace = document.createElement('div');
+                trace.id = 'traceInfo';
+                trace.className = 'pt-3 border-t border-slate-700/50 mt-2';
+                document.getElementById('statusSave').closest('.space-y-4').appendChild(trace);
+            }
+            trace.innerHTML = `<p class="text-xs text-slate-500">Última actualización por <span class="text-slate-300 font-medium">${data.by}</span> el <span class="text-slate-300 font-mono">${data.at}</span></p>`;
+        } else {
+            feedback.textContent = data.error || 'Error al guardar';
+            feedback.className = 'text-xs text-red-400';
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.textContent = 'Guardar estado';
+        feedback.textContent = 'Error de conexión';
+        feedback.className = 'text-xs text-red-400';
+    });
+});
 
 // Ajuste manual de prioridad
 document.getElementById('prioritySave').addEventListener('click', function () {

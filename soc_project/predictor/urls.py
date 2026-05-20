@@ -4,6 +4,7 @@ from .views import (
     alert_shap_view,
     alert_explain_view,
     alert_set_priority_view,
+    alert_set_status_view,
     dashboard_view,
     history_view,
     predict_json_view,
@@ -30,6 +31,7 @@ urlpatterns = [
     path('alerts/<int:pk>/shap/', alert_shap_view, name='alert_shap'),
     path('alerts/<int:pk>/explain/', alert_explain_view, name='alert_explain'),
     path('alerts/<int:pk>/priority/', alert_set_priority_view, name='alert_set_priority'),
+    path('alerts/<int:pk>/status/',   alert_set_status_view,   name='alert_set_status'),
     # HU009 — Pipeline de normalización
     path('pipeline/', pipeline_view, name='pipeline'),
     path('pipeline/upload/', pipeline_upload_view, name='pipeline_upload'),
