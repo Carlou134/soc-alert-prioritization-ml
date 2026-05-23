@@ -33,6 +33,7 @@ from accounts.models import (
     ACTION_PIPELINE_EXPORT,
     ACTION_ALERT_ASSIGNED,
     ACTION_REPORT_EXPORT,
+    ACTION_ALERT_EVALUATED,
     log_action,
 )
 
@@ -1151,17 +1152,20 @@ def alert_shap_view(request, pk):
         if allowed_roles else User.objects.none()
     )
 
-    is_trainee = request.user.profile.is_trainee
+    is_trainee   = request.user.profile.is_trainee
+    can_evaluate = request.user.profile.role in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1')
 
     return render(request, 'predictor/alert_shap.html', {
-        'alert'           : alert,
-        'shap_s1'         : _json.dumps(shap_data['s1']),
-        'shap_s2'         : _json.dumps(shap_data['s2']),
-        'status_choices'  : Alert.INVESTIGATION_STATUS_CHOICES,
-        'can_assign'      : bool(allowed_roles),
-        'assignable_users': assignable_users,
-        'is_trainee'      : is_trainee,
-        'assigned_to_me'  : alert.assigned_to_id == request.user.pk,
+        'alert'              : alert,
+        'shap_s1'            : _json.dumps(shap_data['s1']),
+        'shap_s2'            : _json.dumps(shap_data['s2']),
+        'status_choices'     : Alert.INVESTIGATION_STATUS_CHOICES,
+        'evaluation_choices' : Alert.ML_EVALUATION_CHOICES,
+        'can_assign'         : bool(allowed_roles),
+        'assignable_users'   : assignable_users,
+        'is_trainee'         : is_trainee,
+        'assigned_to_me'     : alert.assigned_to_id == request.user.pk,
+        'can_evaluate'       : can_evaluate,
     })
 
 
@@ -1234,6 +1238,60 @@ def alert_assign_view(request, pk):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# HU030 — Evaluación de decisiones ML
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+def alert_evaluate_view(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    profile = request.user.profile
+    if profile.role not in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1'):
+        return JsonResponse({'error': 'No tenés permisos para evaluar decisiones ML.'}, status=403)
+
+    alert = get_object_or_404(Alert, pk=pk)
+
+    if not alert.predicted_class:
+        return JsonResponse({'error': 'La alerta no está clasificada aún.'}, status=400)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    evaluation = data.get('evaluation', '').strip()
+    notes      = data.get('notes', '').strip()
+
+    valid = {'correct', 'partially_correct', 'incorrect'}
+    if evaluation not in valid:
+        return JsonResponse({'error': 'Evaluación inválida.'}, status=400)
+
+    alert.ml_evaluation       = evaluation
+    alert.ml_evaluation_notes = notes
+    alert.ml_evaluated_by     = request.user
+    alert.ml_evaluated_at     = timezone.now()
+    alert.save(update_fields=[
+        'ml_evaluation', 'ml_evaluation_notes', 'ml_evaluated_by', 'ml_evaluated_at',
+    ])
+
+    LABELS = dict(Alert.ML_EVALUATION_CHOICES)
+    log_action(
+        request.user,
+        ACTION_ALERT_EVALUATED,
+        f'Evaluó la predicción ML de alerta #{pk} como "{LABELS[evaluation]}". Notas: {notes or "—"}',
+    )
+
+    return JsonResponse({
+        'ok':         True,
+        'evaluation': evaluation,
+        'label':      LABELS[evaluation],
+        'by':         request.user.username,
+        'at':         alert.ml_evaluated_at.strftime('%Y-%m-%d %H:%M'),
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # HU026 / HU027 — Reportes y exportación
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1270,15 +1328,18 @@ def _build_report_queryset(params):
 
 
 def _build_report_summary(qs):
-    total = qs.count()
+    total     = qs.count()
     by_class  = dict(qs.values_list('predicted_class').annotate(n=Count('id')).order_by())
     by_status = dict(qs.values_list('investigation_status').annotate(n=Count('id')).order_by())
     by_sev    = dict(qs.values_list('severity').annotate(n=Count('id')).order_by())
+    by_eval   = dict(qs.exclude(ml_evaluation='').values_list('ml_evaluation').annotate(n=Count('id')).order_by())
     return {
-        'total':    total,
-        'by_class': by_class,
-        'by_status': by_status,
+        'total':       total,
+        'by_class':    by_class,
+        'by_status':   by_status,
         'by_severity': by_sev,
+        'by_eval':     by_eval,
+        'evaluated':   sum(by_eval.values()),
     }
 
 
@@ -1305,6 +1366,10 @@ def report_view(request):
         (label, summary['by_status'].get(val, 0))
         for val, label in Alert.INVESTIGATION_STATUS_CHOICES
     ]
+    eval_breakdown = [
+        (label, summary['by_eval'].get(val, 0))
+        for val, label in Alert.ML_EVALUATION_CHOICES
+    ]
 
     return render(request, 'predictor/reports.html', {
         'alerts':           alerts_page,
@@ -1314,6 +1379,7 @@ def report_view(request):
         'class_choices':    class_choices,
         'status_choices':   Alert.INVESTIGATION_STATUS_CHOICES,
         'status_breakdown': status_breakdown,
+        'eval_breakdown':   eval_breakdown,
     })
 
 
@@ -1334,7 +1400,7 @@ def report_export_excel_view(request):
     headers = [
         'ID', 'Fecha', 'Categoría', 'Protocolo', 'Táctica MITRE',
         'Severidad', 'Clase Predicha', 'Riesgo', 'Estado Investigación',
-        'Prioridad Analista', 'Asignado a', 'Creado por',
+        'Prioridad Analista', 'Evaluación ML', 'Asignado a', 'Creado por',
     ]
     ws.append(headers)
     for col_idx, _ in enumerate(headers, start=1):
@@ -1345,6 +1411,7 @@ def report_export_excel_view(request):
 
     STATUS_LABELS = dict(Alert.INVESTIGATION_STATUS_CHOICES)
     PRIORITY_LABELS = dict(Alert.ANALYST_PRIORITY_CHOICES)
+    EVAL_LABELS = dict(Alert.ML_EVALUATION_CHOICES)
 
     for alert in qs.select_related('created_by', 'assigned_to'):
         ws.append([
@@ -1358,6 +1425,7 @@ def report_export_excel_view(request):
             round(alert.risk_score, 4) if alert.risk_score is not None else '',
             STATUS_LABELS.get(alert.investigation_status, alert.investigation_status),
             PRIORITY_LABELS.get(alert.analyst_priority, '') if alert.analyst_priority else '',
+            EVAL_LABELS.get(alert.ml_evaluation, '') if alert.ml_evaluation else 'Sin evaluar',
             alert.assigned_to.username if alert.assigned_to else '',
             alert.created_by.username if alert.created_by else '',
         ])
@@ -1439,6 +1507,7 @@ def report_export_pdf_view(request):
 
     CLASS_LABELS = {'malicioso': 'Malicioso', 'a_investigar': 'A investigar', 'benigno': 'Benigno', '': 'Sin clasificar'}
     STATUS_LABELS = dict(Alert.INVESTIGATION_STATUS_CHOICES)
+    EVAL_LABELS   = dict(Alert.ML_EVALUATION_CHOICES)
 
     summary_data = [['Métrica', 'Valor']]
     summary_data.append(['Total de alertas', str(summary['total'])])
@@ -1448,6 +1517,9 @@ def report_export_pdf_view(request):
         summary_data.append([f'  Estado: {STATUS_LABELS.get(st, st)}', str(count)])
     for sev, count in summary['by_severity'].items():
         summary_data.append([f'  Severidad: {sev}', str(count)])
+    summary_data.append([f'Alertas evaluadas por analistas', str(summary['evaluated'])])
+    for ev, count in summary['by_eval'].items():
+        summary_data.append([f'  Evaluación: {EVAL_LABELS.get(ev, ev)}', str(count)])
 
     summary_table = Table(summary_data, colWidths=[10 * cm, 4 * cm])
     summary_table.setStyle(TableStyle([
@@ -1470,7 +1542,7 @@ def report_export_pdf_view(request):
 
     detail_headers = [
         'ID', 'Fecha', 'Categoría', 'Táctica MITRE',
-        'Severidad', 'Clase Predicha', 'Estado', 'Asignado a',
+        'Severidad', 'Clase Predicha', 'Estado', 'Evaluación ML', 'Asignado a',
     ]
     detail_data = [detail_headers]
 
@@ -1483,10 +1555,11 @@ def report_export_pdf_view(request):
             alert.severity,
             CLASS_LABELS.get(alert.predicted_class, alert.predicted_class or 'Sin clasificar'),
             STATUS_LABELS.get(alert.investigation_status, alert.investigation_status),
+            EVAL_LABELS.get(alert.ml_evaluation, '—') if alert.ml_evaluation else '—',
             alert.assigned_to.username[:12] if alert.assigned_to else '—',
         ])
 
-    col_widths = [1.2*cm, 2.5*cm, 4*cm, 4.5*cm, 2.5*cm, 3*cm, 3.5*cm, 3*cm]
+    col_widths = [1.2*cm, 2.3*cm, 3.5*cm, 4*cm, 2.2*cm, 2.8*cm, 3*cm, 3*cm, 2.7*cm]
     detail_table = Table(detail_data, colWidths=col_widths, repeatRows=1)
     detail_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E3A5F')),

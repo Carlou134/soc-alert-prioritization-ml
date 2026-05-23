@@ -95,6 +95,21 @@ class Alert(models.Model):
     analyst_priority = models.CharField(max_length=20, blank=True, default='')
     analyst_note     = models.TextField(blank=True, default='')
 
+    # Evaluación de la decisión ML — analista nivel 2
+    ML_EVALUATION_CHOICES = [
+        ('correct',           'Correcta'),
+        ('partially_correct', 'Parcialmente correcta'),
+        ('incorrect',         'Incorrecta'),
+    ]
+    ml_evaluation       = models.CharField(max_length=20, blank=True, default='', choices=ML_EVALUATION_CHOICES)
+    ml_evaluation_notes = models.TextField(blank=True, default='')
+    ml_evaluated_by     = models.ForeignKey(
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='evaluated_alerts',
+    )
+    ml_evaluated_at     = models.DateTimeField(null=True, blank=True)
+
     # Asignación — analista responsable de la alerta
     assigned_to = models.ForeignKey(
         User, null=True, blank=True,
