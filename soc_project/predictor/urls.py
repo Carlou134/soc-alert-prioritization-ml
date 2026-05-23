@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
     alert_list_view,
+    alert_history_view,
     alert_shap_view,
     alert_explain_view,
     alert_set_priority_view,
@@ -32,6 +33,7 @@ urlpatterns = [
     path('upload-alerts/', upload_alerts_view, name='upload_alerts'),
     path('history/', history_view, name='history'),
     path('alerts/', alert_list_view, name='alert_list'),
+    path('alerts/history/', alert_history_view, name='alert_history'),
     path('alerts/predict-pending/', predict_pending_view, name='predict_pending'),
     path('alerts/<int:pk>/shap/', alert_shap_view, name='alert_shap'),
     path('alerts/<int:pk>/explain/', alert_explain_view, name='alert_explain'),

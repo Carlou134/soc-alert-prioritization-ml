@@ -24,7 +24,7 @@ from django.db.models.functions import TruncDate
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from accounts.decorators import admin_required, analyst_required
+from accounts.decorators import admin_required, analyst_required, role_required
 from accounts.models import (
     ACTION_PREDICT_JSON,
     ACTION_PREDICT_MANUAL,
@@ -260,6 +260,79 @@ def history_view(request):
         'total_count': total_count,
         'source_choices': ['manual', 'json', 'api', 'upload_csv', 'upload_json'],
         'class_choices': ['benigno', 'a_investigar', 'malicioso'],
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HU028 — Historial de alertas procesadas (n2 / n3 / admin)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@role_required('admin', 'analyst_n3', 'analyst_n2')
+def alert_history_view(request):
+    qs = (
+        Alert.objects
+        .exclude(predicted_class='')
+        .select_related('created_by', 'investigated_by', 'assigned_to', 'ml_evaluated_by')
+        .order_by('-created_at')
+    )
+
+    date_from = request.GET.get('date_from', '').strip()
+    if date_from:
+        qs = qs.filter(created_at__date__gte=date_from)
+
+    date_to = request.GET.get('date_to', '').strip()
+    if date_to:
+        qs = qs.filter(created_at__date__lte=date_to)
+
+    class_filter = request.GET.get('predicted_class', '').strip()
+    if class_filter:
+        qs = qs.filter(predicted_class=class_filter)
+
+    status_filter = request.GET.get('investigation_status', '').strip()
+    if status_filter:
+        qs = qs.filter(investigation_status=status_filter)
+
+    tactic_filter = request.GET.get('mitre_tactic', '').strip()
+    if tactic_filter:
+        qs = qs.filter(mitre_tactic__icontains=tactic_filter)
+
+    attack_filter = request.GET.get('attack_type', '').strip()
+    if attack_filter:
+        qs = qs.filter(attack_type__icontains=attack_filter)
+
+    eval_filter = request.GET.get('ml_evaluation', '').strip()
+    if eval_filter:
+        qs = qs.filter(ml_evaluation=eval_filter)
+
+    analyst_filter = request.GET.get('analyst', '').strip()
+    if analyst_filter:
+        qs = qs.filter(investigated_by__username__icontains=analyst_filter)
+
+    total_count = qs.count()
+    paginator = Paginator(qs, 15)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    mitre_tactics = (
+        Alert.objects.exclude(mitre_tactic='')
+        .values_list('mitre_tactic', flat=True)
+        .distinct().order_by('mitre_tactic')
+    )
+
+    return render(request, 'predictor/alert_history.html', {
+        'page_obj':        page_obj,
+        'total_count':     total_count,
+        'date_from':       date_from,
+        'date_to':         date_to,
+        'class_filter':    class_filter,
+        'status_filter':   status_filter,
+        'tactic_filter':   tactic_filter,
+        'attack_filter':   attack_filter,
+        'eval_filter':     eval_filter,
+        'analyst_filter':  analyst_filter,
+        'mitre_tactics':   mitre_tactics,
+        'status_choices':  Alert.INVESTIGATION_STATUS_CHOICES,
+        'eval_choices':    Alert.ML_EVALUATION_CHOICES,
     })
 
 
