@@ -3,7 +3,9 @@ import csv
 import json
 from collections import Counter
 
+from django.contrib.auth.models import User
 from django.http import JsonResponse
+from django.utils import timezone
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -11,16 +13,27 @@ from django.core.paginator import Paginator
 from django.db.models import Count, F, Q
 from django.db.models.functions import TruncDate
 from django.http import HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 
+from accounts.decorators import admin_required, analyst_required
 from accounts.models import (
     ACTION_PREDICT_JSON,
     ACTION_PREDICT_MANUAL,
     ACTION_UPLOAD_ALERTS,
     ACTION_PIPELINE_NORMALIZATION,
     ACTION_PIPELINE_EXPORT,
+    ACTION_ALERT_ASSIGNED,
     log_action,
 )
+
+# Roles a los que cada rol puede asignar alertas (incluye auto-asignación)
+ASSIGNMENT_TARGETS = {
+    'admin':      ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1', 'trainee'),
+    'analyst_n3': ('analyst_n3', 'analyst_n2', 'analyst_n1'),
+    'analyst_n2': ('analyst_n2', 'analyst_n3', 'analyst_n1'),
+    'analyst_n1': ('analyst_n1', 'analyst_n2', 'trainee'),
+    'trainee':    (),
+}
 from .forms import PredictionForm, JSONPredictionForm
 from .models import Alert, PredictionLog, log_error
 from .utils import predict_alert, predict_batch, extract_valid_fields, calculate_risk_score, calculate_shap_values, compute_shap_safe
@@ -118,6 +131,7 @@ def dashboard_view(request):
     return render(request, 'predictor/dashboard.html', context)
 
 @login_required
+@analyst_required
 def predict_view(request):
     form = PredictionForm()
     result = None
@@ -156,6 +170,7 @@ def predict_view(request):
     })
 
 @login_required
+@analyst_required
 def predict_json_view(request):
     form = JSONPredictionForm()
     result = None
@@ -238,6 +253,7 @@ def history_view(request):
 
 
 @login_required
+@analyst_required
 def upload_alerts_view(request):
     context = {'processed': [], 'failed': [], 'error': None, 'summary': None}
 
@@ -399,7 +415,7 @@ def _friendly_serializer_errors(errors: dict) -> dict:
 @login_required
 def alert_list_view(request):
     is_admin = request.user.profile.is_admin
-    qs = Alert.objects.select_related('created_by').all()
+    qs = Alert.objects.select_related('created_by', 'assigned_to').all()
 
     # Toggle "Mis alertas" / "Todas las alertas"
     mine = request.GET.get('mine', '').strip()
@@ -429,6 +445,18 @@ def alert_list_view(request):
         qs = qs.filter(predicted_class='')
     elif class_filter:
         qs = qs.filter(predicted_class=class_filter)
+
+    # Filtro por estado de investigación
+    status_filter = request.GET.get('investigation_status', '').strip()
+    if status_filter:
+        qs = qs.filter(investigation_status=status_filter)
+
+    # Filtro por prioridad del analista ('none' → sin ajuste)
+    priority_filter = request.GET.get('analyst_priority', '').strip()
+    if priority_filter == 'none':
+        qs = qs.filter(analyst_priority='')
+    elif priority_filter:
+        qs = qs.filter(analyst_priority=priority_filter)
 
     # Filtro por usuario: admins pueden filtrar por cualquier usuario;
     # usuarios normales solo pueden aplicar el toggle "mine"
@@ -479,14 +507,17 @@ def alert_list_view(request):
         'date_from': date_from,
         'date_to': date_to,
         'severity_choices': severity_choices,
-        'pending_count': pending_count,
-        'total_count': qs.count(),
-        'order': order,
+        'pending_count':    pending_count,
+        'total_count':      qs.count(),
+        'order':            order,
+        'priority_filter':  priority_filter,
+        'status_filter':    status_filter,
     }
     return render(request, 'predictor/alert_list.html', context)
 
 
 @login_required
+@analyst_required
 def predict_pending_view(request):
     """Clasifica todas las alertas sin predicción y asigna risk_score."""
     if request.method != 'POST':
@@ -606,6 +637,7 @@ def _clear_pipeline_session(session):
 
 
 @login_required
+@analyst_required
 def pipeline_view(request):
     """Paso 1: Formulario de carga de archivo."""
     _clear_pipeline_session(request.session)
@@ -616,6 +648,7 @@ def pipeline_view(request):
 
 
 @login_required
+@analyst_required
 def pipeline_upload_view(request):
     """POST: Parsea el archivo, detecta columnas y decide el siguiente paso."""
     if request.method != 'POST':
@@ -724,6 +757,7 @@ def _map_ctx(detected_cols, filename, missing_required, missing_optional, missin
 
 
 @login_required
+@analyst_required
 def pipeline_map_view(request):
     """Paso 2: Mapeo de columnas — requeridas, opcionales y de visualización."""
     records = request.session.get('pipeline_records')
@@ -788,6 +822,7 @@ def pipeline_map_view(request):
 
 
 @login_required
+@analyst_required
 def pipeline_normalize_view(request):
     """
     GET: Muestra preview de datos en bruto y botón de normalización.
@@ -922,6 +957,7 @@ def pipeline_normalize_view(request):
 
 
 @login_required
+@analyst_required
 def pipeline_preview_view(request):
     """Paso 4: Preview del dataset limpio y botones de exportación."""
     clean = request.session.get('pipeline_clean_records')
@@ -946,6 +982,7 @@ def pipeline_preview_view(request):
 
 
 @login_required
+@analyst_required
 def pipeline_export_view(request):
     """POST: Genera y descarga el dataset limpio en CSV o JSON."""
     if request.method != 'POST':
@@ -992,6 +1029,74 @@ def pipeline_export_view(request):
 
 
 @login_required
+def alert_set_status_view(request, pk):
+    from django.shortcuts import get_object_or_404
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    alert = get_object_or_404(Alert, pk=pk)
+
+    profile = request.user.profile
+    if profile.is_trainee and alert.assigned_to_id != request.user.pk:
+        return JsonResponse({'error': 'No tenés permisos para modificar esta alerta.'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    status_value = data.get('status', '').strip()
+    notes        = data.get('notes', '').strip()
+
+    valid = {'new', 'investigating', 'investigated', 'false_positive'}
+    if status_value not in valid:
+        return JsonResponse({'error': 'Estado inválido'}, status=400)
+
+    alert.investigation_status = status_value
+    alert.investigation_notes  = notes
+    alert.investigated_by      = request.user
+    alert.investigated_at      = timezone.now()
+    alert.save(update_fields=[
+        'investigation_status', 'investigation_notes',
+        'investigated_by', 'investigated_at',
+    ])
+
+    return JsonResponse({
+        'ok':       True,
+        'status':   status_value,
+        'by':       request.user.username,
+        'at':       alert.investigated_at.strftime('%Y-%m-%d %H:%M'),
+    })
+
+
+@login_required
+@analyst_required
+def alert_set_priority_view(request, pk):
+    from django.shortcuts import get_object_or_404
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    alert = get_object_or_404(Alert, pk=pk)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    priority = data.get('priority', '').strip()
+    note     = data.get('note', '').strip()
+
+    if priority not in {'', 'low', 'medium', 'high', 'critical'}:
+        return JsonResponse({'error': 'Prioridad inválida'}, status=400)
+
+    alert.analyst_priority = priority
+    alert.analyst_note     = note
+    alert.save(update_fields=['analyst_priority', 'analyst_note'])
+
+    return JsonResponse({'ok': True, 'priority': priority})
+
+
+@login_required
 def alert_shap_view(request, pk):
     from django.shortcuts import get_object_or_404
     import json as _json
@@ -1027,10 +1132,26 @@ def alert_shap_view(request, pk):
         }
         shap_data = calculate_shap_values(data)
 
+    user_role = request.user.profile.role
+    allowed_roles = ASSIGNMENT_TARGETS.get(user_role, ())
+    assignable_users = (
+        User.objects.filter(profile__role__in=allowed_roles)
+        .select_related('profile')
+        .order_by('username')
+        if allowed_roles else User.objects.none()
+    )
+
+    is_trainee = request.user.profile.is_trainee
+
     return render(request, 'predictor/alert_shap.html', {
-        'alert'  : alert,
-        'shap_s1': _json.dumps(shap_data['s1']),
-        'shap_s2': _json.dumps(shap_data['s2']),
+        'alert'           : alert,
+        'shap_s1'         : _json.dumps(shap_data['s1']),
+        'shap_s2'         : _json.dumps(shap_data['s2']),
+        'status_choices'  : Alert.INVESTIGATION_STATUS_CHOICES,
+        'can_assign'      : bool(allowed_roles),
+        'assignable_users': assignable_users,
+        'is_trainee'      : is_trainee,
+        'assigned_to_me'  : alert.assigned_to_id == request.user.pk,
     })
 
 
@@ -1061,3 +1182,42 @@ def alert_explain_view(request, pk):
         return JsonResponse({'explanation': explanation, 'cached': False})
     except Exception as exc:
         return JsonResponse({'error': f'Error al generar la explicación: {exc}'}, status=500)
+
+
+@login_required
+@analyst_required
+def alert_assign_view(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    alert = get_object_or_404(Alert, pk=pk)
+    assigner_role = request.user.profile.role
+    allowed_roles = ASSIGNMENT_TARGETS.get(assigner_role, ())
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    assigned_to_id = data.get('assigned_to')
+
+    if not assigned_to_id:
+        alert.assigned_to = None
+        alert.save(update_fields=['assigned_to'])
+        log_action(request.user, ACTION_ALERT_ASSIGNED, f'Alerta #{pk} desasignada.')
+        return JsonResponse({'ok': True, 'assigned_to': None, 'username': ''})
+
+    target_user = get_object_or_404(User, pk=assigned_to_id)
+    target_profile = getattr(target_user, 'profile', None)
+
+    if target_profile is None or target_profile.role not in allowed_roles:
+        return JsonResponse({'error': 'No tenés permisos para asignar a ese analista.'}, status=403)
+
+    alert.assigned_to = target_user
+    alert.save(update_fields=['assigned_to'])
+    log_action(
+        request.user,
+        ACTION_ALERT_ASSIGNED,
+        f'Alerta #{pk} asignada a {target_user.username} ({target_profile.get_role_display()}).',
+    )
+    return JsonResponse({'ok': True, 'assigned_to': target_user.pk, 'username': target_user.username})
