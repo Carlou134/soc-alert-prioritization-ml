@@ -11,6 +11,7 @@ ACTION_USER_ROLE_CHANGED = 'user_role_changed'
 ACTION_PIPELINE_NORMALIZATION = 'pipeline_normalization'
 ACTION_PIPELINE_EXPORT = 'pipeline_export'
 ACTION_ALERT_ASSIGNED = 'alert_assigned'
+ACTION_REPORT_EXPORT = 'report_export'
 
 ACTION_LABELS = {
     ACTION_UPLOAD_ALERTS: 'Subida de alertas',
@@ -22,6 +23,7 @@ ACTION_LABELS = {
     ACTION_PIPELINE_NORMALIZATION: 'Pipeline de normalización',
     ACTION_PIPELINE_EXPORT: 'Exportación de dataset',
     ACTION_ALERT_ASSIGNED: 'Asignación de alerta',
+    ACTION_REPORT_EXPORT: 'Exportación de reporte',
 }
 
 

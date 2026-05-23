@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+
+{% block title %}Reportes — SOC Predictor{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-start justify-between">
+        <div>
+            <h1 class="text-lg font-semibold text-white">Reportes de Alertas</h1>
+            <p class="text-sm text-slate-400 mt-0.5">Análisis histórico del comportamiento del sistema</p>
+        </div>
+
+        <!-- Botones de exportación -->
+        <div class="flex items-center gap-2">
+            <a href="{% url 'report_export_excel' %}?{{ request.GET.urlencode }}"
+               class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Exportar Excel
+            </a>
+            <a href="{% url 'report_export_pdf' %}?{{ request.GET.urlencode }}"
+               class="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+                Exportar PDF
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <form method="get" class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Desde</label>
+                <input type="date" name="date_from" value="{{ params.date_from }}"
+                       class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Hasta</label>
+                <input type="date" name="date_to" value="{{ params.date_to }}"
+                       class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Clase Predicha</label>
+                <select name="predicted_class"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <option value="">Todas</option>
+                    {% for val, label in class_choices %}
+                    <option value="{{ val }}" {% if params.predicted_class == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Estado de Investigación</label>
+                <select name="investigation_status"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <option value="">Todos</option>
+                    {% for val, label in status_choices %}
+                    <option value="{{ val }}" {% if params.investigation_status == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Severidad</label>
+                <select name="severity"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <option value="">Todas</option>
+                    {% for sev in severities %}
+                    <option value="{{ sev }}" {% if params.severity == sev %}selected{% endif %}>{{ sev }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-end col-span-2 md:col-span-1 gap-2">
+                <button type="submit"
+                        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                    Filtrar
+                </button>
+                <a href="{% url 'reports' %}" class="flex-1 flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-md text-sm font-medium">Limpiar</a>
+            </div>
+        </div>
+    </form>
+
+    <!-- Tarjetas de resumen -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <p class="text-xs text-slate-400 uppercase tracking-wide">Total</p>
+            <p class="text-2xl font-bold text-white mt-1">{{ summary.total }}</p>
+        </div>
+        <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+            <p class="text-xs text-red-400 uppercase tracking-wide">Maliciosas</p>
+            <p class="text-2xl font-bold text-red-400 mt-1">{{ summary.by_class.malicioso|default:0 }}</p>
+        </div>
+        <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+            <p class="text-xs text-amber-400 uppercase tracking-wide">A Investigar</p>
+            <p class="text-2xl font-bold text-amber-400 mt-1">{{ summary.by_class.a_investigar|default:0 }}</p>
+        </div>
+        <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4">
+            <p class="text-xs text-emerald-400 uppercase tracking-wide">Benignas</p>
+            <p class="text-2xl font-bold text-emerald-400 mt-1">{{ summary.by_class.benigno|default:0 }}</p>
+        </div>
+    </div>
+
+    <!-- Desglose por estado -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+            <h2 class="text-sm font-semibold text-white mb-3">Por Estado de Investigación</h2>
+            {% for label, count in status_breakdown %}
+            <div class="flex items-center justify-between py-1.5 border-b border-slate-700/50 last:border-0">
+                <span class="text-sm text-slate-300">{{ label }}</span>
+                <span class="text-sm font-medium text-white">{{ count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+            <h2 class="text-sm font-semibold text-white mb-3">Por Severidad</h2>
+            {% for sev, count in summary.by_severity.items %}
+            <div class="flex items-center justify-between py-1.5 border-b border-slate-700/50 last:border-0">
+                <span class="text-sm text-slate-300">{{ sev|default:"—" }}</span>
+                <span class="text-sm font-medium text-white">{{ count }}</span>
+            </div>
+            {% empty %}
+            <p class="text-sm text-slate-500">Sin datos</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Tabla de alertas -->
+    <div class="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-700">
+            <h2 class="text-sm font-semibold text-white">
+                Detalle de alertas
+                <span class="ml-2 text-xs text-slate-400 font-normal">({{ alerts.paginator.count }} resultados)</span>
+            </h2>
+        </div>
+
+        {% if alerts %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-slate-700 text-xs text-slate-400 uppercase tracking-wide">
+                        <th class="px-4 py-3 text-left">ID</th>
+                        <th class="px-4 py-3 text-left">Fecha</th>
+                        <th class="px-4 py-3 text-left">Categoría</th>
+                        <th class="px-4 py-3 text-left">Táctica MITRE</th>
+                        <th class="px-4 py-3 text-left">Severidad</th>
+                        <th class="px-4 py-3 text-left">Clase</th>
+                        <th class="px-4 py-3 text-left">Estado</th>
+                        <th class="px-4 py-3 text-left">Asignado a</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700/50">
+                    {% for alert in alerts %}
+                    <tr class="hover:bg-slate-700/30">
+                        <td class="px-4 py-3 text-slate-400 font-mono text-xs">#{{ alert.pk }}</td>
+                        <td class="px-4 py-3 text-slate-300 whitespace-nowrap">{{ alert.created_at|date:"d/m/Y H:i" }}</td>
+                        <td class="px-4 py-3 text-slate-300">{{ alert.event_category }}</td>
+                        <td class="px-4 py-3 text-slate-300">{{ alert.mitre_tactic }}</td>
+                        <td class="px-4 py-3">
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">{{ alert.severity }}</span>
+                        </td>
+                        <td class="px-4 py-3">
+                            {% if alert.predicted_class == 'malicioso' %}
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">Malicioso</span>
+                            {% elif alert.predicted_class == 'a_investigar' %}
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">A investigar</span>
+                            {% elif alert.predicted_class == 'benigno' %}
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">Benigno</span>
+                            {% else %}
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-400">Sin clasificar</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            {% if alert.investigation_status == 'new' %}
+                            <span class="text-xs text-slate-400">Nueva</span>
+                            {% elif alert.investigation_status == 'investigating' %}
+                            <span class="text-xs text-blue-400">En investigación</span>
+                            {% elif alert.investigation_status == 'investigated' %}
+                            <span class="text-xs text-emerald-400">Investigada</span>
+                            {% elif alert.investigation_status == 'false_positive' %}
+                            <span class="text-xs text-slate-500">Falso positivo</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-slate-400">{{ alert.assigned_to.username|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginación -->
+        {% if alerts.has_other_pages %}
+        <div class="px-4 py-3 border-t border-slate-700 flex items-center justify-between">
+            <span class="text-xs text-slate-500">
+                Página {{ alerts.number }} de {{ alerts.paginator.num_pages }}
+            </span>
+            <div class="flex gap-1">
+                {% if alerts.has_previous %}
+                <a href="?{{ request.GET.urlencode }}&page={{ alerts.previous_page_number }}"
+                   class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-md">Anterior</a>
+                {% endif %}
+                {% if alerts.has_next %}
+                <a href="?{{ request.GET.urlencode }}&page={{ alerts.next_page_number }}"
+                   class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-md">Siguiente</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="px-4 py-12 text-center">
+            <p class="text-slate-500 text-sm">No se encontraron alertas con los filtros aplicados.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

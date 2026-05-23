@@ -2,6 +2,15 @@ import io
 import csv
 import json
 from collections import Counter
+from datetime import datetime, date
+
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
 from django.contrib.auth.models import User
 from django.http import JsonResponse
@@ -23,6 +32,7 @@ from accounts.models import (
     ACTION_PIPELINE_NORMALIZATION,
     ACTION_PIPELINE_EXPORT,
     ACTION_ALERT_ASSIGNED,
+    ACTION_REPORT_EXPORT,
     log_action,
 )
 
@@ -1221,3 +1231,289 @@ def alert_assign_view(request, pk):
         f'Alerta #{pk} asignada a {target_user.username} ({target_profile.get_role_display()}).',
     )
     return JsonResponse({'ok': True, 'assigned_to': target_user.pk, 'username': target_user.username})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HU026 / HU027 — Reportes y exportación
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _build_report_queryset(params):
+    """Aplica filtros de fecha, clase predicha, severidad y estado de investigación."""
+    qs = Alert.objects.all()
+
+    date_from = params.get('date_from')
+    date_to   = params.get('date_to')
+    if date_from:
+        try:
+            qs = qs.filter(created_at__date__gte=datetime.strptime(date_from, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            qs = qs.filter(created_at__date__lte=datetime.strptime(date_to, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+
+    predicted_class = params.get('predicted_class', '').strip()
+    if predicted_class:
+        qs = qs.filter(predicted_class=predicted_class)
+
+    severity = params.get('severity', '').strip()
+    if severity:
+        qs = qs.filter(severity=severity)
+
+    investigation_status = params.get('investigation_status', '').strip()
+    if investigation_status:
+        qs = qs.filter(investigation_status=investigation_status)
+
+    return qs
+
+
+def _build_report_summary(qs):
+    total = qs.count()
+    by_class  = dict(qs.values_list('predicted_class').annotate(n=Count('id')).order_by())
+    by_status = dict(qs.values_list('investigation_status').annotate(n=Count('id')).order_by())
+    by_sev    = dict(qs.values_list('severity').annotate(n=Count('id')).order_by())
+    return {
+        'total':    total,
+        'by_class': by_class,
+        'by_status': by_status,
+        'by_severity': by_sev,
+    }
+
+
+@login_required
+@admin_required
+def report_view(request):
+    params = request.GET
+    qs = _build_report_queryset(params)
+    summary = _build_report_summary(qs)
+
+    alerts_page = Paginator(qs.select_related('created_by', 'assigned_to'), 10).get_page(
+        params.get('page')
+    )
+
+    severities = Alert.objects.values_list('severity', flat=True).distinct().order_by('severity')
+    class_choices = [
+        ('malicioso',   'Malicioso'),
+        ('a_investigar', 'A investigar'),
+        ('benigno',     'Benigno'),
+        ('',            'Sin clasificar'),
+    ]
+
+    status_breakdown = [
+        (label, summary['by_status'].get(val, 0))
+        for val, label in Alert.INVESTIGATION_STATUS_CHOICES
+    ]
+
+    return render(request, 'predictor/reports.html', {
+        'alerts':           alerts_page,
+        'summary':          summary,
+        'params':           params,
+        'severities':       severities,
+        'class_choices':    class_choices,
+        'status_choices':   Alert.INVESTIGATION_STATUS_CHOICES,
+        'status_breakdown': status_breakdown,
+    })
+
+
+@login_required
+@admin_required
+def report_export_excel_view(request):
+    params = request.GET
+    qs = _build_report_queryset(params)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Reporte de Alertas'
+
+    header_fill  = PatternFill(fill_type='solid', fgColor='1E3A5F')
+    header_font  = Font(bold=True, color='FFFFFF', size=11)
+    center_align = Alignment(horizontal='center', vertical='center')
+
+    headers = [
+        'ID', 'Fecha', 'Categoría', 'Protocolo', 'Táctica MITRE',
+        'Severidad', 'Clase Predicha', 'Riesgo', 'Estado Investigación',
+        'Prioridad Analista', 'Asignado a', 'Creado por',
+    ]
+    ws.append(headers)
+    for col_idx, _ in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.fill   = header_fill
+        cell.font   = header_font
+        cell.alignment = center_align
+
+    STATUS_LABELS = dict(Alert.INVESTIGATION_STATUS_CHOICES)
+    PRIORITY_LABELS = dict(Alert.ANALYST_PRIORITY_CHOICES)
+
+    for alert in qs.select_related('created_by', 'assigned_to'):
+        ws.append([
+            alert.pk,
+            alert.created_at.strftime('%Y-%m-%d %H:%M') if alert.created_at else '',
+            alert.event_category,
+            alert.protocol,
+            alert.mitre_tactic,
+            alert.severity,
+            alert.predicted_class or 'Sin clasificar',
+            round(alert.risk_score, 4) if alert.risk_score is not None else '',
+            STATUS_LABELS.get(alert.investigation_status, alert.investigation_status),
+            PRIORITY_LABELS.get(alert.analyst_priority, '') if alert.analyst_priority else '',
+            alert.assigned_to.username if alert.assigned_to else '',
+            alert.created_by.username if alert.created_by else '',
+        ])
+
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    filename = f'reporte_alertas_{date.today().isoformat()}.xlsx'
+    log_action(
+        request.user,
+        ACTION_REPORT_EXPORT,
+        f'Exportó reporte de alertas en Excel. Registros: {qs.count()}.',
+    )
+
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+@admin_required
+def report_export_pdf_view(request):
+    params = request.GET
+    qs = _build_report_queryset(params)
+    summary = _build_report_summary(qs)
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=1.5 * cm,
+        rightMargin=1.5 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'ReportTitle',
+        parent=styles['Title'],
+        fontSize=16,
+        textColor=colors.HexColor('#1E3A5F'),
+        spaceAfter=6,
+    )
+    subtitle_style = ParagraphStyle(
+        'ReportSubtitle',
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=colors.grey,
+        spaceAfter=12,
+    )
+    section_style = ParagraphStyle(
+        'SectionTitle',
+        parent=styles['Heading2'],
+        fontSize=11,
+        textColor=colors.HexColor('#1E3A5F'),
+        spaceBefore=12,
+        spaceAfter=6,
+    )
+
+    story = []
+
+    story.append(Paragraph('Reporte de Alertas SOC', title_style))
+    story.append(Paragraph(
+        f'Generado el {date.today().strftime("%d/%m/%Y")} — Total: {summary["total"]} alertas',
+        subtitle_style,
+    ))
+
+    # Resumen
+    story.append(Paragraph('Resumen ejecutivo', section_style))
+
+    CLASS_LABELS = {'malicioso': 'Malicioso', 'a_investigar': 'A investigar', 'benigno': 'Benigno', '': 'Sin clasificar'}
+    STATUS_LABELS = dict(Alert.INVESTIGATION_STATUS_CHOICES)
+
+    summary_data = [['Métrica', 'Valor']]
+    summary_data.append(['Total de alertas', str(summary['total'])])
+    for cls, count in summary['by_class'].items():
+        summary_data.append([f'  Clase: {CLASS_LABELS.get(cls, cls or "Sin clasificar")}', str(count)])
+    for st, count in summary['by_status'].items():
+        summary_data.append([f'  Estado: {STATUS_LABELS.get(st, st)}', str(count)])
+    for sev, count in summary['by_severity'].items():
+        summary_data.append([f'  Severidad: {sev}', str(count)])
+
+    summary_table = Table(summary_data, colWidths=[10 * cm, 4 * cm])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E3A5F')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+        ('GRID',       (0, 0), (-1, -1), 0.4, colors.HexColor('#CCCCCC')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F5F7FA')]),
+        ('LEFTPADDING',  (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING',   (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 0.5 * cm))
+
+    # Detalle de alertas
+    story.append(Paragraph('Detalle de alertas', section_style))
+
+    detail_headers = [
+        'ID', 'Fecha', 'Categoría', 'Táctica MITRE',
+        'Severidad', 'Clase Predicha', 'Estado', 'Asignado a',
+    ]
+    detail_data = [detail_headers]
+
+    for alert in qs.select_related('assigned_to')[:500]:
+        detail_data.append([
+            str(alert.pk),
+            alert.created_at.strftime('%Y-%m-%d') if alert.created_at else '',
+            alert.event_category[:20],
+            alert.mitre_tactic[:18],
+            alert.severity,
+            CLASS_LABELS.get(alert.predicted_class, alert.predicted_class or 'Sin clasificar'),
+            STATUS_LABELS.get(alert.investigation_status, alert.investigation_status),
+            alert.assigned_to.username[:12] if alert.assigned_to else '—',
+        ])
+
+    col_widths = [1.2*cm, 2.5*cm, 4*cm, 4.5*cm, 2.5*cm, 3*cm, 3.5*cm, 3*cm]
+    detail_table = Table(detail_data, colWidths=col_widths, repeatRows=1)
+    detail_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E3A5F')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME',   (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE',   (0, 0), (-1, -1), 7.5),
+        ('GRID',       (0, 0), (-1, -1), 0.3, colors.HexColor('#CCCCCC')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F5F7FA')]),
+        ('VALIGN',     (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING',  (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING',   (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    story.append(detail_table)
+
+    doc.build(story)
+    buffer.seek(0)
+
+    filename = f'reporte_alertas_{date.today().isoformat()}.pdf'
+    log_action(
+        request.user,
+        ACTION_REPORT_EXPORT,
+        f'Exportó reporte de alertas en PDF. Registros: {qs.count()}.',
+    )
+
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response

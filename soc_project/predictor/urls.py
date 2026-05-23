@@ -18,6 +18,9 @@ from .views import (
     pipeline_normalize_view,
     pipeline_preview_view,
     pipeline_export_view,
+    report_view,
+    report_export_excel_view,
+    report_export_pdf_view,
 )
 
 urlpatterns = [
@@ -34,6 +37,10 @@ urlpatterns = [
     path('alerts/<int:pk>/priority/', alert_set_priority_view, name='alert_set_priority'),
     path('alerts/<int:pk>/status/',   alert_set_status_view,   name='alert_set_status'),
     path('alerts/<int:pk>/assign/',   alert_assign_view,       name='alert_assign'),
+    # HU026 / HU027 — Reportes y exportación
+    path('reports/', report_view, name='reports'),
+    path('reports/export/excel/', report_export_excel_view, name='report_export_excel'),
+    path('reports/export/pdf/', report_export_pdf_view, name='report_export_pdf'),
     # HU009 — Pipeline de normalización
     path('pipeline/', pipeline_view, name='pipeline'),
     path('pipeline/upload/', pipeline_upload_view, name='pipeline_upload'),
