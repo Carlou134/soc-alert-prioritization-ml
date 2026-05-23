@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 import re
 import __main__
+import logging
 from pathlib import Path
 
 import joblib
 import numpy as np
 import pandas as pd
 
-BASE_DIR = Path(__file__).resolve().parent
+logger = logging.getLogger(__name__)
+
+BASE_DIR   = Path(__file__).resolve().parent
 MODEL_PATH = BASE_DIR / 'ml' / 'soc_model.pkl'
 
 
@@ -26,19 +29,47 @@ class _CalibratedS2:
         return self.lr.predict_proba(self.rf.predict_proba(X))
 
 
-# Necesario para que pickle resuelva _CalibratedS2 que fue guardada desde __main__
-__main__._CalibratedS2 = _CalibratedS2
+# Lazy-loaded — se inicializan en _load_model() al primer uso
+rf_s1            = None
+rf_s2_cal        = None
+training_columns = None
+s2_columns       = None
+_t1              = None
+_t2              = None
+_idx_mal_s1      = None
+_idx_inv_s2      = None
+_idx_ben_s2      = None
+_model_loaded    = False
 
-artifact         = joblib.load(MODEL_PATH)
-rf_s1            = artifact['model_s1']
-rf_s2_cal        = artifact['model_s2']
-training_columns = artifact['training_columns']
-s2_columns       = artifact['s2_columns']
-_t1              = artifact['thresholds']['t1']
-_t2              = artifact['thresholds']['t2']
-_idx_mal_s1      = artifact['idx_mal_s1']
-_idx_inv_s2      = artifact['idx_inv_s2']
-_idx_ben_s2      = artifact['idx_ben_s2']
+
+def _load_model() -> bool:
+    """Carga el artefacto ML la primera vez que se invoca. Thread-unsafe pero aceptable para uso en servidor único."""
+    global rf_s1, rf_s2_cal, training_columns, s2_columns
+    global _t1, _t2, _idx_mal_s1, _idx_inv_s2, _idx_ben_s2, _model_loaded
+
+    if _model_loaded:
+        return True
+    if not MODEL_PATH.exists():
+        logger.critical('soc_model.pkl no encontrado — modelo ML no disponible.')
+        return False
+    try:
+        __main__._CalibratedS2 = _CalibratedS2
+        artifact         = joblib.load(MODEL_PATH)
+        rf_s1            = artifact['model_s1']
+        rf_s2_cal        = artifact['model_s2']
+        training_columns = artifact['training_columns']
+        s2_columns       = artifact['s2_columns']
+        _t1              = artifact['thresholds']['t1']
+        _t2              = artifact['thresholds']['t2']
+        _idx_mal_s1      = artifact['idx_mal_s1']
+        _idx_inv_s2      = artifact['idx_inv_s2']
+        _idx_ben_s2      = artifact['idx_ben_s2']
+        _model_loaded    = True
+        logger.info('Modelo ML cargado correctamente.')
+        return True
+    except Exception as e:
+        logger.critical(f'Model load failed: {e}')
+        return False
 
 CLASS_LABELS = {0: 'benigno', 1: 'a_investigar', 2: 'malicioso'}
 
@@ -416,6 +447,8 @@ def _composite_proba(X: pd.DataFrame) -> np.ndarray:
 
 def predict_alert(data: dict) -> tuple:
     """Predicción jerárquica sobre una alerta individual."""
+    if not _load_model():
+        raise RuntimeError('Modelo ML no disponible. Verificá los logs para más detalles.')
     X = preprocess_input(data)
 
     p_mal  = rf_s1.predict_proba(X)[:, _idx_mal_s1]
@@ -442,6 +475,8 @@ def predict_batch(records: list) -> list:
     Usa preprocess_batch() para calcular incident features reales por correlation_id.
     Retorna lista de (predicted_class, probabilities) en el mismo orden que records.
     """
+    if not _load_model():
+        raise RuntimeError('Modelo ML no disponible. Verificá los logs para más detalles.')
     X = preprocess_batch(records)
 
     p_mal  = rf_s1.predict_proba(X)[:, _idx_mal_s1]
@@ -511,6 +546,8 @@ def calculate_shap_values(data: dict, top_n: int = 15) -> dict:
     SHAP values for a single alert using the hierarchical model.
     SHAP 0.51 returns sv of shape (n_samples, n_features, n_classes).
     """
+    if not _load_model():
+        raise RuntimeError('Modelo ML no disponible. Verificá los logs para más detalles.')
     X = preprocess_input(data)
     exp_s1, exp_s2 = _get_shap_explainers()
 
