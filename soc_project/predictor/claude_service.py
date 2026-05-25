@@ -2,6 +2,7 @@ import anthropic
 from django.conf import settings
 
 _client = None
+_async_client = None
 
 
 def _get_client():
@@ -9,6 +10,13 @@ def _get_client():
     if _client is None:
         _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
     return _client
+
+
+def _get_async_client():
+    global _async_client
+    if _async_client is None:
+        _async_client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    return _async_client
 
 
 def _build_prompt(alert, shap_data: dict) -> str:
@@ -64,6 +72,23 @@ def generate_shap_explanation(alert) -> str:
     prompt = _build_prompt(alert, shap_data)
 
     message = _get_client().messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    return message.content[0].text
+
+
+async def generate_shap_explanation_async(alert) -> str:
+    """
+    Versión async de generate_shap_explanation.
+    Permite manejar múltiples usuarios concurrentes sin bloquear el event loop.
+    """
+    shap_data = alert.shap_values or {}
+    prompt = _build_prompt(alert, shap_data)
+
+    message = await _get_async_client().messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],

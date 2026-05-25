@@ -48,7 +48,6 @@ ASSIGNMENT_TARGETS = {
 from .forms import PredictionForm, JSONPredictionForm
 from .models import Alert, log_error
 from .utils import predict_alert, predict_batch, extract_valid_fields, calculate_risk_score, calculate_shap_values, compute_shap_safe
-from .serializers import PredictionRequestSerializer
 from .pipeline import (
     REQUIRED_COLUMNS,
     OPTIONAL_COLUMNS,
@@ -359,16 +358,34 @@ def upload_alerts_view(request):
 
     processed = []
     failed = []
+    error_count = 0
 
     try:
-        # Fase 1 — validación por registro
-        valid_records = []
-        for index, record in enumerate(records, start=1):
-            serializer = PredictionRequestSerializer(data=record)
-            if not serializer.is_valid():
-                failed.append({'record': index, 'errors': _friendly_serializer_errors(serializer.errors)})
-            else:
-                valid_records.append((index, record, serializer.validated_data))
+        # Fase 1 — validación y limpieza vectorizada con pandas
+        _, missing_cols = validate_columns(records)
+        if missing_cols:
+            context['error'] = f'El archivo no contiene las columnas requeridas: {", ".join(missing_cols)}'
+            return render(request, 'predictor/upload_alerts.html', context)
+
+        clean, stats = clean_records(records)
+
+        if not clean:
+            context['error'] = 'Ningún registro pasó la validación. Verificá el formato del archivo.'
+            return render(request, 'predictor/upload_alerts.html', context)
+
+        error_count = stats['duplicates_removed'] + stats['invalid_rows_removed']
+        if error_count > 0:
+            parts = []
+            if stats['duplicates_removed']:
+                parts.append(f'{stats["duplicates_removed"]} duplicados')
+            if stats['invalid_rows_removed']:
+                parts.append(f'{stats["invalid_rows_removed"]} con valores inválidos')
+            failed.append({
+                'record': '—',
+                'errors': f'Registros removidos durante limpieza: {", ".join(parts)}.',
+            })
+
+        valid_records = [(i + 1, rec, rec) for i, rec in enumerate(clean)]
 
         if valid_records:
             # Fase 2 — predicción en batch
@@ -445,7 +462,7 @@ def upload_alerts_view(request):
         log_action(
             request.user,
             ACTION_UPLOAD_ALERTS,
-            f'Archivo "{file.name}" subido: {len(processed)} alertas importadas, {len(failed)} con errores.',
+            f'Archivo "{file.name}" subido: {len(processed)} alertas importadas, {error_count} con errores.',
         )
         messages.success(
             request,
@@ -459,7 +476,7 @@ def upload_alerts_view(request):
         'file': file.name,
         'total': len(records),
         'ok': len(processed),
-        'errors': len(failed),
+        'errors': error_count,
     }
     return render(request, 'predictor/upload_alerts.html', context)
 
@@ -1287,14 +1304,16 @@ def alert_shap_view(request, pk):
 
 
 @login_required
-def alert_explain_view(request, pk):
-    from django.shortcuts import get_object_or_404
-    from .claude_service import generate_shap_explanation
+async def alert_explain_view(request, pk):
+    from .claude_service import generate_shap_explanation_async
 
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-    alert = get_object_or_404(Alert, pk=pk)
+    try:
+        alert = await Alert.objects.aget(pk=pk)
+    except Alert.DoesNotExist:
+        return JsonResponse({'error': 'Alerta no encontrada.'}, status=404)
 
     if not alert.predicted_class:
         return JsonResponse({'error': 'La alerta no está clasificada.'}, status=400)
@@ -1302,14 +1321,13 @@ def alert_explain_view(request, pk):
     if not alert.shap_values:
         return JsonResponse({'error': 'Esta alerta no tiene valores SHAP calculados.'}, status=400)
 
-    # Si ya existe explicación guardada, la devolvemos sin llamar a la API
     if alert.shap_explanation:
         return JsonResponse({'explanation': alert.shap_explanation, 'cached': True})
 
     try:
-        explanation = generate_shap_explanation(alert)
+        explanation = await generate_shap_explanation_async(alert)
         alert.shap_explanation = explanation
-        alert.save(update_fields=['shap_explanation'])
+        await alert.asave(update_fields=['shap_explanation'])
         return JsonResponse({'explanation': explanation, 'cached': False})
     except Exception as exc:
         return JsonResponse({'error': f'Error al generar la explicación: {exc}'}, status=500)
