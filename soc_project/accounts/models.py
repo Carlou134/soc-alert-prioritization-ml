@@ -14,6 +14,7 @@ ACTION_PIPELINE_EXPORT = 'pipeline_export'
 ACTION_ALERT_ASSIGNED = 'alert_assigned'
 ACTION_REPORT_EXPORT = 'report_export'
 ACTION_ALERT_EVALUATED = 'alert_evaluated'
+ACTION_ALERT_ESCALATED = 'alert_escalated'
 
 ACTION_LABELS = {
     ACTION_USER_CREATED: 'Creación de usuario',
@@ -28,6 +29,7 @@ ACTION_LABELS = {
     ACTION_ALERT_ASSIGNED: 'Asignación de alerta',
     ACTION_REPORT_EXPORT:   'Exportación de reporte',
     ACTION_ALERT_EVALUATED: 'Evaluación de decisión ML',
+    ACTION_ALERT_ESCALATED: 'Escalado a incidente',
 }
 
 

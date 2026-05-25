@@ -34,13 +34,14 @@ from accounts.models import (
     ACTION_ALERT_ASSIGNED,
     ACTION_REPORT_EXPORT,
     ACTION_ALERT_EVALUATED,
+    ACTION_ALERT_ESCALATED,
     log_action,
 )
 
 # Roles a los que cada rol puede asignar alertas (incluye auto-asignación)
 ASSIGNMENT_TARGETS = {
     'admin':      ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1', 'trainee'),
-    'analyst_n3': ('analyst_n3', 'analyst_n2', 'analyst_n1'),
+    'analyst_n3': ('admin', 'analyst_n3'),
     'analyst_n2': ('analyst_n2', 'analyst_n3', 'analyst_n1'),
     'analyst_n1': ('analyst_n1', 'analyst_n2', 'trainee'),
     'trainee':    (),
@@ -511,7 +512,14 @@ def _friendly_serializer_errors(errors: dict) -> dict:
 @login_required
 def alert_list_view(request):
     is_admin = request.user.profile.is_admin
-    qs = Alert.objects.select_related('created_by', 'assigned_to').all()
+    role     = request.user.profile.role
+    qs = Alert.objects.select_related('created_by', 'assigned_to').filter(is_incident=False)
+
+    # Filtros automáticos por rol — no pueden ser sobreescritos por el usuario
+    if role in ('analyst_n1', 'trainee'):
+        qs = qs.filter(predicted_class='benigno')
+    elif role == 'analyst_n2':
+        qs = qs.exclude(predicted_class__in=('benigno', ''))
 
     # Toggle "Mis alertas" / "Todas las alertas"
     mine = request.GET.get('mine', '').strip()
@@ -615,6 +623,7 @@ def alert_list_view(request):
     context = {
         'page_obj': page_obj,
         'is_admin': is_admin,
+        'role':     role,
         'mine': mine,
         'search': search,
         'severity_filter': severity_filter,
@@ -1273,11 +1282,17 @@ def alert_shap_view(request, pk):
 
     is_trainee   = request.user.profile.is_trainee
     can_evaluate = request.user.profile.role in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1')
+    can_escalate = (
+        user_role in ('admin', 'analyst_n2')
+        and not alert.is_incident
+        and alert.predicted_class in ('malicioso', 'a_investigar')
+    )
     readonly     = request.GET.get('readonly') == '1'
 
     _back_map = {
         'alert_list':    ('alert_list',    'Volver a alertas'),
         'alert_history': ('alert_history', 'Volver al historial'),
+        'incident_desk': ('incident_desk', 'Volver a incidentes'),
         'dashboard':     ('dashboard',     'Volver al dashboard'),
     }
     from django.urls import reverse as _reverse
@@ -1297,6 +1312,7 @@ def alert_shap_view(request, pk):
         'is_trainee'         : is_trainee,
         'assigned_to_me'     : alert.assigned_to_id == request.user.pk,
         'can_evaluate'       : can_evaluate,
+        'can_escalate'       : can_escalate,
         'readonly'           : readonly,
         'back_url'           : _back_url,
         'back_label'         : _back_label,
@@ -1743,3 +1759,100 @@ def report_export_pdf_view(request):
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fase 5 — Escalado a incidente y Mesa de Incidentes Activos
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@role_required('admin', 'analyst_n2')
+def alert_escalate_view(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    alert = get_object_or_404(Alert, pk=pk)
+
+    if alert.is_incident:
+        return JsonResponse({'error': 'Esta alerta ya fue escalada a incidente.'}, status=400)
+
+    if not alert.predicted_class or alert.predicted_class == 'benigno':
+        return JsonResponse({'error': 'Solo se pueden escalar alertas maliciosas o a investigar.'}, status=400)
+
+    alert.is_incident  = True
+    alert.escalated_at = timezone.now()
+    alert.escalated_by = request.user
+    alert.save(update_fields=['is_incident', 'escalated_at', 'escalated_by'])
+
+    log_action(
+        request.user,
+        ACTION_ALERT_ESCALATED,
+        f'Escaló alerta #{alert.pk} ({alert.predicted_class}) a incidente activo.',
+    )
+
+    return JsonResponse({
+        'ok':  True,
+        'msg': f'Alerta #{alert.pk} escalada a incidente correctamente.',
+    })
+
+
+@login_required
+@role_required('admin', 'analyst_n3')
+def incident_desk_view(request):
+    qs = (
+        Alert.objects
+        .filter(is_incident=True)
+        .select_related('created_by', 'assigned_to', 'escalated_by', 'investigated_by')
+    )
+
+    search = request.GET.get('q', '').strip()
+    if search:
+        qs = qs.filter(
+            Q(event_category__icontains=search)
+            | Q(attack_type__icontains=search)
+            | Q(attack_signature__icontains=search)
+            | Q(protocol__icontains=search)
+            | Q(mitre_tactic__icontains=search)
+        )
+
+    class_filter = request.GET.get('predicted_class', '').strip()
+    if class_filter:
+        qs = qs.filter(predicted_class=class_filter)
+
+    date_from = request.GET.get('date_from', '').strip()
+    if date_from:
+        qs = qs.filter(escalated_at__date__gte=date_from)
+
+    date_to = request.GET.get('date_to', '').strip()
+    if date_to:
+        qs = qs.filter(escalated_at__date__lte=date_to)
+
+    order = request.GET.get('order', 'date_desc').strip()
+    _order_map = {
+        'risk_desc':    F('risk_score').desc(nulls_last=True),
+        'risk_asc':     F('risk_score').asc(nulls_last=True),
+        'date_desc':    '-escalated_at',
+        'date_asc':     'escalated_at',
+    }
+    qs = qs.order_by(_order_map.get(order, '-escalated_at'))
+
+    from urllib.parse import quote as _quote
+
+    _qs_params = request.GET.copy()
+    _qs_params.pop('page', None)
+    _raw_qs    = _qs_params.urlencode()
+
+    paginator = Paginator(qs, 10)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'predictor/incident_desk.html', {
+        'page_obj':     page_obj,
+        'search':       search,
+        'class_filter': class_filter,
+        'date_from':    date_from,
+        'date_to':      date_to,
+        'order':        order,
+        'total_count':  qs.count(),
+        'query_string': _raw_qs,
+        'encoded_qs':   _quote(_raw_qs),
+    })

@@ -117,6 +117,15 @@ class Alert(models.Model):
         related_name='assigned_alerts',
     )
 
+    # Escalado a incidente — gestionado por analista nivel 2
+    is_incident  = models.BooleanField(default=False)
+    escalated_at = models.DateTimeField(null=True, blank=True)
+    escalated_by = models.ForeignKey(
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='escalated_alerts',
+    )
+
     # Trazabilidad
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')
     created_at = models.DateTimeField(auto_now_add=True)

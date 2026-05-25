@@ -8,6 +8,8 @@ from .views import (
     alert_set_status_view,
     alert_assign_view,
     alert_evaluate_view,
+    alert_escalate_view,
+    incident_desk_view,
     dashboard_view,
     predict_json_view,
     predict_view,
@@ -39,6 +41,9 @@ urlpatterns = [
     path('alerts/<int:pk>/status/',   alert_set_status_view,   name='alert_set_status'),
     path('alerts/<int:pk>/assign/',    alert_assign_view,    name='alert_assign'),
     path('alerts/<int:pk>/evaluate/',  alert_evaluate_view,  name='alert_evaluate'),
+    path('alerts/<int:pk>/escalate/',  alert_escalate_view,  name='alert_escalate'),
+    # Mesa de Incidentes Activos
+    path('incidents/', incident_desk_view, name='incident_desk'),
     # HU026 / HU027 — Reportes y exportación
     path('reports/', report_view, name='reports'),
     path('reports/export/excel/', report_export_excel_view, name='report_export_excel'),

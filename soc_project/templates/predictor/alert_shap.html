@@ -505,6 +505,40 @@
     </div>
     {% endif %}
 
+    <!-- Escalado a Incidente -->
+    {% if alert.is_incident %}
+    <div class="bg-red-500/5 border border-red-500/30 rounded-xl p-5">
+        <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <div>
+                <p class="text-sm font-semibold text-red-400">Incidente Activo</p>
+                {% if alert.escalated_by and alert.escalated_at %}
+                <p class="text-xs text-slate-400 mt-0.5">
+                    Escalado por <span class="text-slate-300 font-medium">{{ alert.escalated_by.username }}</span>
+                    el <span class="text-slate-300 font-mono">{{ alert.escalated_at|date:"Y-m-d H:i" }}</span>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% elif can_escalate %}
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+        <div>
+            <h2 class="text-sm font-semibold text-white">Escalado a Incidente</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Nivel 2 — confirmá que esta alerta es un ataque real y crítico</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button id="escalateBtn"
+                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                Escalar a Incidente
+            </button>
+            <span id="escalateFeedback" class="text-xs text-slate-500"></span>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Asignación de alerta -->
     {% if can_assign or alert.assigned_to %}
     <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
@@ -555,6 +589,7 @@
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@13/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 (function () {
     const shap_s1 = {{ shap_s1|safe }};
@@ -833,6 +868,59 @@ document.getElementById('assignSave').addEventListener('click', function () {
         });
     });
 })();
+{% endif %}
+
+// Escalado a incidente
+{% if can_escalate %}
+document.getElementById('escalateBtn').addEventListener('click', async function () {
+    const btn      = this;
+    const feedback = document.getElementById('escalateFeedback');
+
+    const result = await Swal.fire({
+        title:              '¿Escalar a incidente?',
+        html:               'Confirmás que la <strong>Alerta #{{ alert.pk }}</strong> es un ataque real.<br><span style="font-size:0.8rem;color:#94a3b8;">Desaparecerá del triaje y pasará a la Mesa de Incidentes Activos.</span>',
+        icon:               'warning',
+        showCancelButton:   true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor:  '#334155',
+        confirmButtonText:  'Sí, escalar',
+        cancelButtonText:   'Cancelar',
+        background:         '#1e293b',
+        color:              '#e2e8f0',
+        iconColor:          '#f97316',
+        reverseButtons:     true,
+    });
+
+    if (!result.isConfirmed) return;
+
+    btn.disabled    = true;
+    btn.textContent = 'Escalando…';
+    feedback.textContent = '';
+
+    fetch("{% url 'alert_escalate' alert.pk %}", {
+        method:  'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' },
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            feedback.textContent = '✓ ' + data.msg;
+            feedback.className = 'text-xs text-emerald-400';
+            setTimeout(() => { window.location.href = '{{ back_url|safe }}'; }, 1500);
+        } else {
+            btn.disabled    = false;
+            btn.textContent = 'Escalar a Incidente';
+            feedback.textContent = data.error || 'Error al escalar';
+            feedback.className = 'text-xs text-red-400';
+        }
+    })
+    .catch(() => {
+        btn.disabled    = false;
+        btn.textContent = 'Escalar a Incidente';
+        feedback.textContent = 'Error de conexión';
+        feedback.className = 'text-xs text-red-400';
+    });
+});
 {% endif %}
 
 // Ajuste manual de prioridad
