@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
+ACTION_USER_CREATED = 'user_created'
 ACTION_UPLOAD_ALERTS = 'upload_alerts'
 ACTION_PREDICT_MANUAL = 'predict_manual'
 ACTION_PREDICT_JSON = 'predict_json'
@@ -15,6 +16,7 @@ ACTION_REPORT_EXPORT = 'report_export'
 ACTION_ALERT_EVALUATED = 'alert_evaluated'
 
 ACTION_LABELS = {
+    ACTION_USER_CREATED: 'Creación de usuario',
     ACTION_UPLOAD_ALERTS: 'Subida de alertas',
     ACTION_PREDICT_MANUAL: 'Predicción manual',
     ACTION_PREDICT_JSON: 'Predicción por JSON',

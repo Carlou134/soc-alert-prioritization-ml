@@ -42,6 +42,45 @@ class RegisterForm(UserCreationForm):
         return email
 
 
+class AdminCreateUserForm(UserCreationForm):
+    email = forms.EmailField(
+        required=True,
+        widget=forms.EmailInput(attrs={'class': INPUT_CLASS}),
+    )
+    role = forms.ChoiceField(
+        choices=UserProfile.ROLE_CHOICES,
+        label='Rol',
+        widget=forms.Select(attrs={'class': SELECT_CLASS}),
+    )
+    is_active = forms.BooleanField(
+        required=False,
+        initial=True,
+        label='Cuenta activa',
+        widget=forms.CheckboxInput(
+            attrs={'class': 'w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded'}
+        ),
+    )
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'password1', 'password2']
+        widgets = {
+            'username': forms.TextInput(attrs={'class': INPUT_CLASS}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['username'].widget.attrs.update({'class': INPUT_CLASS})
+        self.fields['password1'].widget.attrs.update({'class': INPUT_CLASS})
+        self.fields['password2'].widget.attrs.update({'class': INPUT_CLASS})
+
+    def clean_email(self):
+        email = self.cleaned_data['email'].strip().lower()
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError('Este correo ya está registrado.')
+        return email
+
+
 class UserRoleForm(forms.Form):
     role = forms.ChoiceField(
         choices=UserProfile.ROLE_CHOICES,

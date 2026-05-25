@@ -2,20 +2,28 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .decorators import admin_required
-from .forms import RegisterForm, UserRoleForm
+from .forms import AdminCreateUserForm, RegisterForm, UserRoleForm
 from .models import (
     ACTION_LABELS,
     ACTION_USER_ACTIVATED,
+    ACTION_USER_CREATED,
     ACTION_USER_DEACTIVATED,
     ACTION_USER_ROLE_CHANGED,
     UserActionLog,
     UserProfile,
     log_action,
 )
+
+
+def _safe_next(url):
+    """Return url only if it's a relative path (prevents open redirect)."""
+    if url and url.startswith('/') and not url.startswith('//'):
+        return url
+    return None
 
 
 # ── Authentication ────────────────────────────────────────────────────────────
@@ -75,12 +83,72 @@ def logout_view(request):
 @login_required
 @admin_required
 def user_list_view(request):
-    users = User.objects.select_related('profile').order_by('username')
     # Ensure every user has a profile (covers users created before the signal)
-    for user in users:
+    for user in User.objects.select_related('profile').all():
         UserProfile.objects.get_or_create(user=user)
-    users = User.objects.select_related('profile').order_by('username')
-    return render(request, 'accounts/user_list.html', {'users': users})
+
+    qs = User.objects.select_related('profile')
+
+    role_filter = request.GET.get('role', '').strip()
+    if role_filter:
+        qs = qs.filter(profile__role=role_filter)
+
+    status_filter = request.GET.get('status', '').strip()
+    if status_filter == 'active':
+        qs = qs.filter(is_active=True)
+    elif status_filter == 'inactive':
+        qs = qs.filter(is_active=False)
+
+    sort = request.GET.get('sort', 'username')
+    if sort == 'newest':
+        qs = qs.order_by('-date_joined')
+    elif sort == 'oldest':
+        qs = qs.order_by('date_joined')
+    else:
+        qs = qs.order_by('username')
+
+    paginator = Paginator(qs, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    context = {
+        'page_obj': page_obj,
+        'role_choices': UserProfile.ROLE_CHOICES,
+        'role_filter': role_filter,
+        'status_filter': status_filter,
+        'sort': sort,
+        'total_count': qs.count(),
+    }
+    return render(request, 'accounts/user_list.html', context)
+
+
+@login_required
+@admin_required
+def user_create_view(request):
+    next_url = _safe_next(request.GET.get('next') or request.POST.get('next'))
+    form = AdminCreateUserForm()
+
+    if request.method == 'POST':
+        form = AdminCreateUserForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.email = form.cleaned_data['email']
+            user.is_active = form.cleaned_data['is_active']
+            user.save()
+
+            profile = user.profile
+            profile.role = form.cleaned_data['role']
+            profile.save()
+
+            log_action(
+                request.user,
+                ACTION_USER_CREATED,
+                f'Usuario "{user.username}" creado por {request.user.username} con rol "{profile.get_role_display()}".',
+            )
+
+            messages.success(request, f'Usuario "{user.username}" creado correctamente.')
+            return redirect(next_url or 'user_list')
+
+    return render(request, 'accounts/user_create.html', {'form': form, 'next_url': next_url})
 
 
 @login_required
@@ -88,6 +156,7 @@ def user_list_view(request):
 def user_edit_view(request, user_id):
     target_user = get_object_or_404(User, id=user_id)
     profile, _ = UserProfile.objects.get_or_create(user=target_user)
+    next_url = _safe_next(request.GET.get('next') or request.POST.get('next'))
 
     if request.method == 'POST':
         form = UserRoleForm(request.POST)
@@ -128,7 +197,7 @@ def user_edit_view(request, user_id):
                 request,
                 f'Usuario "{target_user.username}" actualizado correctamente.'
             )
-            return redirect('user_list')
+            return redirect(next_url or 'user_list')
     else:
         form = UserRoleForm(initial={
             'role': profile.role,
@@ -139,6 +208,7 @@ def user_edit_view(request, user_id):
         'form': form,
         'target_user': target_user,
         'profile': profile,
+        'next_url': next_url,
     })
 
 
