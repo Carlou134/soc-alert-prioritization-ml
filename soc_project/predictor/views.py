@@ -332,54 +332,77 @@ def upload_alerts_view(request):
     failed = []
 
     try:
+        # Fase 1 — validación por registro
+        valid_records = []
         for index, record in enumerate(records, start=1):
             serializer = PredictionRequestSerializer(data=record)
             if not serializer.is_valid():
                 failed.append({'record': index, 'errors': _friendly_serializer_errors(serializer.errors)})
-                continue
+            else:
+                valid_records.append((index, record, serializer.validated_data))
 
+        if valid_records:
+            # Fase 2 — predicción en batch
+            valid_data_list = [d for _, _, d in valid_records]
             try:
-                data = serializer.validated_data
-                predicted_class, probabilities = predict_alert(data)
-                risk_score = calculate_risk_score(probabilities)
-                shap_data = compute_shap_safe(data)
-
-                Alert.objects.create(
-                    event_category=data.get('event_category', ''),
-                    protocol=data.get('protocol', ''),
-                    traffic_type=data.get('traffic_type', ''),
-                    mitre_tactic=data.get('mitre_tactic', ''),
-                    kill_chain_stage=data.get('kill_chain_stage', ''),
-                    failed_login_attempts=data.get('failed_login_attempts', 0),
-                    request_rate_per_min=data.get('request_rate_per_min', 0.0),
-                    ids_ips_alert=data.get('ids_ips_alert', ''),
-                    asset_criticality=data.get('asset_criticality', ''),
-                    log_source=data.get('log_source', ''),
-                    firewall_action=data.get('firewall_action', ''),
-                    severity=data.get('severity', ''),
-                    has_threat_family=data.get('has_threat_family', 0),
-                    evidence_role=data.get('evidence_role', 'unknown'),
-                    os_family=data.get('os_family', 'unknown'),
-                    correlation_id=data.get('correlation_id', 'unknown'),
-                    mitre_techniques=data.get('mitre_techniques', ''),
-                    attack_type=record.get('attack_type', ''),
-                    attack_signature=record.get('attack_signature', ''),
-                    malware_indicator=record.get('malware_indicator', ''),
-                    label=record.get('label', ''),
-                    predicted_class=predicted_class,
-                    risk_score=risk_score,
-                    probabilities=probabilities,
-                    shap_values=shap_data,
-                    created_by=request.user,
-                )
-                processed.append({'record': index, 'predicted_class': predicted_class, 'risk_score': risk_score})
-
+                batch_results = predict_batch(valid_data_list)
             except Exception as exc:
-                log_error(request.user, 'upload_alerts', f'Registro #{index}: {exc}')
-                failed.append({
-                    'record': index,
-                    'errors': {'_error': ['Error interno al procesar este registro. El resto del archivo se procesó normalmente.']},
-                })
+                log_error(request.user, 'upload_alerts', f'predict_batch falló, usando predict_alert por registro: {exc}')
+                batch_results = None
+
+            # Fase 3 — construir instancias Alert sin tocar la DB
+            alert_instances = []
+            pending_processed = []
+            for i, (index, record, data) in enumerate(valid_records):
+                try:
+                    if batch_results is not None:
+                        predicted_class, probabilities = batch_results[i]
+                    else:
+                        predicted_class, probabilities = predict_alert(data)
+                    risk_score = calculate_risk_score(probabilities)
+                    shap_data = None  # se calcula lazy al primer clic en SHAP
+
+                    alert_instances.append(Alert(
+                        event_category=data.get('event_category', ''),
+                        protocol=data.get('protocol', ''),
+                        traffic_type=data.get('traffic_type', ''),
+                        mitre_tactic=data.get('mitre_tactic', ''),
+                        kill_chain_stage=data.get('kill_chain_stage', ''),
+                        failed_login_attempts=data.get('failed_login_attempts', 0),
+                        request_rate_per_min=data.get('request_rate_per_min', 0.0),
+                        ids_ips_alert=data.get('ids_ips_alert', ''),
+                        asset_criticality=data.get('asset_criticality', ''),
+                        log_source=data.get('log_source', ''),
+                        firewall_action=data.get('firewall_action', ''),
+                        severity=data.get('severity', ''),
+                        has_threat_family=data.get('has_threat_family', 0),
+                        evidence_role=data.get('evidence_role', 'unknown'),
+                        os_family=data.get('os_family', 'unknown'),
+                        correlation_id=data.get('correlation_id', 'unknown'),
+                        mitre_techniques=data.get('mitre_techniques', ''),
+                        attack_type=record.get('attack_type', ''),
+                        attack_signature=record.get('attack_signature', ''),
+                        malware_indicator=record.get('malware_indicator', ''),
+                        label=record.get('label', ''),
+                        predicted_class=predicted_class,
+                        risk_score=risk_score,
+                        probabilities=probabilities,
+                        shap_values=shap_data,
+                        created_by=request.user,
+                    ))
+                    pending_processed.append({'record': index, 'predicted_class': predicted_class, 'risk_score': risk_score})
+
+                except Exception as exc:
+                    log_error(request.user, 'upload_alerts', f'Registro #{index}: {exc}')
+                    failed.append({
+                        'record': index,
+                        'errors': {'_error': ['Error interno al procesar este registro. El resto del archivo se procesó normalmente.']},
+                    })
+
+            # Fase 4 — un único INSERT para todos los registros válidos
+            if alert_instances:
+                Alert.objects.bulk_create(alert_instances)
+                processed.extend(pending_processed)
 
     except Exception as exc:
         log_error(request.user, 'upload_alerts', str(exc))
@@ -909,6 +932,8 @@ def pipeline_normalize_view(request):
 
         saved_count = 0
         failed_count = 0
+
+        alert_instances = []
         for i, record in enumerate(clean):
             try:
                 if batch_results is not None:
@@ -916,8 +941,8 @@ def pipeline_normalize_view(request):
                 else:
                     predicted_class, probabilities = predict_alert(record)
                 risk_score = calculate_risk_score(probabilities)
-                shap_data = compute_shap_safe(record)
-                Alert.objects.create(
+                shap_data = None  # se calcula lazy al primer clic en SHAP
+                alert_instances.append(Alert(
                     event_category=record.get('event_category', ''),
                     protocol=record.get('protocol', ''),
                     traffic_type=record.get('traffic_type', ''),
@@ -944,11 +969,18 @@ def pipeline_normalize_view(request):
                     probabilities=probabilities,
                     shap_values=shap_data,
                     created_by=request.user,
-                )
-                saved_count += 1
+                ))
             except Exception as exc:
                 log_error(request.user, 'pipeline_normalize_save', str(exc))
                 failed_count += 1
+
+        if alert_instances:
+            try:
+                Alert.objects.bulk_create(alert_instances)
+                saved_count = len(alert_instances)
+            except Exception as exc:
+                log_error(request.user, 'pipeline_normalize_save', f'bulk_create: {exc}')
+                failed_count += len(alert_instances)
 
         request.session['pipeline_saved_count'] = saved_count
         request.session['pipeline_failed_count'] = failed_count
@@ -1136,7 +1168,6 @@ def alert_shap_view(request, pk):
 
     shap_data = alert.shap_values
 
-    # Alertas clasificadas antes de esta versión no tienen SHAP guardado — lo calculamos on-the-fly.
     if shap_data is None:
         data = {
             'event_category'       : alert.event_category,
@@ -1158,6 +1189,8 @@ def alert_shap_view(request, pk):
             'mitre_techniques'     : alert.mitre_techniques,
         }
         shap_data = calculate_shap_values(data)
+        alert.shap_values = shap_data
+        alert.save(update_fields=['shap_values'])
 
     user_role = request.user.profile.role
     allowed_roles = ASSIGNMENT_TARGETS.get(user_role, ())
