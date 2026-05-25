@@ -252,12 +252,33 @@ def alert_history_view(request):
         qs = qs.filter(attack_type__icontains=attack_filter)
 
     eval_filter = request.GET.get('ml_evaluation', '').strip()
-    if eval_filter:
+    if eval_filter == '__none__':
+        qs = qs.filter(ml_evaluation='')
+    elif eval_filter:
         qs = qs.filter(ml_evaluation=eval_filter)
 
     analyst_filter = request.GET.get('analyst', '').strip()
     if analyst_filter:
         qs = qs.filter(investigated_by__username__icontains=analyst_filter)
+
+    priority_filter = request.GET.get('analyst_priority', '').strip()
+    if priority_filter == 'none':
+        qs = qs.filter(analyst_priority='')
+    elif priority_filter:
+        qs = qs.filter(analyst_priority=priority_filter)
+
+    risk_min = request.GET.get('risk_min', '').strip()
+    risk_max = request.GET.get('risk_max', '').strip()
+    try:
+        if risk_min:
+            qs = qs.filter(risk_score__gte=float(risk_min))
+    except ValueError:
+        risk_min = ''
+    try:
+        if risk_max:
+            qs = qs.filter(risk_score__lte=float(risk_max))
+    except ValueError:
+        risk_max = ''
 
     total_count = qs.count()
     paginator = Paginator(qs, 10)
@@ -269,20 +290,28 @@ def alert_history_view(request):
         .distinct().order_by('mitre_tactic')
     )
 
+    _p = request.GET.copy()
+    _p.pop('page', None)
+
     return render(request, 'predictor/alert_history.html', {
-        'page_obj':        page_obj,
-        'total_count':     total_count,
-        'date_from':       date_from,
-        'date_to':         date_to,
-        'class_filter':    class_filter,
-        'status_filter':   status_filter,
-        'tactic_filter':   tactic_filter,
-        'attack_filter':   attack_filter,
-        'eval_filter':     eval_filter,
-        'analyst_filter':  analyst_filter,
-        'mitre_tactics':   mitre_tactics,
-        'status_choices':  Alert.INVESTIGATION_STATUS_CHOICES,
-        'eval_choices':    Alert.ML_EVALUATION_CHOICES,
+        'page_obj':         page_obj,
+        'total_count':      total_count,
+        'date_from':        date_from,
+        'date_to':          date_to,
+        'class_filter':     class_filter,
+        'status_filter':    status_filter,
+        'tactic_filter':    tactic_filter,
+        'attack_filter':    attack_filter,
+        'eval_filter':      eval_filter,
+        'analyst_filter':   analyst_filter,
+        'priority_filter':  priority_filter,
+        'risk_min':         risk_min,
+        'risk_max':         risk_max,
+        'mitre_tactics':    mitre_tactics,
+        'status_choices':   Alert.INVESTIGATION_STATUS_CHOICES,
+        'eval_choices':     Alert.ML_EVALUATION_CHOICES,
+        'priority_choices': Alert.ANALYST_PRIORITY_CHOICES,
+        'query_string':     _p.urlencode(),
     })
 
 
@@ -522,6 +551,23 @@ def alert_list_view(request):
     if date_to:
         qs = qs.filter(created_at__date__lte=date_to)
 
+    risk_min = request.GET.get('risk_min', '').strip()
+    risk_max = request.GET.get('risk_max', '').strip()
+    try:
+        if risk_min:
+            qs = qs.filter(risk_score__gte=float(risk_min))
+    except ValueError:
+        risk_min = ''
+    try:
+        if risk_max:
+            qs = qs.filter(risk_score__lte=float(risk_max))
+    except ValueError:
+        risk_max = ''
+
+    assigned_filter = request.GET.get('assigned_to', '').strip()
+    if assigned_filter:
+        qs = qs.filter(assigned_to__username__icontains=assigned_filter)
+
     order = request.GET.get('order', 'date_desc').strip()
     _order_map = {
         'risk_desc': F('risk_score').desc(nulls_last=True),
@@ -546,6 +592,9 @@ def alert_list_view(request):
     paginator = Paginator(qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
 
+    _qs_params = request.GET.copy()
+    _qs_params.pop('page', None)
+
     context = {
         'page_obj': page_obj,
         'is_admin': is_admin,
@@ -562,6 +611,10 @@ def alert_list_view(request):
         'order':            order,
         'priority_filter':  priority_filter,
         'status_filter':    status_filter,
+        'risk_min':         risk_min,
+        'risk_max':         risk_max,
+        'assigned_filter':  assigned_filter,
+        'query_string':     _qs_params.urlencode(),
     }
     return render(request, 'predictor/alert_list.html', context)
 
@@ -1213,6 +1266,8 @@ def alert_shap_view(request, pk):
     from django.urls import reverse as _reverse
     _next = request.GET.get('next', 'alert_list')
     _back_name, _back_label = _back_map.get(_next, _back_map['alert_list'])
+    _back_qs = request.GET.get('back_qs', '')
+    _back_url = _reverse(_back_name) + ('?' + _back_qs if _back_qs else '')
 
     return render(request, 'predictor/alert_shap.html', {
         'alert'              : alert,
@@ -1226,7 +1281,7 @@ def alert_shap_view(request, pk):
         'assigned_to_me'     : alert.assigned_to_id == request.user.pk,
         'can_evaluate'       : can_evaluate,
         'readonly'           : readonly,
-        'back_url'           : _reverse(_back_name),
+        'back_url'           : _back_url,
         'back_label'         : _back_label,
     })
 
@@ -1386,6 +1441,18 @@ def _build_report_queryset(params):
     if investigation_status:
         qs = qs.filter(investigation_status=investigation_status)
 
+    ml_evaluation = params.get('ml_evaluation', '').strip()
+    if ml_evaluation == '__none__':
+        qs = qs.filter(ml_evaluation='')
+    elif ml_evaluation:
+        qs = qs.filter(ml_evaluation=ml_evaluation)
+
+    analyst_priority = params.get('analyst_priority', '').strip()
+    if analyst_priority == 'none':
+        qs = qs.filter(analyst_priority='')
+    elif analyst_priority:
+        qs = qs.filter(analyst_priority=analyst_priority)
+
     return qs
 
 
@@ -1416,6 +1483,9 @@ def report_view(request):
         params.get('page')
     )
 
+    _qs_params = request.GET.copy()
+    _qs_params.pop('page', None)
+
     severities = Alert.objects.values_list('severity', flat=True).distinct().order_by('severity')
     class_choices = [
         ('malicioso',   'Malicioso'),
@@ -1434,14 +1504,17 @@ def report_view(request):
     ]
 
     return render(request, 'predictor/reports.html', {
-        'alerts':           alerts_page,
-        'summary':          summary,
-        'params':           params,
-        'severities':       severities,
-        'class_choices':    class_choices,
-        'status_choices':   Alert.INVESTIGATION_STATUS_CHOICES,
-        'status_breakdown': status_breakdown,
-        'eval_breakdown':   eval_breakdown,
+        'alerts':            alerts_page,
+        'summary':           summary,
+        'params':            params,
+        'severities':        severities,
+        'class_choices':     class_choices,
+        'status_choices':    Alert.INVESTIGATION_STATUS_CHOICES,
+        'eval_choices':      Alert.ML_EVALUATION_CHOICES,
+        'priority_choices':  Alert.ANALYST_PRIORITY_CHOICES,
+        'status_breakdown':  status_breakdown,
+        'eval_breakdown':    eval_breakdown,
+        'query_string':      _qs_params.urlencode(),
     })
 
 

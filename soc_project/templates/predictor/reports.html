@@ -74,7 +74,29 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="flex items-end col-span-2 md:col-span-1 gap-2">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Evaluación ML</label>
+                <select name="ml_evaluation"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <option value="">Todas</option>
+                    {% for val, label in eval_choices %}
+                    <option value="{{ val }}" {% if params.ml_evaluation == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                    <option value="__none__" {% if params.ml_evaluation == '__none__' %}selected{% endif %}>Sin evaluar</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Prioridad analista</label>
+                <select name="analyst_priority"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <option value="">Todas</option>
+                    {% for val, label in priority_choices %}
+                    <option value="{{ val }}" {% if params.analyst_priority == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                    <option value="none" {% if params.analyst_priority == 'none' %}selected{% endif %}>Sin ajuste</option>
+                </select>
+            </div>
+            <div class="flex items-end gap-2">
                 <button type="submit"
                         class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
                     Filtrar
@@ -224,11 +246,11 @@
             </span>
             <div class="flex gap-1">
                 {% if alerts.has_previous %}
-                <a href="?{{ request.GET.urlencode }}&page={{ alerts.previous_page_number }}"
+                <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ alerts.previous_page_number }}"
                    class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-md">Anterior</a>
                 {% endif %}
                 {% if alerts.has_next %}
-                <a href="?{{ request.GET.urlencode }}&page={{ alerts.next_page_number }}"
+                <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ alerts.next_page_number }}"
                    class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-md">Siguiente</a>
                 {% endif %}
             </div>
