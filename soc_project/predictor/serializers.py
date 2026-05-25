@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from .models import PredictionLog
 
 
 class PredictionRequestSerializer(serializers.Serializer):
@@ -51,9 +50,3 @@ class PredictionRequestSerializer(serializers.Serializer):
             if attrs.get(field) is None:
                 attrs[field] = default
         return attrs
-
-
-class PredictionLogSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PredictionLog
-        fields = ['id', 'predicted_class', 'probabilities', 'source', 'created_at', 'input_data']

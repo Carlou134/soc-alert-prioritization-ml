@@ -116,8 +116,14 @@
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">Pipeline ML</span>
                             {% elif log.action == 'pipeline_export' %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Exportación dataset</span>
+                            {% elif log.action == 'alert_assigned' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-500/10 text-sky-400 border border-sky-500/20">Asignación de alerta</span>
+                            {% elif log.action == 'report_export' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">Exportación de reporte</span>
+                            {% elif log.action == 'alert_evaluated' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">Evaluación ML</span>
                             {% else %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-600/50 text-slate-300 border border-slate-600">{{ log.action }}</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-600/50 text-slate-300 border border-slate-600">{{ log.get_action_label }}</span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 text-slate-400 text-sm">{{ log.description }}</td>
@@ -138,7 +144,7 @@
         </p>
         <div class="flex items-center gap-1">
             {% if page_obj.has_previous %}
-            <a href="?{% if action_filter %}action={{ action_filter }}&{% endif %}{% if user_filter %}user={{ user_filter }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}page={{ page_obj.previous_page_number }}"
+            <a href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}"
                class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">
                 ← Anterior
             </a>
@@ -148,7 +154,7 @@
                 {% if page_obj.number == num %}
                 <span class="px-3 py-1.5 rounded-md text-xs font-medium bg-blue-500 text-white">{{ num }}</span>
                 {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                <a href="?{% if action_filter %}action={{ action_filter }}&{% endif %}{% if user_filter %}user={{ user_filter }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}page={{ num }}"
+                <a href="?{{ request.GET.urlencode }}&page={{ num }}"
                    class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">
                     {{ num }}
                 </a>
@@ -156,7 +162,7 @@
             {% endfor %}
 
             {% if page_obj.has_next %}
-            <a href="?{% if action_filter %}action={{ action_filter }}&{% endif %}{% if user_filter %}user={{ user_filter }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}page={{ page_obj.next_page_number }}"
+            <a href="?{{ request.GET.urlencode }}&page={{ page_obj.next_page_number }}"
                class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">
                 Siguiente →
             </a>

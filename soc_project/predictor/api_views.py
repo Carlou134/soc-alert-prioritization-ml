@@ -8,9 +8,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser
 from rest_framework import status
 
-from .serializers import PredictionRequestSerializer, PredictionLogSerializer
+from .serializers import PredictionRequestSerializer
 from .utils import predict_alert
-from .models import PredictionLog
 
 
 class PredictAPIView(APIView):
@@ -23,31 +22,12 @@ class PredictAPIView(APIView):
         data = serializer.validated_data
         predicted_class, probabilities = predict_alert(data)
 
-        log = PredictionLog.objects.create(
-            user=request.user,
-            input_data=data,
-            predicted_class=predicted_class,
-            probabilities=probabilities,
-            source='api'
-        )
-
         return Response({
             'message': 'Predicción realizada correctamente.',
-            'prediction_id': log.id,
             'predicted_class': predicted_class,
             'probabilities': probabilities,
             'source': 'api',
-            'created_at': log.created_at,
         }, status=status.HTTP_200_OK)
-
-
-class HistoryAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        logs = PredictionLog.objects.filter(user=request.user).order_by('-created_at')
-        serializer = PredictionLogSerializer(logs, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class UploadAlertsAPIView(APIView):
@@ -119,16 +99,8 @@ class UploadAlertsAPIView(APIView):
                 data = serializer.validated_data
                 predicted_class, probabilities = predict_alert(data)
 
-                log = PredictionLog.objects.create(
-                    user=request.user,
-                    input_data=data,
-                    predicted_class=predicted_class,
-                    probabilities=probabilities,
-                    source=source,
-                )
                 processed.append({
                     'record': index,
-                    'prediction_id': log.id,
                     'predicted_class': predicted_class,
                 })
             else:

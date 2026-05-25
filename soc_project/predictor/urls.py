@@ -1,13 +1,14 @@
 from django.urls import path
 from .views import (
     alert_list_view,
+    alert_history_view,
     alert_shap_view,
     alert_explain_view,
     alert_set_priority_view,
     alert_set_status_view,
     alert_assign_view,
+    alert_evaluate_view,
     dashboard_view,
-    history_view,
     predict_json_view,
     predict_view,
     predict_pending_view,
@@ -18,6 +19,9 @@ from .views import (
     pipeline_normalize_view,
     pipeline_preview_view,
     pipeline_export_view,
+    report_view,
+    report_export_excel_view,
+    report_export_pdf_view,
 )
 
 urlpatterns = [
@@ -26,14 +30,19 @@ urlpatterns = [
     path('predict/', predict_view, name='predict'),
     path('predict-json/', predict_json_view, name='predict_json'),
     path('upload-alerts/', upload_alerts_view, name='upload_alerts'),
-    path('history/', history_view, name='history'),
     path('alerts/', alert_list_view, name='alert_list'),
+    path('alerts/history/', alert_history_view, name='alert_history'),
     path('alerts/predict-pending/', predict_pending_view, name='predict_pending'),
     path('alerts/<int:pk>/shap/', alert_shap_view, name='alert_shap'),
     path('alerts/<int:pk>/explain/', alert_explain_view, name='alert_explain'),
     path('alerts/<int:pk>/priority/', alert_set_priority_view, name='alert_set_priority'),
     path('alerts/<int:pk>/status/',   alert_set_status_view,   name='alert_set_status'),
-    path('alerts/<int:pk>/assign/',   alert_assign_view,       name='alert_assign'),
+    path('alerts/<int:pk>/assign/',    alert_assign_view,    name='alert_assign'),
+    path('alerts/<int:pk>/evaluate/',  alert_evaluate_view,  name='alert_evaluate'),
+    # HU026 / HU027 — Reportes y exportación
+    path('reports/', report_view, name='reports'),
+    path('reports/export/excel/', report_export_excel_view, name='report_export_excel'),
+    path('reports/export/pdf/', report_export_pdf_view, name='report_export_pdf'),
     # HU009 — Pipeline de normalización
     path('pipeline/', pipeline_view, name='pipeline'),
     path('pipeline/upload/', pipeline_upload_view, name='pipeline_upload'),

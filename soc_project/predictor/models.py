@@ -95,6 +95,21 @@ class Alert(models.Model):
     analyst_priority = models.CharField(max_length=20, blank=True, default='')
     analyst_note     = models.TextField(blank=True, default='')
 
+    # Evaluación de la decisión ML — analista nivel 2
+    ML_EVALUATION_CHOICES = [
+        ('correct',           'Correcta'),
+        ('partially_correct', 'Parcialmente correcta'),
+        ('incorrect',         'Incorrecta'),
+    ]
+    ml_evaluation       = models.CharField(max_length=20, blank=True, default='', choices=ML_EVALUATION_CHOICES)
+    ml_evaluation_notes = models.TextField(blank=True, default='')
+    ml_evaluated_by     = models.ForeignKey(
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='evaluated_alerts',
+    )
+    ml_evaluated_at     = models.DateTimeField(null=True, blank=True)
+
     # Asignación — analista responsable de la alerta
     assigned_to = models.ForeignKey(
         User, null=True, blank=True,
@@ -113,13 +128,3 @@ class Alert(models.Model):
         return f"[{self.severity}] {self.attack_type} — {self.created_at:%Y-%m-%d %H:%M}"
 
 
-class PredictionLog(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    input_data = models.JSONField()
-    predicted_class = models.CharField(max_length=100)
-    probabilities = models.JSONField(null=True, blank=True)
-    source = models.CharField(max_length=20, default='manual')
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.user.username} - {self.predicted_class} - {self.created_at:%Y-%m-%d %H:%M}"

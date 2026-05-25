@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+
+{% block title %}Historial de Alertas — SOC Predictor{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+    <!-- Header -->
+    <div>
+        <h1 class="text-lg font-semibold text-white">Historial de Alertas Procesadas</h1>
+        <p class="text-sm text-slate-400 mt-0.5">
+            {{ total_count }} alerta{{ total_count|pluralize }} clasificada{{ total_count|pluralize }} — solo se muestran alertas con predicción ML
+        </p>
+    </div>
+
+    <!-- Filtros -->
+    <form method="get" class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Desde</label>
+                <input type="date" name="date_from" value="{{ date_from }}"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Hasta</label>
+                <input type="date" name="date_to" value="{{ date_to }}"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Clase predicha</label>
+                <select name="predicted_class"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todas</option>
+                    <option value="malicioso"    {% if class_filter == 'malicioso'    %}selected{% endif %}>Malicioso</option>
+                    <option value="a_investigar" {% if class_filter == 'a_investigar' %}selected{% endif %}>A investigar</option>
+                    <option value="benigno"      {% if class_filter == 'benigno'      %}selected{% endif %}>Benigno</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Estado de investigación</label>
+                <select name="investigation_status"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todos</option>
+                    {% for val, label in status_choices %}
+                    <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Táctica MITRE</label>
+                <select name="mitre_tactic"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todas</option>
+                    {% for tactic in mitre_tactics %}
+                    <option value="{{ tactic }}" {% if tactic_filter == tactic %}selected{% endif %}>{{ tactic }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Tipo de ataque</label>
+                <input type="text" name="attack_type" value="{{ attack_filter }}"
+                    placeholder="Ej: DDoS, Brute Force…"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 placeholder-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Evaluación ML</label>
+                <select name="ml_evaluation"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todas</option>
+                    {% for val, label in eval_choices %}
+                    <option value="{{ val }}" {% if eval_filter == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                    <option value="__none__" {% if eval_filter == '__none__' %}selected{% endif %}>Sin evaluar</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Analista investigador</label>
+                <input type="text" name="analyst" value="{{ analyst_filter }}"
+                    placeholder="Username del analista…"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 placeholder-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+        </div>
+
+        <div class="flex items-center gap-3 mt-3">
+            <button type="submit"
+                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+                Filtrar
+            </button>
+            <a href="{% url 'alert_history' %}"
+                class="text-slate-400 hover:text-white text-sm px-3 py-2 rounded-md hover:bg-slate-700">
+                Limpiar
+            </a>
+        </div>
+    </form>
+
+    <!-- Tabla -->
+    {% if page_obj.object_list %}
+    <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead>
+                    <tr class="border-b border-slate-700 bg-slate-900 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                        <th class="px-4 py-3">Fecha</th>
+                        <th class="px-4 py-3">Categoría / Ataque</th>
+                        <th class="px-4 py-3">Táctica MITRE</th>
+                        <th class="px-4 py-3">Severidad</th>
+                        <th class="px-4 py-3">Clase ML</th>
+                        <th class="px-4 py-3">Riesgo</th>
+                        <th class="px-4 py-3">Estado</th>
+                        <th class="px-4 py-3">Evaluación ML</th>
+                        <th class="px-4 py-3">Investigado por</th>
+                        <th class="px-4 py-3"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700/50">
+                    {% for alert in page_obj %}
+                    <tr class="hover:bg-slate-700/30 transition-colors
+                        {% if alert.predicted_class == 'malicioso' %}border-l-2 border-l-red-500
+                        {% elif alert.predicted_class == 'a_investigar' %}border-l-2 border-l-amber-500
+                        {% else %}border-l-2 border-l-emerald-500{% endif %}">
+
+                        <td class="px-4 py-3 text-xs font-mono text-slate-400 whitespace-nowrap">
+                            {{ alert.created_at|date:"Y-m-d H:i" }}
+                        </td>
+
+                        <td class="px-4 py-3">
+                            <p class="text-slate-200 text-sm">{{ alert.event_category }}</p>
+                            {% if alert.attack_type %}
+                            <p class="text-slate-500 text-xs mt-0.5">{{ alert.attack_type }}</p>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-4 py-3 text-slate-300 text-xs">{{ alert.mitre_tactic|default:"—" }}</td>
+
+                        <td class="px-4 py-3">
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">{{ alert.severity }}</span>
+                        </td>
+
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            {% if alert.predicted_class == 'malicioso' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">Malicioso</span>
+                            {% elif alert.predicted_class == 'a_investigar' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">A investigar</span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Benigno</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-4 py-3 font-mono text-xs
+                            {% if alert.risk_score >= 0.7 %}text-red-400
+                            {% elif alert.risk_score >= 0.3 %}text-amber-400
+                            {% else %}text-emerald-400{% endif %}">
+                            {% if alert.risk_score is not None %}{{ alert.risk_score|floatformat:3 }}{% else %}—{% endif %}
+                        </td>
+
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            {% if alert.investigation_status == 'new' %}
+                                <span class="text-xs text-slate-500">Nueva</span>
+                            {% elif alert.investigation_status == 'investigating' %}
+                                <span class="text-xs text-blue-400">En investigación</span>
+                            {% elif alert.investigation_status == 'investigated' %}
+                                <span class="text-xs text-emerald-400">Investigada</span>
+                            {% elif alert.investigation_status == 'false_positive' %}
+                                <span class="text-xs text-violet-400">Falso positivo</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            {% if alert.ml_evaluation == 'correct' %}
+                                <span class="text-xs text-emerald-400">Correcta</span>
+                            {% elif alert.ml_evaluation == 'partially_correct' %}
+                                <span class="text-xs text-amber-400">Parcial</span>
+                            {% elif alert.ml_evaluation == 'incorrect' %}
+                                <span class="text-xs text-red-400">Incorrecta</span>
+                            {% else %}
+                                <span class="text-xs text-slate-600">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-4 py-3">
+                            {% if alert.investigated_by %}
+                            <p class="text-xs text-slate-300">{{ alert.investigated_by.username }}</p>
+                            <p class="text-xs text-slate-600 font-mono">{{ alert.investigated_at|date:"Y-m-d" }}</p>
+                            {% else %}
+                            <span class="text-xs text-slate-600">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-4 py-3">
+                            <a href="{% url 'alert_shap' alert.pk %}?readonly=1"
+                               class="text-xs text-blue-400 hover:text-blue-300 whitespace-nowrap">
+                                Ver detalle →
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Paginación -->
+    {% if page_obj.has_other_pages %}
+    <div class="flex items-center justify-between">
+        <p class="text-xs text-slate-500">
+            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+            &mdash; {{ total_count }} resultado{{ total_count|pluralize }}
+        </p>
+        <div class="flex items-center gap-1">
+            {% if page_obj.has_previous %}
+            <a href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}"
+               class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">← Anterior</a>
+            {% endif %}
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <span class="px-3 py-1.5 rounded-md text-xs font-medium bg-blue-500 text-white">{{ num }}</span>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <a href="?{{ request.GET.urlencode }}&page={{ num }}"
+                   class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">{{ num }}</a>
+                {% endif %}
+            {% endfor %}
+            {% if page_obj.has_next %}
+            <a href="?{{ request.GET.urlencode }}&page={{ page_obj.next_page_number }}"
+               class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">Siguiente →</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-12 text-center">
+        <svg class="w-10 h-10 text-slate-600 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        {% if class_filter or status_filter or tactic_filter or attack_filter or eval_filter or analyst_filter or date_from or date_to %}
+        <p class="text-slate-400 text-sm font-medium">Sin resultados para los filtros aplicados.</p>
+        <a href="{% url 'alert_history' %}" class="text-blue-400 hover:text-blue-300 text-xs mt-2 inline-block">Limpiar filtros</a>
+        {% else %}
+        <p class="text-slate-400 text-sm font-medium">No hay alertas clasificadas aún.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
