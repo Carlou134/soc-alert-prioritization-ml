@@ -46,7 +46,7 @@ ASSIGNMENT_TARGETS = {
     'trainee':    (),
 }
 from .forms import PredictionForm, JSONPredictionForm
-from .models import Alert, PredictionLog, log_error
+from .models import Alert, log_error
 from .utils import predict_alert, predict_batch, extract_valid_fields, calculate_risk_score, calculate_shap_values, compute_shap_safe
 from .serializers import PredictionRequestSerializer
 from .pipeline import (
@@ -154,13 +154,6 @@ def predict_view(request):
             data = form.cleaned_data
             try:
                 result, probabilities = predict_alert(data)
-                PredictionLog.objects.create(
-                    user=request.user,
-                    input_data=data,
-                    predicted_class=result,
-                    probabilities=probabilities,
-                    source='manual',
-                )
                 log_action(
                     request.user,
                     ACTION_PREDICT_MANUAL,
@@ -199,13 +192,6 @@ def predict_json_view(request):
 
                 if not missing_fields:
                     result, probabilities = predict_alert(cleaned_payload)
-                    PredictionLog.objects.create(
-                        user=request.user,
-                        input_data=cleaned_payload,
-                        predicted_class=result,
-                        probabilities=probabilities,
-                        source='json',
-                    )
                     log_action(
                         request.user,
                         ACTION_PREDICT_JSON,
@@ -226,42 +212,6 @@ def predict_json_view(request):
         'cleaned_payload': cleaned_payload,
         'missing_fields': missing_fields,
     })
-
-@login_required
-def history_view(request):
-    qs = PredictionLog.objects.filter(user=request.user).order_by('-created_at')
-
-    date_from = request.GET.get('date_from', '').strip()
-    if date_from:
-        qs = qs.filter(created_at__date__gte=date_from)
-
-    date_to = request.GET.get('date_to', '').strip()
-    if date_to:
-        qs = qs.filter(created_at__date__lte=date_to)
-
-    source_filter = request.GET.get('source', '').strip()
-    if source_filter:
-        qs = qs.filter(source=source_filter)
-
-    class_filter = request.GET.get('clase', '').strip()
-    if class_filter:
-        qs = qs.filter(predicted_class=class_filter)
-
-    total_count = qs.count()
-    paginator = Paginator(qs, 15)
-    page_obj = paginator.get_page(request.GET.get('page'))
-
-    return render(request, 'predictor/history.html', {
-        'page_obj': page_obj,
-        'date_from': date_from,
-        'date_to': date_to,
-        'source_filter': source_filter,
-        'class_filter': class_filter,
-        'total_count': total_count,
-        'source_choices': ['manual', 'json', 'api', 'upload_csv', 'upload_json'],
-        'class_choices': ['benigno', 'a_investigar', 'malicioso'],
-    })
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HU028 — Historial de alertas procesadas (n2 / n3 / admin)
@@ -310,7 +260,7 @@ def alert_history_view(request):
         qs = qs.filter(investigated_by__username__icontains=analyst_filter)
 
     total_count = qs.count()
-    paginator = Paginator(qs, 15)
+    paginator = Paginator(qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     mitre_tactics = (
@@ -394,13 +344,6 @@ def upload_alerts_view(request):
                 risk_score = calculate_risk_score(probabilities)
                 shap_data = compute_shap_safe(data)
 
-                PredictionLog.objects.create(
-                    user=request.user,
-                    input_data=data,
-                    predicted_class=predicted_class,
-                    probabilities=probabilities,
-                    source=source,
-                )
                 Alert.objects.create(
                     event_category=data.get('event_category', ''),
                     protocol=data.get('protocol', ''),
@@ -1227,6 +1170,7 @@ def alert_shap_view(request, pk):
 
     is_trainee   = request.user.profile.is_trainee
     can_evaluate = request.user.profile.role in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1')
+    readonly     = request.GET.get('readonly') == '1'
 
     return render(request, 'predictor/alert_shap.html', {
         'alert'              : alert,
@@ -1239,6 +1183,7 @@ def alert_shap_view(request, pk):
         'is_trainee'         : is_trainee,
         'assigned_to_me'     : alert.assigned_to_id == request.user.pk,
         'can_evaluate'       : can_evaluate,
+        'readonly'           : readonly,
     })
 
 

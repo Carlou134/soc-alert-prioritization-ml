@@ -296,7 +296,7 @@
             </p>
         </div>
 
-        {% if is_trainee and not assigned_to_me %}
+        {% if is_trainee and not assigned_to_me or readonly %}
         <div class="flex items-center gap-2">
             {% if alert.investigation_status == 'investigated' %}
                 <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">Investigada</span>
@@ -364,11 +364,11 @@
         <div>
             <h2 class="text-sm font-semibold text-white">Ajuste manual de prioridad</h2>
             <p class="text-xs text-slate-400 mt-0.5">
-                {% if is_trainee %}Solo lectura{% else %}Nivel 2 — override basado en contexto operacional{% endif %}
+                {% if is_trainee or readonly %}Solo lectura{% else %}Nivel 2 — override basado en contexto operacional{% endif %}
             </p>
         </div>
 
-        {% if is_trainee %}
+        {% if is_trainee or readonly %}
         <div class="flex items-center gap-3 flex-wrap">
             <div>
                 <p class="text-xs text-slate-500 mb-1">Prioridad del analista</p>
@@ -458,11 +458,14 @@
             el <span class="text-slate-300 font-mono">{{ alert.ml_evaluated_at|date:"Y-m-d H:i" }}</span>
         </p>
         {% endif %}
+        {% if not readonly %}
         <div class="pt-1">
             <button id="evalEditToggle" class="text-xs text-blue-400 hover:text-blue-300">Modificar evaluación</button>
         </div>
         {% endif %}
+        {% endif %}
 
+        {% if not readonly %}
         <div id="evalForm" class="{% if alert.ml_evaluation %}hidden {% endif %}space-y-3">
             <div>
                 <label class="block text-xs font-medium text-slate-400 mb-1.5">¿Cómo evaluás la predicción?</label>
@@ -498,6 +501,7 @@
                 <span id="evalFeedback" class="text-xs text-slate-500"></span>
             </div>
         </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -524,7 +528,7 @@
             {% endif %}
         </div>
 
-        {% if can_assign %}
+        {% if can_assign and not readonly %}
         <div class="flex items-center gap-3 flex-wrap">
             <select id="assignSelect"
                 class="bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
