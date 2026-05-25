@@ -1205,6 +1205,15 @@ def alert_shap_view(request, pk):
     can_evaluate = request.user.profile.role in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1')
     readonly     = request.GET.get('readonly') == '1'
 
+    _back_map = {
+        'alert_list':    ('alert_list',    'Volver a alertas'),
+        'alert_history': ('alert_history', 'Volver al historial'),
+        'dashboard':     ('dashboard',     'Volver al dashboard'),
+    }
+    from django.urls import reverse as _reverse
+    _next = request.GET.get('next', 'alert_list')
+    _back_name, _back_label = _back_map.get(_next, _back_map['alert_list'])
+
     return render(request, 'predictor/alert_shap.html', {
         'alert'              : alert,
         'shap_s1'            : _json.dumps(shap_data['s1']),
@@ -1217,6 +1226,8 @@ def alert_shap_view(request, pk):
         'assigned_to_me'     : alert.assigned_to_id == request.user.pk,
         'can_evaluate'       : can_evaluate,
         'readonly'           : readonly,
+        'back_url'           : _reverse(_back_name),
+        'back_label'         : _back_label,
     })
 
 
