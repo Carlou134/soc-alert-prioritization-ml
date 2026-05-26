@@ -115,7 +115,7 @@
                         {% if alert.escalated_at %}{{ alert.escalated_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
                     </td>
                     <td class="px-4 py-3 text-right">
-                        <a href="{% url 'alert_shap' alert.pk %}?next=incident_desk{% if encoded_qs %}&back_qs={{ encoded_qs }}{% endif %}"
+                        <a href="{% url 'incident_detail' alert.pk %}{% if query_string %}?back_qs={{ query_string|urlencode }}{% endif %}"
                             class="text-xs text-slate-400 hover:text-white transition-colors">
                             Ver detalle →
                         </a>

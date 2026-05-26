@@ -10,6 +10,9 @@ from .views import (
     alert_evaluate_view,
     alert_escalate_view,
     incident_desk_view,
+    incident_detail_view,
+    incident_resolve_view,
+    incident_chat_view,
     dashboard_view,
     predict_json_view,
     predict_view,
@@ -45,6 +48,9 @@ urlpatterns = [
     path('alerts/<int:pk>/escalate/',  alert_escalate_view,  name='alert_escalate'),
     # Mesa de Incidentes Activos
     path('incidents/', incident_desk_view, name='incident_desk'),
+    path('incidents/<int:pk>/', incident_detail_view, name='incident_detail'),
+    path('incidents/<int:pk>/resolve/', incident_resolve_view, name='incident_resolve'),
+    path('incidents/<int:pk>/chat/', incident_chat_view, name='incident_chat'),
     # HU026 / HU027 — Reportes y exportación
     path('reports/', report_view, name='reports'),
     path('reports/export/excel/', report_export_excel_view, name='report_export_excel'),

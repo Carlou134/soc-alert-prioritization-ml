@@ -126,6 +126,25 @@ class Alert(models.Model):
         related_name='escalated_alerts',
     )
 
+    # Cierre del incidente — gestionado por analista nivel 3
+    ROOT_CAUSE_CHOICES = [
+        ('phishing',         'Phishing'),
+        ('unpatched_vuln',   'Vulnerabilidad no parchada'),
+        ('malware',          'Malware / Ransomware'),
+        ('misconfig',        'Error de configuración'),
+        ('insider_threat',   'Amenaza interna'),
+        ('other',            'Otro'),
+    ]
+    is_resolved      = models.BooleanField(default=False)
+    resolved_at      = models.DateTimeField(null=True, blank=True)
+    resolved_by      = models.ForeignKey(
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='resolved_alerts',
+    )
+    root_cause       = models.CharField(max_length=30, blank=True, default='', choices=ROOT_CAUSE_CHOICES)
+    lessons_learned  = models.TextField(blank=True, default='')
+
     # Trazabilidad
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')
     created_at = models.DateTimeField(auto_now_add=True)

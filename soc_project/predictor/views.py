@@ -1308,9 +1308,13 @@ def alert_shap_view(request, pk):
     }
     from django.urls import reverse as _reverse
     _next = request.GET.get('next', 'alert_list')
-    _back_name, _back_label = _back_map.get(_next, _back_map['alert_list'])
     _back_qs = request.GET.get('back_qs', '')
-    _back_url = _reverse(_back_name) + ('?' + _back_qs if _back_qs else '')
+    if _next == 'incident_detail':
+        _back_url   = _reverse('incident_detail', args=[alert.pk])
+        _back_label = 'Volver al incidente'
+    else:
+        _back_name, _back_label = _back_map.get(_next, _back_map['alert_list'])
+        _back_url = _reverse(_back_name) + ('?' + _back_qs if _back_qs else '')
 
     return render(request, 'predictor/alert_shap.html', {
         'alert'              : alert,
@@ -1805,6 +1809,69 @@ def alert_escalate_view(request, pk):
         'ok':  True,
         'msg': f'Alerta #{alert.pk} escalada a incidente correctamente.',
     })
+
+
+@login_required
+@role_required('admin', 'analyst_n3')
+def incident_detail_view(request, pk):
+    alert = get_object_or_404(Alert, pk=pk, is_incident=True)
+    mttr = None
+    if alert.is_resolved and alert.resolved_at and alert.escalated_at:
+        delta = alert.resolved_at - alert.escalated_at
+        total_minutes = max(int(delta.total_seconds() / 60), 0)
+        mttr = f"{total_minutes // 60}h {total_minutes % 60}m"
+    back_qs = request.GET.get('back_qs', '')
+    return render(request, 'predictor/incident_detail.html', {
+        'alert':   alert,
+        'mttr':    mttr,
+        'back_qs': back_qs,
+    })
+
+
+@login_required
+@role_required('admin', 'analyst_n3')
+def incident_resolve_view(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+    alert = get_object_or_404(Alert, pk=pk, is_incident=True)
+    if alert.is_resolved:
+        return JsonResponse({'error': 'Este incidente ya fue cerrado.'}, status=400)
+    root_cause      = request.POST.get('root_cause', '').strip()
+    lessons_learned = request.POST.get('lessons_learned', '').strip()
+    if not root_cause:
+        return JsonResponse({'error': 'La causa raíz es obligatoria.'}, status=400)
+    alert.root_cause      = root_cause
+    alert.lessons_learned = lessons_learned
+    alert.is_resolved     = True
+    alert.resolved_at     = timezone.now()
+    alert.resolved_by     = request.user
+    alert.save(update_fields=['root_cause', 'lessons_learned', 'is_resolved', 'resolved_at', 'resolved_by'])
+    return JsonResponse({'ok': True, 'msg': f'Incidente #{alert.pk} cerrado correctamente.'})
+
+
+@login_required
+async def incident_chat_view(request, pk):
+    from asgiref.sync import sync_to_async
+    role = await sync_to_async(
+        lambda: getattr(getattr(request.user, 'profile', None), 'role', None)
+    )()
+    if role not in ('admin', 'analyst_n3'):
+        return JsonResponse({'error': 'Sin permisos.'}, status=403)
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+    try:
+        alert = await Alert.objects.aget(pk=pk, is_incident=True)
+    except Alert.DoesNotExist:
+        return JsonResponse({'error': 'Incidente no encontrado.'}, status=404)
+    message = request.POST.get('message', '').strip()
+    if not message:
+        return JsonResponse({'error': 'Mensaje vacío.'}, status=400)
+    try:
+        from .claude_service import generate_incident_chat_async
+        response = await generate_incident_chat_async(alert, message)
+        return JsonResponse({'ok': True, 'response': response})
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
 
 
 @login_required
