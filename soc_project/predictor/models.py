@@ -137,3 +137,16 @@ class Alert(models.Model):
         return f"[{self.severity}] {self.attack_type} — {self.created_at:%Y-%m-%d %H:%M}"
 
 
+class TurnoNota(models.Model):
+    contenido  = models.TextField()
+    autor      = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='turno_notas')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        username = self.autor.username if self.autor else 'anónimo'
+        return f'[{self.created_at:%Y-%m-%d %H:%M}] {username}'
+
+

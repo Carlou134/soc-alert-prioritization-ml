@@ -29,6 +29,7 @@ from .views import (
 urlpatterns = [
     path('', dashboard_view, name='dashboard'),
     path('dashboard/', dashboard_view, name='dashboard'),
+    path('dashboard/turno-nota/', dashboard_view, name='turno_nota_save'),
     path('predict/', predict_view, name='predict'),
     path('predict-json/', predict_json_view, name='predict_json'),
     path('upload-alerts/', upload_alerts_view, name='upload_alerts'),

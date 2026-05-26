@@ -47,7 +47,7 @@ ASSIGNMENT_TARGETS = {
     'trainee':    (),
 }
 from .forms import PredictionForm, JSONPredictionForm
-from .models import Alert, log_error
+from .models import Alert, TurnoNota, log_error
 from .utils import predict_alert, predict_batch, extract_valid_fields, calculate_risk_score, calculate_shap_values, compute_shap_safe
 from .pipeline import (
     REQUIRED_COLUMNS,
@@ -66,6 +66,14 @@ from .pipeline import (
 
 @login_required
 def dashboard_view(request):
+    if request.method == 'POST':
+        profile = getattr(request.user, 'profile', None)
+        if profile and profile.role != 'trainee':
+            contenido = request.POST.get('contenido', '').strip()
+            if contenido:
+                TurnoNota.objects.create(contenido=contenido, autor=request.user)
+        return redirect('dashboard')
+
     alerts = Alert.objects.all()
 
     total_alerts     = alerts.count()
@@ -116,6 +124,8 @@ def dashboard_view(request):
     daily_labels = [item['day'].strftime('%Y-%m-%d') for item in daily_data if item['day']]
     daily_totals = [item['total'] for item in daily_data]
 
+    turno_notas = TurnoNota.objects.select_related('autor')[:5]
+
     context = {
         'total_alerts':     total_alerts,
         'total_pending':    total_pending,
@@ -123,6 +133,7 @@ def dashboard_view(request):
         'total_investigar': total_investigar,
         'total_benigno':    total_benigno,
         'recent_alerts':    recent_alerts,
+        'turno_notas':      turno_notas,
 
         'class_labels_json': json.dumps(['Benigno', 'A investigar', 'Malicioso']),
         'class_data_json':   json.dumps([total_benigno, total_investigar, total_malicioso]),

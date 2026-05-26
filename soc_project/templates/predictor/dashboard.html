@@ -96,6 +96,76 @@
         </div>
     </div>
 
+    <!-- Tablón de cambio de turno -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+        <!-- Nota activa (la más reciente) -->
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+            <div class="flex items-center justify-between mb-4">
+                <p class="text-sm font-semibold text-white">Bitácora de turno</p>
+                <span class="text-xs text-slate-500 font-mono uppercase tracking-wide">NIST CSF — GV</span>
+            </div>
+            {% if turno_notas %}
+                {% with nota=turno_notas.0 %}
+                <div class="bg-slate-900/60 border border-slate-700 rounded-md p-4 mb-4">
+                    <p class="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">{{ nota.contenido }}</p>
+                    <p class="text-xs text-slate-500 mt-3">
+                        {{ nota.autor.get_full_name|default:nota.autor.username }} &mdash; {{ nota.created_at|date:"Y-m-d H:i" }}
+                    </p>
+                </div>
+                {% endwith %}
+                {% if turno_notas|length > 1 %}
+                <details class="group">
+                    <summary class="text-xs text-slate-400 cursor-pointer hover:text-slate-300 select-none">
+                        Ver notas anteriores ({{ turno_notas|length|add:"-1" }})
+                    </summary>
+                    <div class="mt-3 space-y-3">
+                        {% for nota in turno_notas|slice:"1:" %}
+                        <div class="bg-slate-900/40 border border-slate-700/60 rounded-md p-3">
+                            <p class="text-slate-300 text-xs leading-relaxed whitespace-pre-wrap">{{ nota.contenido }}</p>
+                            <p class="text-xs text-slate-600 mt-2">
+                                {{ nota.autor.get_full_name|default:nota.autor.username }} &mdash; {{ nota.created_at|date:"Y-m-d H:i" }}
+                            </p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% endif %}
+            {% else %}
+                <div class="flex flex-col items-center justify-center h-24 text-slate-600">
+                    <svg class="w-8 h-8 mb-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
+                    <p class="text-sm">Sin notas de turno todavía.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Formulario nueva nota -->
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 flex flex-col">
+            <p class="text-sm font-semibold text-white mb-4">Dejar nota para el próximo turno</p>
+            {% if request.user.profile.role != 'trainee' %}
+            <form method="POST" action="{% url 'turno_nota_save' %}" class="flex flex-col flex-1 gap-3">
+                {% csrf_token %}
+                <textarea name="contenido" rows="5" placeholder="Ej: Turno Noche — Dejo 3 alertas escaladas a incidentes por posible Ransomware. Revisar correlation ID 4821."
+                    class="flex-1 w-full bg-slate-900/60 border border-slate-700 text-slate-200 placeholder-slate-600 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                <button type="submit"
+                    class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-md transition-colors">
+                    Registrar nota
+                </button>
+            </form>
+            {% else %}
+            <div class="flex flex-col items-center justify-center flex-1 text-slate-600">
+                <svg class="w-8 h-8 mb-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+                <p class="text-sm text-center">Solo analistas pueden registrar notas de turno.</p>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+
     <!-- Recent alerts table -->
     <div class="bg-slate-800 border border-slate-700 rounded-lg">
         <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
