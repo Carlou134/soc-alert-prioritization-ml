@@ -239,7 +239,7 @@ def audit_list_view(request):
     if date_to:
         qs = qs.filter(created_at__date__lte=date_to)
 
-    paginator = Paginator(qs, 20)
+    paginator = Paginator(qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     context = {

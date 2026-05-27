@@ -9,5 +9,11 @@
   */
 @source "../../../**/*.{html,py,js}";
 
+@layer base {
+  button {
+    cursor: pointer;
+  }
+}
+
 /* Clases usadas dinámicamente que el scanner no siempre detecta */
 @source inline("bg-red-500 hover:bg-red-600 bg-red-600 hover:bg-red-500 text-red-400 border-red-500/20 border-red-500/25 border-red-500/30 bg-red-500/5 bg-red-500/10 bg-red-500/15");
