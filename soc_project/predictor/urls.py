@@ -27,6 +27,7 @@ from .views import (
     report_view,
     report_export_excel_view,
     report_export_pdf_view,
+    report_export_incidents_pdf_view,
 )
 
 urlpatterns = [
@@ -55,6 +56,7 @@ urlpatterns = [
     path('reports/', report_view, name='reports'),
     path('reports/export/excel/', report_export_excel_view, name='report_export_excel'),
     path('reports/export/pdf/', report_export_pdf_view, name='report_export_pdf'),
+    path('reports/export/incidents/pdf/', report_export_incidents_pdf_view, name='report_export_incidents_pdf'),
     # HU009 — Pipeline de normalización
     path('pipeline/', pipeline_view, name='pipeline'),
     path('pipeline/upload/', pipeline_upload_view, name='pipeline_upload'),
