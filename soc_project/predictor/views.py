@@ -35,6 +35,7 @@ from accounts.models import (
     ACTION_REPORT_EXPORT,
     ACTION_ALERT_EVALUATED,
     ACTION_ALERT_ESCALATED,
+    ACTION_INCIDENT_RESOLVED,
     log_action,
 )
 
@@ -1846,6 +1847,11 @@ def incident_resolve_view(request, pk):
     alert.resolved_at     = timezone.now()
     alert.resolved_by     = request.user
     alert.save(update_fields=['root_cause', 'lessons_learned', 'is_resolved', 'resolved_at', 'resolved_by'])
+    log_action(
+        request.user,
+        ACTION_INCIDENT_RESOLVED,
+        f'Cerró incidente #{alert.pk} — Causa raíz: {root_cause}.',
+    )
     return JsonResponse({'ok': True, 'msg': f'Incidente #{alert.pk} cerrado correctamente.'})
 
 
@@ -1905,6 +1911,12 @@ def incident_desk_view(request):
     if date_to:
         qs = qs.filter(escalated_at__date__lte=date_to)
 
+    resolved_filter = request.GET.get('resolved_filter', '').strip()
+    if resolved_filter == 'active':
+        qs = qs.filter(is_resolved=False)
+    elif resolved_filter == 'resolved':
+        qs = qs.filter(is_resolved=True)
+
     order = request.GET.get('order', 'date_desc').strip()
     _order_map = {
         'risk_desc':    F('risk_score').desc(nulls_last=True),
@@ -1924,13 +1936,14 @@ def incident_desk_view(request):
     page_obj  = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'predictor/incident_desk.html', {
-        'page_obj':     page_obj,
-        'search':       search,
-        'class_filter': class_filter,
-        'date_from':    date_from,
-        'date_to':      date_to,
-        'order':        order,
-        'total_count':  qs.count(),
-        'query_string': _raw_qs,
-        'encoded_qs':   _quote(_raw_qs),
+        'page_obj':        page_obj,
+        'search':          search,
+        'class_filter':    class_filter,
+        'date_from':       date_from,
+        'date_to':         date_to,
+        'order':           order,
+        'resolved_filter': resolved_filter,
+        'total_count':     qs.count(),
+        'query_string':    _raw_qs,
+        'encoded_qs':      _quote(_raw_qs),
     })

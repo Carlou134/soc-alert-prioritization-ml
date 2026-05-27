@@ -59,6 +59,15 @@
                     class="w-full bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
             </div>
             <div>
+                <label class="block text-xs text-slate-500 mb-1">Estado</label>
+                <select name="resolved_filter"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+                    <option value=""        {% if resolved_filter == ''        %}selected{% endif %}>Todos</option>
+                    <option value="active"  {% if resolved_filter == 'active'  %}selected{% endif %}>Solo activos</option>
+                    <option value="resolved"{% if resolved_filter == 'resolved'%}selected{% endif %}>Solo resueltos</option>
+                </select>
+            </div>
+            <div>
                 <label class="block text-xs text-slate-500 mb-1">Ordenar por</label>
                 <select name="order"
                     class="w-full bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
@@ -78,6 +87,7 @@
             <thead>
                 <tr class="border-b border-slate-700/50">
                     <th class="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">#</th>
+                    <th class="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Estado</th>
                     <th class="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Clasificación</th>
                     <th class="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Risk Score</th>
                     <th class="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Evento / Ataque</th>
@@ -91,6 +101,17 @@
                 {% for alert in page_obj %}
                 <tr class="hover:bg-slate-700/20 transition-colors">
                     <td class="px-4 py-3 text-slate-500 font-mono text-xs">{{ alert.pk }}</td>
+                    <td class="px-4 py-3">
+                        {% if alert.is_resolved %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>Resuelto
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-900/40 text-red-300 border border-red-700/50">
+                                <span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse inline-block"></span>Activo
+                            </span>
+                        {% endif %}
+                    </td>
                     <td class="px-4 py-3">
                         {% if alert.predicted_class == 'malicioso' %}
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/25">Malicioso</span>
