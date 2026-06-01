@@ -283,7 +283,9 @@ disp_base = ConfusionMatrixDisplay(confusion_matrix=cm_base,
             display_labels=["Benigno", "A_Investigar", "Malicioso"])
 disp_base.plot(cmap="Blues", xticks_rotation=45)
 plt.title("Matriz de Confusión — RF Jerárquico baseline")
-plt.show()
+plt.tight_layout()
+plt.savefig(os.path.join(BASE_DIR, "reports", "figures", "cm_baseline.png"), dpi=150, bbox_inches="tight")
+plt.close()
 
 # ── Optimización de umbrales por etapa (OOB, sin data leakage) ───────────────
 
@@ -332,8 +334,10 @@ cm_opt = confusion_matrix(y_test, y_pred_opt, labels=[0, 1, 2])
 disp_opt = ConfusionMatrixDisplay(confusion_matrix=cm_opt,
            display_labels=["Benigno", "A_Investigar", "Malicioso"])
 disp_opt.plot(cmap="Greens", xticks_rotation=45)
-plt.title("Matriz de Confusión — RF Jerárquico + Umbrales")
-plt.show()
+plt.title("Matriz de Confusión — RF Jerárquico + Umbrales Optimizados")
+plt.tight_layout()
+plt.savefig(os.path.join(BASE_DIR, "reports", "figures", "cm_optimizado.png"), dpi=150, bbox_inches="tight")
+plt.close()
 
 fp_real      = (y_test == 0).sum()
 fp_correctos = ((y_pred_opt == 0) & (y_test == 0)).sum()
@@ -373,7 +377,8 @@ ax2.barh(top2["feature"][::-1], top2["importance"][::-1])
 ax2.set_title("Top 15 — Stage 2 (Benigno vs A_Investigar)")
 ax2.set_xlabel("Importancia")
 plt.tight_layout()
-plt.show()
+plt.savefig(os.path.join(BASE_DIR, "reports", "figures", "feature_importance.png"), dpi=150, bbox_inches="tight")
+plt.close()
 
 # ── Curvas ROC ────────────────────────────────────────────────────────────────
 
@@ -397,7 +402,8 @@ plt.ylabel("True Positive Rate")
 plt.title("Curvas ROC — RF Jerárquico SOC")
 plt.legend(loc="lower right")
 plt.tight_layout()
-plt.show()
+plt.savefig(os.path.join(BASE_DIR, "reports", "figures", "roc_curves.png"), dpi=150, bbox_inches="tight")
+plt.close()
 
 # ── Comparación con modelos baseline ─────────────────────────────────────────
 
