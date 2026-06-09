@@ -10,7 +10,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 
 from django.contrib.auth.models import User
 from django.http import JsonResponse
@@ -34,21 +34,22 @@ from accounts.models import (
     ACTION_ALERT_ASSIGNED,
     ACTION_REPORT_EXPORT,
     ACTION_ALERT_EVALUATED,
+    ACTION_ALERT_ESCALATED,
+    ACTION_INCIDENT_RESOLVED,
     log_action,
 )
 
 # Roles a los que cada rol puede asignar alertas (incluye auto-asignación)
 ASSIGNMENT_TARGETS = {
     'admin':      ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1', 'trainee'),
-    'analyst_n3': ('analyst_n3', 'analyst_n2', 'analyst_n1'),
+    'analyst_n3': ('admin', 'analyst_n3'),
     'analyst_n2': ('analyst_n2', 'analyst_n3', 'analyst_n1'),
     'analyst_n1': ('analyst_n1', 'analyst_n2', 'trainee'),
     'trainee':    (),
 }
 from .forms import PredictionForm, JSONPredictionForm
-from .models import Alert, log_error
+from .models import Alert, TurnoNota, log_error
 from .utils import predict_alert, predict_batch, extract_valid_fields, calculate_risk_score, calculate_shap_values, compute_shap_safe
-from .serializers import PredictionRequestSerializer
 from .pipeline import (
     REQUIRED_COLUMNS,
     OPTIONAL_COLUMNS,
@@ -66,6 +67,14 @@ from .pipeline import (
 
 @login_required
 def dashboard_view(request):
+    if request.method == 'POST':
+        profile = getattr(request.user, 'profile', None)
+        if profile and profile.role != 'trainee':
+            contenido = request.POST.get('contenido', '').strip()
+            if contenido:
+                TurnoNota.objects.create(contenido=contenido, autor=request.user)
+        return redirect('dashboard')
+
     alerts = Alert.objects.all()
 
     total_alerts     = alerts.count()
@@ -116,6 +125,8 @@ def dashboard_view(request):
     daily_labels = [item['day'].strftime('%Y-%m-%d') for item in daily_data if item['day']]
     daily_totals = [item['total'] for item in daily_data]
 
+    turno_notas = TurnoNota.objects.select_related('autor')[:5]
+
     context = {
         'total_alerts':     total_alerts,
         'total_pending':    total_pending,
@@ -123,6 +134,7 @@ def dashboard_view(request):
         'total_investigar': total_investigar,
         'total_benigno':    total_benigno,
         'recent_alerts':    recent_alerts,
+        'turno_notas':      turno_notas,
 
         'class_labels_json': json.dumps(['Benigno', 'A investigar', 'Malicioso']),
         'class_data_json':   json.dumps([total_benigno, total_investigar, total_malicioso]),
@@ -252,12 +264,33 @@ def alert_history_view(request):
         qs = qs.filter(attack_type__icontains=attack_filter)
 
     eval_filter = request.GET.get('ml_evaluation', '').strip()
-    if eval_filter:
+    if eval_filter == '__none__':
+        qs = qs.filter(ml_evaluation='')
+    elif eval_filter:
         qs = qs.filter(ml_evaluation=eval_filter)
 
     analyst_filter = request.GET.get('analyst', '').strip()
     if analyst_filter:
         qs = qs.filter(investigated_by__username__icontains=analyst_filter)
+
+    priority_filter = request.GET.get('analyst_priority', '').strip()
+    if priority_filter == 'none':
+        qs = qs.filter(analyst_priority='')
+    elif priority_filter:
+        qs = qs.filter(analyst_priority=priority_filter)
+
+    risk_min = request.GET.get('risk_min', '').strip()
+    risk_max = request.GET.get('risk_max', '').strip()
+    try:
+        if risk_min:
+            qs = qs.filter(risk_score__gte=float(risk_min))
+    except ValueError:
+        risk_min = ''
+    try:
+        if risk_max:
+            qs = qs.filter(risk_score__lte=float(risk_max))
+    except ValueError:
+        risk_max = ''
 
     total_count = qs.count()
     paginator = Paginator(qs, 10)
@@ -269,20 +302,28 @@ def alert_history_view(request):
         .distinct().order_by('mitre_tactic')
     )
 
+    _p = request.GET.copy()
+    _p.pop('page', None)
+
     return render(request, 'predictor/alert_history.html', {
-        'page_obj':        page_obj,
-        'total_count':     total_count,
-        'date_from':       date_from,
-        'date_to':         date_to,
-        'class_filter':    class_filter,
-        'status_filter':   status_filter,
-        'tactic_filter':   tactic_filter,
-        'attack_filter':   attack_filter,
-        'eval_filter':     eval_filter,
-        'analyst_filter':  analyst_filter,
-        'mitre_tactics':   mitre_tactics,
-        'status_choices':  Alert.INVESTIGATION_STATUS_CHOICES,
-        'eval_choices':    Alert.ML_EVALUATION_CHOICES,
+        'page_obj':         page_obj,
+        'total_count':      total_count,
+        'date_from':        date_from,
+        'date_to':          date_to,
+        'class_filter':     class_filter,
+        'status_filter':    status_filter,
+        'tactic_filter':    tactic_filter,
+        'attack_filter':    attack_filter,
+        'eval_filter':      eval_filter,
+        'analyst_filter':   analyst_filter,
+        'priority_filter':  priority_filter,
+        'risk_min':         risk_min,
+        'risk_max':         risk_max,
+        'mitre_tactics':    mitre_tactics,
+        'status_choices':   Alert.INVESTIGATION_STATUS_CHOICES,
+        'eval_choices':     Alert.ML_EVALUATION_CHOICES,
+        'priority_choices': Alert.ANALYST_PRIORITY_CHOICES,
+        'query_string':     _p.urlencode(),
     })
 
 
@@ -330,56 +371,97 @@ def upload_alerts_view(request):
 
     processed = []
     failed = []
+    error_count = 0
 
     try:
-        for index, record in enumerate(records, start=1):
-            serializer = PredictionRequestSerializer(data=record)
-            if not serializer.is_valid():
-                failed.append({'record': index, 'errors': _friendly_serializer_errors(serializer.errors)})
-                continue
+        # Fase 1 — validación y limpieza vectorizada con pandas
+        _, missing_cols = validate_columns(records)
+        if missing_cols:
+            context['error'] = f'El archivo no contiene las columnas requeridas: {", ".join(missing_cols)}'
+            return render(request, 'predictor/upload_alerts.html', context)
 
+        clean, stats = clean_records(records)
+
+        if not clean:
+            context['error'] = 'Ningún registro pasó la validación. Verificá el formato del archivo.'
+            return render(request, 'predictor/upload_alerts.html', context)
+
+        error_count = stats['duplicates_removed'] + stats['invalid_rows_removed']
+        if error_count > 0:
+            parts = []
+            if stats['duplicates_removed']:
+                parts.append(f'{stats["duplicates_removed"]} duplicados')
+            if stats['invalid_rows_removed']:
+                parts.append(f'{stats["invalid_rows_removed"]} con valores inválidos')
+            failed.append({
+                'record': '—',
+                'errors': f'Registros removidos durante limpieza: {", ".join(parts)}.',
+            })
+
+        valid_records = [(i + 1, rec, rec) for i, rec in enumerate(clean)]
+
+        if valid_records:
+            # Fase 2 — predicción en batch
+            valid_data_list = [d for _, _, d in valid_records]
             try:
-                data = serializer.validated_data
-                predicted_class, probabilities = predict_alert(data)
-                risk_score = calculate_risk_score(probabilities)
-                shap_data = compute_shap_safe(data)
-
-                Alert.objects.create(
-                    event_category=data.get('event_category', ''),
-                    protocol=data.get('protocol', ''),
-                    traffic_type=data.get('traffic_type', ''),
-                    mitre_tactic=data.get('mitre_tactic', ''),
-                    kill_chain_stage=data.get('kill_chain_stage', ''),
-                    failed_login_attempts=data.get('failed_login_attempts', 0),
-                    request_rate_per_min=data.get('request_rate_per_min', 0.0),
-                    ids_ips_alert=data.get('ids_ips_alert', ''),
-                    asset_criticality=data.get('asset_criticality', ''),
-                    log_source=data.get('log_source', ''),
-                    firewall_action=data.get('firewall_action', ''),
-                    severity=data.get('severity', ''),
-                    has_threat_family=data.get('has_threat_family', 0),
-                    evidence_role=data.get('evidence_role', 'unknown'),
-                    os_family=data.get('os_family', 'unknown'),
-                    correlation_id=data.get('correlation_id', 'unknown'),
-                    mitre_techniques=data.get('mitre_techniques', ''),
-                    attack_type=record.get('attack_type', ''),
-                    attack_signature=record.get('attack_signature', ''),
-                    malware_indicator=record.get('malware_indicator', ''),
-                    label=record.get('label', ''),
-                    predicted_class=predicted_class,
-                    risk_score=risk_score,
-                    probabilities=probabilities,
-                    shap_values=shap_data,
-                    created_by=request.user,
-                )
-                processed.append({'record': index, 'predicted_class': predicted_class, 'risk_score': risk_score})
-
+                batch_results = predict_batch(valid_data_list)
             except Exception as exc:
-                log_error(request.user, 'upload_alerts', f'Registro #{index}: {exc}')
-                failed.append({
-                    'record': index,
-                    'errors': {'_error': ['Error interno al procesar este registro. El resto del archivo se procesó normalmente.']},
-                })
+                log_error(request.user, 'upload_alerts', f'predict_batch falló, usando predict_alert por registro: {exc}')
+                batch_results = None
+
+            # Fase 3 — construir instancias Alert sin tocar la DB
+            alert_instances = []
+            pending_processed = []
+            for i, (index, record, data) in enumerate(valid_records):
+                try:
+                    if batch_results is not None:
+                        predicted_class, probabilities = batch_results[i]
+                    else:
+                        predicted_class, probabilities = predict_alert(data)
+                    risk_score = calculate_risk_score(probabilities)
+                    shap_data = None  # se calcula lazy al primer clic en SHAP
+
+                    alert_instances.append(Alert(
+                        event_category=data.get('event_category', ''),
+                        protocol=data.get('protocol', ''),
+                        traffic_type=data.get('traffic_type', ''),
+                        mitre_tactic=data.get('mitre_tactic', ''),
+                        kill_chain_stage=data.get('kill_chain_stage', ''),
+                        failed_login_attempts=data.get('failed_login_attempts', 0),
+                        request_rate_per_min=data.get('request_rate_per_min', 0.0),
+                        ids_ips_alert=data.get('ids_ips_alert', ''),
+                        asset_criticality=data.get('asset_criticality', ''),
+                        log_source=data.get('log_source', ''),
+                        firewall_action=data.get('firewall_action', ''),
+                        severity=data.get('severity', ''),
+                        has_threat_family=data.get('has_threat_family', 0),
+                        evidence_role=data.get('evidence_role', 'unknown'),
+                        os_family=data.get('os_family', 'unknown'),
+                        correlation_id=data.get('correlation_id', 'unknown'),
+                        mitre_techniques=data.get('mitre_techniques', ''),
+                        attack_type=record.get('attack_type', ''),
+                        attack_signature=record.get('attack_signature', ''),
+                        malware_indicator=record.get('malware_indicator', ''),
+                        label=record.get('label', ''),
+                        predicted_class=predicted_class,
+                        risk_score=risk_score,
+                        probabilities=probabilities,
+                        shap_values=shap_data,
+                        created_by=request.user,
+                    ))
+                    pending_processed.append({'record': index, 'predicted_class': predicted_class, 'risk_score': risk_score})
+
+                except Exception as exc:
+                    log_error(request.user, 'upload_alerts', f'Registro #{index}: {exc}')
+                    failed.append({
+                        'record': index,
+                        'errors': {'_error': ['Error interno al procesar este registro. El resto del archivo se procesó normalmente.']},
+                    })
+
+            # Fase 4 — un único INSERT para todos los registros válidos
+            if alert_instances:
+                Alert.objects.bulk_create(alert_instances)
+                processed.extend(pending_processed)
 
     except Exception as exc:
         log_error(request.user, 'upload_alerts', str(exc))
@@ -393,7 +475,7 @@ def upload_alerts_view(request):
         log_action(
             request.user,
             ACTION_UPLOAD_ALERTS,
-            f'Archivo "{file.name}" subido: {len(processed)} alertas importadas, {len(failed)} con errores.',
+            f'Archivo "{file.name}" subido: {len(processed)} alertas importadas, {error_count} con errores.',
         )
         messages.success(
             request,
@@ -407,7 +489,7 @@ def upload_alerts_view(request):
         'file': file.name,
         'total': len(records),
         'ok': len(processed),
-        'errors': len(failed),
+        'errors': error_count,
     }
     return render(request, 'predictor/upload_alerts.html', context)
 
@@ -442,7 +524,14 @@ def _friendly_serializer_errors(errors: dict) -> dict:
 @login_required
 def alert_list_view(request):
     is_admin = request.user.profile.is_admin
-    qs = Alert.objects.select_related('created_by', 'assigned_to').all()
+    role     = request.user.profile.role
+    qs = Alert.objects.select_related('created_by', 'assigned_to').filter(is_incident=False)
+
+    # Filtros automáticos por rol — no pueden ser sobreescritos por el usuario
+    if role in ('analyst_n1', 'trainee'):
+        qs = qs.filter(predicted_class='benigno')
+    elif role == 'analyst_n2':
+        qs = qs.exclude(predicted_class__in=('benigno', ''))
 
     # Toggle "Mis alertas" / "Todas las alertas"
     mine = request.GET.get('mine', '').strip()
@@ -499,6 +588,23 @@ def alert_list_view(request):
     if date_to:
         qs = qs.filter(created_at__date__lte=date_to)
 
+    risk_min = request.GET.get('risk_min', '').strip()
+    risk_max = request.GET.get('risk_max', '').strip()
+    try:
+        if risk_min:
+            qs = qs.filter(risk_score__gte=float(risk_min))
+    except ValueError:
+        risk_min = ''
+    try:
+        if risk_max:
+            qs = qs.filter(risk_score__lte=float(risk_max))
+    except ValueError:
+        risk_max = ''
+
+    assigned_filter = request.GET.get('assigned_to', '').strip()
+    if assigned_filter:
+        qs = qs.filter(assigned_to__username__icontains=assigned_filter)
+
     order = request.GET.get('order', 'date_desc').strip()
     _order_map = {
         'risk_desc': F('risk_score').desc(nulls_last=True),
@@ -523,9 +629,13 @@ def alert_list_view(request):
     paginator = Paginator(qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
 
+    _qs_params = request.GET.copy()
+    _qs_params.pop('page', None)
+
     context = {
         'page_obj': page_obj,
         'is_admin': is_admin,
+        'role':     role,
         'mine': mine,
         'search': search,
         'severity_filter': severity_filter,
@@ -539,6 +649,10 @@ def alert_list_view(request):
         'order':            order,
         'priority_filter':  priority_filter,
         'status_filter':    status_filter,
+        'risk_min':         risk_min,
+        'risk_max':         risk_max,
+        'assigned_filter':  assigned_filter,
+        'query_string':     _qs_params.urlencode(),
     }
     return render(request, 'predictor/alert_list.html', context)
 
@@ -909,6 +1023,8 @@ def pipeline_normalize_view(request):
 
         saved_count = 0
         failed_count = 0
+
+        alert_instances = []
         for i, record in enumerate(clean):
             try:
                 if batch_results is not None:
@@ -916,8 +1032,8 @@ def pipeline_normalize_view(request):
                 else:
                     predicted_class, probabilities = predict_alert(record)
                 risk_score = calculate_risk_score(probabilities)
-                shap_data = compute_shap_safe(record)
-                Alert.objects.create(
+                shap_data = None  # se calcula lazy al primer clic en SHAP
+                alert_instances.append(Alert(
                     event_category=record.get('event_category', ''),
                     protocol=record.get('protocol', ''),
                     traffic_type=record.get('traffic_type', ''),
@@ -944,11 +1060,18 @@ def pipeline_normalize_view(request):
                     probabilities=probabilities,
                     shap_values=shap_data,
                     created_by=request.user,
-                )
-                saved_count += 1
+                ))
             except Exception as exc:
                 log_error(request.user, 'pipeline_normalize_save', str(exc))
                 failed_count += 1
+
+        if alert_instances:
+            try:
+                Alert.objects.bulk_create(alert_instances)
+                saved_count = len(alert_instances)
+            except Exception as exc:
+                log_error(request.user, 'pipeline_normalize_save', f'bulk_create: {exc}')
+                failed_count += len(alert_instances)
 
         request.session['pipeline_saved_count'] = saved_count
         request.session['pipeline_failed_count'] = failed_count
@@ -1136,7 +1259,6 @@ def alert_shap_view(request, pk):
 
     shap_data = alert.shap_values
 
-    # Alertas clasificadas antes de esta versión no tienen SHAP guardado — lo calculamos on-the-fly.
     if shap_data is None:
         data = {
             'event_category'       : alert.event_category,
@@ -1158,6 +1280,8 @@ def alert_shap_view(request, pk):
             'mitre_techniques'     : alert.mitre_techniques,
         }
         shap_data = calculate_shap_values(data)
+        alert.shap_values = shap_data
+        alert.save(update_fields=['shap_values'])
 
     user_role = request.user.profile.role
     allowed_roles = ASSIGNMENT_TARGETS.get(user_role, ())
@@ -1170,7 +1294,28 @@ def alert_shap_view(request, pk):
 
     is_trainee   = request.user.profile.is_trainee
     can_evaluate = request.user.profile.role in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1')
+    can_escalate = (
+        user_role in ('admin', 'analyst_n2')
+        and not alert.is_incident
+        and alert.predicted_class in ('malicioso', 'a_investigar')
+    )
     readonly     = request.GET.get('readonly') == '1'
+
+    _back_map = {
+        'alert_list':    ('alert_list',    'Volver a alertas'),
+        'alert_history': ('alert_history', 'Volver al historial'),
+        'incident_desk': ('incident_desk', 'Volver a incidentes'),
+        'dashboard':     ('dashboard',     'Volver al dashboard'),
+    }
+    from django.urls import reverse as _reverse
+    _next = request.GET.get('next', 'alert_list')
+    _back_qs = request.GET.get('back_qs', '')
+    if _next == 'incident_detail':
+        _back_url   = _reverse('incident_detail', args=[alert.pk])
+        _back_label = 'Volver al incidente'
+    else:
+        _back_name, _back_label = _back_map.get(_next, _back_map['alert_list'])
+        _back_url = _reverse(_back_name) + ('?' + _back_qs if _back_qs else '')
 
     return render(request, 'predictor/alert_shap.html', {
         'alert'              : alert,
@@ -1183,19 +1328,24 @@ def alert_shap_view(request, pk):
         'is_trainee'         : is_trainee,
         'assigned_to_me'     : alert.assigned_to_id == request.user.pk,
         'can_evaluate'       : can_evaluate,
+        'can_escalate'       : can_escalate,
         'readonly'           : readonly,
+        'back_url'           : _back_url,
+        'back_label'         : _back_label,
     })
 
 
 @login_required
-def alert_explain_view(request, pk):
-    from django.shortcuts import get_object_or_404
-    from .claude_service import generate_shap_explanation
+async def alert_explain_view(request, pk):
+    from .claude_service import generate_shap_explanation_async
 
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-    alert = get_object_or_404(Alert, pk=pk)
+    try:
+        alert = await Alert.objects.aget(pk=pk)
+    except Alert.DoesNotExist:
+        return JsonResponse({'error': 'Alerta no encontrada.'}, status=404)
 
     if not alert.predicted_class:
         return JsonResponse({'error': 'La alerta no está clasificada.'}, status=400)
@@ -1203,14 +1353,13 @@ def alert_explain_view(request, pk):
     if not alert.shap_values:
         return JsonResponse({'error': 'Esta alerta no tiene valores SHAP calculados.'}, status=400)
 
-    # Si ya existe explicación guardada, la devolvemos sin llamar a la API
     if alert.shap_explanation:
         return JsonResponse({'explanation': alert.shap_explanation, 'cached': True})
 
     try:
-        explanation = generate_shap_explanation(alert)
+        explanation = await generate_shap_explanation_async(alert)
         alert.shap_explanation = explanation
-        alert.save(update_fields=['shap_explanation'])
+        await alert.asave(update_fields=['shap_explanation'])
         return JsonResponse({'explanation': explanation, 'cached': False})
     except Exception as exc:
         return JsonResponse({'error': f'Error al generar la explicación: {exc}'}, status=500)
@@ -1342,6 +1491,18 @@ def _build_report_queryset(params):
     if investigation_status:
         qs = qs.filter(investigation_status=investigation_status)
 
+    ml_evaluation = params.get('ml_evaluation', '').strip()
+    if ml_evaluation == '__none__':
+        qs = qs.filter(ml_evaluation='')
+    elif ml_evaluation:
+        qs = qs.filter(ml_evaluation=ml_evaluation)
+
+    analyst_priority = params.get('analyst_priority', '').strip()
+    if analyst_priority == 'none':
+        qs = qs.filter(analyst_priority='')
+    elif analyst_priority:
+        qs = qs.filter(analyst_priority=analyst_priority)
+
     return qs
 
 
@@ -1361,6 +1522,98 @@ def _build_report_summary(qs):
     }
 
 
+def _compute_executive_kpis(qs):
+    total = qs.count()
+    noise_count = qs.filter(
+        Q(predicted_class='benigno') | Q(investigation_status='false_positive')
+    ).count()
+    noise_pct = round(noise_count / total * 100, 1) if total > 0 else 0.0
+
+    matrix = {}
+    for row in (
+        qs.exclude(ml_evaluation='')
+          .values('predicted_class', 'ml_evaluation')
+          .annotate(n=Count('id'))
+    ):
+        matrix[(row['predicted_class'] or '', row['ml_evaluation'])] = row['n']
+
+    return {
+        'total': total,
+        'noise_count': noise_count,
+        'noise_pct': noise_pct,
+        'manually_reviewed': total - noise_count,
+        'matrix': matrix,
+        'evaluated_count': qs.exclude(ml_evaluation='').count(),
+    }
+
+
+def _build_kpi_charts(kpis):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Pie — reducción de ruido
+    fig1, ax1 = plt.subplots(figsize=(4, 2.8))
+    fig1.patch.set_facecolor('#F8FAFC')
+    sizes = [kpis['manually_reviewed'], kpis['noise_count']]
+    labels_pie = ['Requirió revisión', 'Filtrado por modelo']
+    colors_pie = ['#3B82F6', '#10B981']
+    if kpis['total'] > 0:
+        _, texts, autotexts = ax1.pie(
+            sizes, labels=labels_pie, colors=colors_pie,
+            autopct='%1.1f%%', startangle=90,
+            textprops={'fontsize': 8},
+        )
+        for at in autotexts:
+            at.set_fontsize(8)
+    else:
+        ax1.text(0.5, 0.5, 'Sin datos', ha='center', va='center', transform=ax1.transAxes)
+    ax1.set_title('Reducción de Ruido del Modelo', fontsize=9, color='#1E3A5F', pad=8)
+    buf1 = io.BytesIO()
+    fig1.savefig(buf1, format='png', dpi=130, bbox_inches='tight', facecolor='#F8FAFC')
+    buf1.seek(0)
+    plt.close(fig1)
+
+    # Barras agrupadas — matriz de confusión operativa
+    classes    = ['malicioso', 'a_investigar', 'benigno']
+    cls_labels = ['Malicioso', 'A Investigar', 'Benigno']
+    evals      = ['correct', 'partially_correct', 'incorrect']
+    ev_labels  = ['Correcta', 'Parcialmente\ncorrecta', 'Incorrecta']
+    ev_colors  = ['#10B981', '#F59E0B', '#EF4444']
+
+    matrix = kpis['matrix']
+    x = np.arange(len(classes))
+    width = 0.25
+
+    fig2, ax2 = plt.subplots(figsize=(6, 3.2))
+    fig2.patch.set_facecolor('#F8FAFC')
+    for i, (ev, label, color) in enumerate(zip(evals, ev_labels, ev_colors)):
+        vals = [matrix.get((cls, ev), 0) for cls in classes]
+        bars = ax2.bar(x + i * width, vals, width, label=label, color=color, alpha=0.85)
+        for bar in bars:
+            h = bar.get_height()
+            if h > 0:
+                ax2.text(
+                    bar.get_x() + bar.get_width() / 2, h + 0.1,
+                    str(int(h)), ha='center', va='bottom', fontsize=7,
+                )
+    ax2.set_xticks(x + width)
+    ax2.set_xticklabels(cls_labels, fontsize=8)
+    ax2.set_ylabel('Cantidad de alertas', fontsize=8)
+    ax2.set_title('Matriz de Confusión Operativa', fontsize=9, color='#1E3A5F')
+    ax2.legend(fontsize=7, loc='upper right')
+    ax2.grid(axis='y', alpha=0.3)
+    ax2.set_facecolor('#F8FAFC')
+    ax2.tick_params(labelsize=7)
+    buf2 = io.BytesIO()
+    fig2.savefig(buf2, format='png', dpi=130, bbox_inches='tight', facecolor='#F8FAFC')
+    buf2.seek(0)
+    plt.close(fig2)
+
+    return buf1, buf2
+
+
 @login_required
 @admin_required
 def report_view(request):
@@ -1371,6 +1624,9 @@ def report_view(request):
     alerts_page = Paginator(qs.select_related('created_by', 'assigned_to'), 10).get_page(
         params.get('page')
     )
+
+    _qs_params = request.GET.copy()
+    _qs_params.pop('page', None)
 
     severities = Alert.objects.values_list('severity', flat=True).distinct().order_by('severity')
     class_choices = [
@@ -1390,14 +1646,17 @@ def report_view(request):
     ]
 
     return render(request, 'predictor/reports.html', {
-        'alerts':           alerts_page,
-        'summary':          summary,
-        'params':           params,
-        'severities':       severities,
-        'class_choices':    class_choices,
-        'status_choices':   Alert.INVESTIGATION_STATUS_CHOICES,
-        'status_breakdown': status_breakdown,
-        'eval_breakdown':   eval_breakdown,
+        'alerts':            alerts_page,
+        'summary':           summary,
+        'params':            params,
+        'severities':        severities,
+        'class_choices':     class_choices,
+        'status_choices':    Alert.INVESTIGATION_STATUS_CHOICES,
+        'eval_choices':      Alert.ML_EVALUATION_CHOICES,
+        'priority_choices':  Alert.ANALYST_PRIORITY_CHOICES,
+        'status_breakdown':  status_breakdown,
+        'eval_breakdown':    eval_breakdown,
+        'query_string':      _qs_params.urlencode(),
     })
 
 
@@ -1555,6 +1814,72 @@ def report_export_pdf_view(request):
     story.append(summary_table)
     story.append(Spacer(1, 0.5 * cm))
 
+    # ── KPIs ejecutivos del modelo ─────────────────────────────────────────────
+    kpis = _compute_executive_kpis(qs)
+    noise_buf, matrix_buf = _build_kpi_charts(kpis)
+
+    story.append(Paragraph('Análisis de Rendimiento del Modelo', section_style))
+
+    noise_data = [
+        ['Métrica', 'Valor', 'Detalle'],
+        ['Reducción de ruido', f'{kpis["noise_pct"]}%',
+         f'{kpis["noise_count"]} alertas filtradas (benignas + falsos positivos) de {kpis["total"]} totales'],
+        ['Alertas evaluadas', str(kpis["evaluated_count"]),
+         'Con calificación del analista (correcta / parcial / incorrecta)'],
+    ]
+    noise_table = Table(noise_data, colWidths=[5 * cm, 3 * cm, 14.5 * cm])
+    noise_table.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor('#1E3A5F')),
+        ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
+        ('FONTNAME',      (0, 0), (-1, 0),  'Helvetica-Bold'),
+        ('FONTNAME',      (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE',      (0, 0), (-1, -1), 9),
+        ('GRID',          (0, 0), (-1, -1), 0.4, colors.HexColor('#CCCCCC')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#F0FDF4'), colors.HexColor('#EFF6FF')]),
+        ('TOPPADDING',    (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+    ]))
+    story.append(noise_table)
+    story.append(Spacer(1, 0.4 * cm))
+
+    charts_row = [[
+        Image(noise_buf,  width=7 * cm,  height=5 * cm),
+        Image(matrix_buf, width=11 * cm, height=5 * cm),
+    ]]
+    charts_table = Table(charts_row, colWidths=[8 * cm, 12 * cm])
+    charts_table.setStyle(TableStyle([
+        ('ALIGN',  (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(charts_table)
+    story.append(Spacer(1, 0.3 * cm))
+
+    cls_lbl_m = {'malicioso': 'Malicioso', 'a_investigar': 'A Investigar', 'benigno': 'Benigno'}
+    matrix_detail = [['Clase Predicha', 'Correcta', 'Parcialmente Correcta', 'Incorrecta', 'Total']]
+    for cls, label in cls_lbl_m.items():
+        c = kpis['matrix'].get((cls, 'correct'), 0)
+        p = kpis['matrix'].get((cls, 'partially_correct'), 0)
+        i = kpis['matrix'].get((cls, 'incorrect'), 0)
+        matrix_detail.append([label, str(c), str(p), str(i), str(c + p + i)])
+
+    matrix_tbl = Table(matrix_detail, colWidths=[4.5 * cm, 4 * cm, 5.5 * cm, 4 * cm, 2.5 * cm])
+    matrix_tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor('#1E3A5F')),
+        ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
+        ('FONTNAME',      (0, 0), (-1, 0),  'Helvetica-Bold'),
+        ('FONTNAME',      (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE',      (0, 0), (-1, -1), 9),
+        ('ALIGN',         (1, 0), (-1, -1), 'CENTER'),
+        ('GRID',          (0, 0), (-1, -1), 0.4, colors.HexColor('#CCCCCC')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F5F7FA')]),
+        ('TOPPADDING',    (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+    ]))
+    story.append(matrix_tbl)
+    story.append(Spacer(1, 0.5 * cm))
+
     # Detalle de alertas
     story.append(Paragraph('Detalle de alertas', section_style))
 
@@ -1608,3 +1933,396 @@ def report_export_pdf_view(request):
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+
+@login_required
+@admin_required
+def report_export_incidents_pdf_view(request):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    params   = request.GET
+    qs       = Alert.objects.filter(is_incident=True)
+
+    date_from = params.get('date_from')
+    date_to   = params.get('date_to')
+    if date_from:
+        try:
+            qs = qs.filter(created_at__date__gte=datetime.strptime(date_from, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            qs = qs.filter(created_at__date__lte=datetime.strptime(date_to, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+
+    total_incidents = qs.count()
+    resolved_qs     = qs.filter(is_resolved=True, resolved_at__isnull=False, escalated_at__isnull=False)
+    detected_qs     = qs.filter(investigated_at__isnull=False)
+
+    # MTTD y MTTR calculados en Python para evitar problemas con SQLite + duraciones
+    mttd_secs = [
+        (a.investigated_at - a.created_at).total_seconds()
+        for a in detected_qs
+        if a.investigated_at and a.created_at
+    ]
+    mttr_secs = [
+        (a.resolved_at - a.escalated_at).total_seconds()
+        for a in resolved_qs
+        if a.resolved_at and a.escalated_at
+    ]
+    mttd_avg = sum(mttd_secs) / len(mttd_secs) if mttd_secs else None
+    mttr_avg = sum(mttr_secs) / len(mttr_secs) if mttr_secs else None
+
+    def fmt_duration(secs):
+        if secs is None:
+            return 'Sin datos'
+        secs = int(secs)
+        h, m = secs // 3600, (secs % 3600) // 60
+        return f'{h}h {m}m' if h > 0 else f'{m}m'
+
+    # Gráfico MTTR por incidente (últimos 20 resueltos)
+    recent_resolved = list(
+        resolved_qs.select_related('resolved_by').order_by('-resolved_at')[:20]
+    )
+    recent_resolved.reverse()
+
+    chart_buf = None
+    if recent_resolved:
+        ids_ch   = [f'#{a.pk}' for a in recent_resolved]
+        mttr_vals = [
+            (a.resolved_at - a.escalated_at).total_seconds() / 3600
+            for a in recent_resolved
+        ]
+        bar_colors = ['#EF4444' if v > 4 else '#F59E0B' if v > 1 else '#10B981' for v in mttr_vals]
+        fig_h = min(1.0 + len(recent_resolved) * 0.55, 8.0)
+        fig, ax = plt.subplots(figsize=(8, fig_h))
+        fig.patch.set_facecolor('#F8FAFC')
+        bars = ax.barh(ids_ch, mttr_vals, color=bar_colors, height=0.55)
+
+        max_val = max(mttr_vals) if mttr_vals else 1
+        ax.set_xlim(0, max_val * 1.28)
+
+        def _fmt_bar(hours):
+            if hours < 1:
+                mins = int(round(hours * 60))
+                return f'{mins}min'
+            h = int(hours)
+            m = int((hours - h) * 60)
+            return f'{h}h {m}m' if m > 0 else f'{h}h'
+
+        for bar in bars:
+            w = bar.get_width()
+            label = _fmt_bar(w)
+            if w > max_val * 0.18:
+                ax.text(w - max_val * 0.02, bar.get_y() + bar.get_height() / 2,
+                        label, va='center', ha='right', fontsize=7,
+                        color='white', fontweight='bold')
+            else:
+                ax.text(w + max_val * 0.03, bar.get_y() + bar.get_height() / 2,
+                        label, va='center', ha='left', fontsize=7, color='#1E3A5F')
+
+        ax.set_xlabel('Tiempo de respuesta (horas)', fontsize=8)
+        ax.set_title('MTTR por Incidente Resuelto  (verde < 1h · amarillo 1-4h · rojo > 4h)',
+                     fontsize=9, color='#1E3A5F')
+        ax.set_facecolor('#F8FAFC')
+        ax.tick_params(labelsize=7)
+        ax.grid(axis='x', alpha=0.3)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        chart_buf = io.BytesIO()
+        fig.savefig(chart_buf, format='png', dpi=130, bbox_inches='tight', facecolor='#F8FAFC')
+        chart_buf.seek(0)
+        plt.close(fig)
+
+    # ── Build PDF ──────────────────────────────────────────────────────────────
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=1.5 * cm, rightMargin=1.5 * cm,
+        topMargin=2 * cm,    bottomMargin=2 * cm,
+    )
+
+    styles        = getSampleStyleSheet()
+    title_style   = ParagraphStyle('IT', parent=styles['Title'],
+        fontSize=16, textColor=colors.HexColor('#1E3A5F'), spaceAfter=6)
+    subtitle_style = ParagraphStyle('IS', parent=styles['Normal'],
+        fontSize=9, textColor=colors.grey, spaceAfter=12)
+    section_style  = ParagraphStyle('IH', parent=styles['Heading2'],
+        fontSize=11, textColor=colors.HexColor('#1E3A5F'), spaceBefore=12, spaceAfter=6)
+
+    story = []
+    story.append(Paragraph('Reporte de Incidentes SOC', title_style))
+    story.append(Paragraph(
+        f'Generado el {date.today().strftime("%d/%m/%Y")} — Total incidentes: {total_incidents}',
+        subtitle_style,
+    ))
+
+    # Tabla de KPIs MTTD / MTTR
+    story.append(Paragraph('Métricas Operacionales — MTTD / MTTR', section_style))
+    kpi_data = [
+        ['Métrica', 'Valor', 'Descripción'],
+        ['Total de incidentes',   str(total_incidents),       'Alertas escaladas a incidente en el período'],
+        ['Incidentes resueltos',  str(resolved_qs.count()),   'Con fecha de resolución registrada'],
+        ['MTTD promedio',         fmt_duration(mttd_avg),     'Tiempo desde creación de alerta hasta investigación por analista'],
+        ['MTTR promedio',         fmt_duration(mttr_avg),     'Tiempo desde escalado a incidente hasta resolución confirmada'],
+    ]
+    kpi_table = Table(kpi_data, colWidths=[6 * cm, 4 * cm, 12.5 * cm])
+    kpi_table.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor('#1E3A5F')),
+        ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
+        ('FONTNAME',      (0, 0), (-1, 0),  'Helvetica-Bold'),
+        ('FONTNAME',      (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE',      (0, 0), (-1, -1), 9),
+        ('GRID',          (0, 0), (-1, -1), 0.4, colors.HexColor('#CCCCCC')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F5F7FA')]),
+        ('BACKGROUND',    (0, 3), (-1, 3),  colors.HexColor('#EFF6FF')),
+        ('BACKGROUND',    (0, 4), (-1, 4),  colors.HexColor('#FFF7ED')),
+        ('TOPPADDING',    (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+    ]))
+    story.append(kpi_table)
+    story.append(Spacer(1, 0.4 * cm))
+
+    # Gráfico MTTR timeline
+    if chart_buf:
+        story.append(Paragraph('Tiempo de Respuesta por Incidente', section_style))
+        chart_h = (fig_h / 8) * 22 * cm
+        story.append(Image(chart_buf, width=22 * cm, height=chart_h))
+        story.append(Spacer(1, 0.4 * cm))
+
+    # Tabla detalle de incidentes
+    story.append(Paragraph('Detalle de Incidentes', section_style))
+    ROOT_LABELS = dict(Alert.ROOT_CAUSE_CHOICES)
+    CLASS_MAP   = {'malicioso': 'Malicioso', 'a_investigar': 'A Invest.', 'benigno': 'Benigno'}
+
+    detail_headers = [
+        'ID', 'Fecha Alerta', 'Categoría', 'Clase ML',
+        'Escalado', 'Resuelto', 'MTTR', 'Causa Raíz', 'Resuelto por',
+    ]
+    detail_data = [detail_headers]
+
+    for a in qs.select_related('resolved_by').order_by('-escalated_at')[:200]:
+        if a.resolved_at and a.escalated_at:
+            mttr_str = fmt_duration((a.resolved_at - a.escalated_at).total_seconds())
+        else:
+            mttr_str = '—'
+        detail_data.append([
+            str(a.pk),
+            a.created_at.strftime('%Y-%m-%d')       if a.created_at  else '',
+            (a.event_category or '')[:18],
+            CLASS_MAP.get(a.predicted_class, '—'),
+            a.escalated_at.strftime('%d/%m/%Y %H:%M') if a.escalated_at else '—',
+            a.resolved_at.strftime('%d/%m/%Y %H:%M')  if a.resolved_at  else 'Pendiente',
+            mttr_str,
+            ROOT_LABELS.get(a.root_cause, '—')       if a.root_cause  else '—',
+            a.resolved_by.username[:12]               if a.resolved_by else '—',
+        ])
+
+    col_widths = [1.2*cm, 2.5*cm, 3.5*cm, 2.5*cm, 3.8*cm, 3.8*cm, 2.2*cm, 3.8*cm, 2.7*cm]
+    detail_table = Table(detail_data, colWidths=col_widths, repeatRows=1)
+    detail_table.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor('#1E3A5F')),
+        ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
+        ('FONTNAME',      (0, 0), (-1, 0),  'Helvetica-Bold'),
+        ('FONTNAME',      (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE',      (0, 0), (-1, -1), 7.5),
+        ('GRID',          (0, 0), (-1, -1), 0.3, colors.HexColor('#CCCCCC')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F5F7FA')]),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 5),
+        ('TOPPADDING',    (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    story.append(detail_table)
+
+    doc.build(story)
+    buffer.seek(0)
+
+    filename = f'reporte_incidentes_{date.today().isoformat()}.pdf'
+    log_action(
+        request.user,
+        ACTION_REPORT_EXPORT,
+        f'Exportó reporte de incidentes en PDF. Registros: {total_incidents}.',
+    )
+
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fase 5 — Escalado a incidente y Mesa de Incidentes Activos
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@role_required('admin', 'analyst_n2')
+def alert_escalate_view(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    alert = get_object_or_404(Alert, pk=pk)
+
+    if alert.is_incident:
+        return JsonResponse({'error': 'Esta alerta ya fue escalada a incidente.'}, status=400)
+
+    if not alert.predicted_class or alert.predicted_class == 'benigno':
+        return JsonResponse({'error': 'Solo se pueden escalar alertas maliciosas o a investigar.'}, status=400)
+
+    alert.is_incident  = True
+    alert.escalated_at = timezone.now()
+    alert.escalated_by = request.user
+    alert.save(update_fields=['is_incident', 'escalated_at', 'escalated_by'])
+
+    log_action(
+        request.user,
+        ACTION_ALERT_ESCALATED,
+        f'Escaló alerta #{alert.pk} ({alert.predicted_class}) a incidente activo.',
+    )
+
+    return JsonResponse({
+        'ok':  True,
+        'msg': f'Alerta #{alert.pk} escalada a incidente correctamente.',
+    })
+
+
+@login_required
+@role_required('admin', 'analyst_n3')
+def incident_detail_view(request, pk):
+    alert = get_object_or_404(Alert, pk=pk, is_incident=True)
+    mttr = None
+    if alert.is_resolved and alert.resolved_at and alert.escalated_at:
+        delta = alert.resolved_at - alert.escalated_at
+        total_minutes = max(int(delta.total_seconds() / 60), 0)
+        mttr = f"{total_minutes // 60}h {total_minutes % 60}m"
+    back_qs = request.GET.get('back_qs', '')
+    return render(request, 'predictor/incident_detail.html', {
+        'alert':   alert,
+        'mttr':    mttr,
+        'back_qs': back_qs,
+    })
+
+
+@login_required
+@role_required('admin', 'analyst_n3')
+def incident_resolve_view(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+    alert = get_object_or_404(Alert, pk=pk, is_incident=True)
+    if alert.is_resolved:
+        return JsonResponse({'error': 'Este incidente ya fue cerrado.'}, status=400)
+    root_cause      = request.POST.get('root_cause', '').strip()
+    lessons_learned = request.POST.get('lessons_learned', '').strip()
+    if not root_cause:
+        return JsonResponse({'error': 'La causa raíz es obligatoria.'}, status=400)
+    alert.root_cause      = root_cause
+    alert.lessons_learned = lessons_learned
+    alert.is_resolved     = True
+    alert.resolved_at     = timezone.now()
+    alert.resolved_by     = request.user
+    alert.save(update_fields=['root_cause', 'lessons_learned', 'is_resolved', 'resolved_at', 'resolved_by'])
+    log_action(
+        request.user,
+        ACTION_INCIDENT_RESOLVED,
+        f'Cerró incidente #{alert.pk} — Causa raíz: {root_cause}.',
+    )
+    return JsonResponse({'ok': True, 'msg': f'Incidente #{alert.pk} cerrado correctamente.'})
+
+
+@login_required
+async def incident_chat_view(request, pk):
+    from asgiref.sync import sync_to_async
+    role = await sync_to_async(
+        lambda: getattr(getattr(request.user, 'profile', None), 'role', None)
+    )()
+    if role not in ('admin', 'analyst_n3'):
+        return JsonResponse({'error': 'Sin permisos.'}, status=403)
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+    try:
+        alert = await Alert.objects.aget(pk=pk, is_incident=True)
+    except Alert.DoesNotExist:
+        return JsonResponse({'error': 'Incidente no encontrado.'}, status=404)
+    message = request.POST.get('message', '').strip()
+    if not message:
+        return JsonResponse({'error': 'Mensaje vacío.'}, status=400)
+    try:
+        from .claude_service import generate_incident_chat_async
+        response = await generate_incident_chat_async(alert, message)
+        return JsonResponse({'ok': True, 'response': response})
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
+
+
+@login_required
+@role_required('admin', 'analyst_n3')
+def incident_desk_view(request):
+    qs = (
+        Alert.objects
+        .filter(is_incident=True)
+        .select_related('created_by', 'assigned_to', 'escalated_by', 'investigated_by')
+    )
+
+    search = request.GET.get('q', '').strip()
+    if search:
+        qs = qs.filter(
+            Q(event_category__icontains=search)
+            | Q(attack_type__icontains=search)
+            | Q(attack_signature__icontains=search)
+            | Q(protocol__icontains=search)
+            | Q(mitre_tactic__icontains=search)
+        )
+
+    class_filter = request.GET.get('predicted_class', '').strip()
+    if class_filter:
+        qs = qs.filter(predicted_class=class_filter)
+
+    date_from = request.GET.get('date_from', '').strip()
+    if date_from:
+        qs = qs.filter(escalated_at__date__gte=date_from)
+
+    date_to = request.GET.get('date_to', '').strip()
+    if date_to:
+        qs = qs.filter(escalated_at__date__lte=date_to)
+
+    resolved_filter = request.GET.get('resolved_filter', '').strip()
+    if resolved_filter == 'active':
+        qs = qs.filter(is_resolved=False)
+    elif resolved_filter == 'resolved':
+        qs = qs.filter(is_resolved=True)
+
+    order = request.GET.get('order', 'date_desc').strip()
+    _order_map = {
+        'risk_desc':    F('risk_score').desc(nulls_last=True),
+        'risk_asc':     F('risk_score').asc(nulls_last=True),
+        'date_desc':    '-escalated_at',
+        'date_asc':     'escalated_at',
+    }
+    qs = qs.order_by(_order_map.get(order, '-escalated_at'))
+
+    from urllib.parse import quote as _quote
+
+    _qs_params = request.GET.copy()
+    _qs_params.pop('page', None)
+    _raw_qs    = _qs_params.urlencode()
+
+    paginator = Paginator(qs, 10)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'predictor/incident_desk.html', {
+        'page_obj':        page_obj,
+        'search':          search,
+        'class_filter':    class_filter,
+        'date_from':       date_from,
+        'date_to':         date_to,
+        'order':           order,
+        'resolved_filter': resolved_filter,
+        'total_count':     qs.count(),
+        'query_string':    _raw_qs,
+        'encoded_qs':      _quote(_raw_qs),
+    })

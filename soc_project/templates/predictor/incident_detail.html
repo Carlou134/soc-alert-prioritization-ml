@@ -1,0 +1,456 @@
+{% extends 'base.html' %}
+
+{% block title %}Incidente #{{ alert.pk }} — Mesa N3{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-start justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <a href="{% url 'incident_desk' %}{% if back_qs %}?{{ back_qs }}{% endif %}" class="text-slate-400 hover:text-white text-sm transition-colors">← Mesa de Incidentes</a>
+                <span class="text-slate-600">/</span>
+                <h1 class="text-xl font-semibold text-white">Incidente #{{ alert.pk }}</h1>
+                {% if alert.is_resolved %}
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>RESUELTO
+                    </span>
+                {% else %}
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-900/40 text-red-300 border border-red-700/50">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse inline-block"></span>ACTIVO
+                    </span>
+                {% endif %}
+            </div>
+            <p class="text-sm text-slate-400 mt-1">{{ alert.event_category }} — {{ alert.attack_type|default:"Tipo desconocido" }}</p>
+        </div>
+        <a href="{% url 'alert_shap' alert.pk %}?next=incident_detail"
+           class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-colors">
+            Ver análisis SHAP →
+        </a>
+    </div>
+
+    <!-- KPIs del incidente -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <p class="text-xs text-slate-400 uppercase tracking-wide">Risk Score</p>
+            <p class="text-2xl font-bold mt-1 font-mono
+                {% if alert.risk_score >= 0.7 %}text-red-400{% elif alert.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
+                {{ alert.risk_score|floatformat:4|default:"—" }}
+            </p>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <p class="text-xs text-slate-400 uppercase tracking-wide">Clasificación ML</p>
+            <p class="text-sm font-semibold mt-2
+                {% if alert.predicted_class == 'malicioso' %}text-red-400{% elif alert.predicted_class == 'a_investigar' %}text-amber-400{% else %}text-emerald-400{% endif %}">
+                {{ alert.predicted_class|default:"—"|capfirst }}
+            </p>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <p class="text-xs text-slate-400 uppercase tracking-wide">Escalado el</p>
+            <p class="text-sm font-mono text-slate-200 mt-2">{{ alert.escalated_at|date:"Y-m-d H:i"|default:"—" }}</p>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <p class="text-xs text-slate-400 uppercase tracking-wide">MTTR</p>
+            {% if mttr %}
+                <p class="text-2xl font-bold text-blue-400 mt-1 font-mono">{{ mttr }}</p>
+            {% else %}
+                <p class="text-sm text-slate-500 mt-2">En curso…</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Detalles técnicos -->
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+        <p class="text-sm font-semibold text-white mb-4">Datos técnicos de la alerta</p>
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-3 text-sm">
+            {% with fields=alert %}
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Severidad</p><p class="text-slate-200 mt-0.5">{{ alert.severity|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Protocolo</p><p class="text-slate-200 mt-0.5">{{ alert.protocol|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Táctica MITRE</p><p class="text-slate-200 mt-0.5">{{ alert.mitre_tactic|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Kill Chain</p><p class="text-slate-200 mt-0.5">{{ alert.kill_chain_stage|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">IDS/IPS Alert</p><p class="text-slate-200 mt-0.5">{{ alert.ids_ips_alert|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Firewall</p><p class="text-slate-200 mt-0.5">{{ alert.firewall_action|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Criticidad activo</p><p class="text-slate-200 mt-0.5">{{ alert.asset_criticality|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Fuente log</p><p class="text-slate-200 mt-0.5">{{ alert.log_source|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Firma del ataque</p><p class="text-slate-200 mt-0.5">{{ alert.attack_signature|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Indicador malware</p><p class="text-slate-200 mt-0.5">{{ alert.malware_indicator|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Correlation ID</p><p class="text-slate-200 mt-0.5 font-mono text-xs">{{ alert.correlation_id|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Escalado por</p><p class="text-slate-200 mt-0.5">{{ alert.escalated_by.username|default:"—" }}</p></div>
+            {% endwith %}
+        </div>
+    </div>
+
+    <!-- SOAR Simulado -->
+    {% if not alert.is_resolved %}
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+        <div class="flex items-center justify-between mb-1">
+            <p class="text-sm font-semibold text-white">Acciones de Contención Inmediata</p>
+            <span class="text-xs text-slate-500 font-mono uppercase tracking-wide">SOAR SIMULADO</span>
+        </div>
+        <p class="text-xs text-slate-500 mb-4">Playbooks de respuesta automática. Simulación para demostración — NIST SP 800-61 RS.MI</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <button onclick="runPlaybook('block_ip')"
+                class="flex items-center gap-3 px-4 py-3 bg-red-900/20 border border-red-700/40 hover:border-red-500/60 hover:bg-red-900/30 rounded-lg text-left transition-all group">
+                <svg class="w-5 h-5 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+                <div>
+                    <p class="text-sm font-medium text-red-300">Bloquear IP Atacante</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Añadir regla DROP en firewall perimetral</p>
+                </div>
+            </button>
+
+            <button onclick="runPlaybook('isolate_host')"
+                class="flex items-center gap-3 px-4 py-3 bg-orange-900/20 border border-orange-700/40 hover:border-orange-500/60 hover:bg-orange-900/30 rounded-lg text-left transition-all group">
+                <svg class="w-5 h-5 text-orange-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3" />
+                </svg>
+                <div>
+                    <p class="text-sm font-medium text-orange-300">Aislar Host Afectado</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Cortar conectividad de red del endpoint</p>
+                </div>
+            </button>
+
+            <button onclick="runPlaybook('revoke_creds')"
+                class="flex items-center gap-3 px-4 py-3 bg-amber-900/20 border border-amber-700/40 hover:border-amber-500/60 hover:bg-amber-900/30 rounded-lg text-left transition-all group">
+                <svg class="w-5 h-5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+                </svg>
+                <div>
+                    <p class="text-sm font-medium text-amber-300">Revocar Credenciales</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Deshabilitar usuario en Active Directory</p>
+                </div>
+            </button>
+        </div>
+
+        <!-- Terminal SOAR -->
+        <div id="soar-terminal" class="hidden bg-slate-950 border border-slate-700 rounded-md p-4 font-mono text-xs">
+            <div class="flex items-center gap-2 mb-3 pb-2 border-b border-slate-800">
+                <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                <span class="text-slate-500 ml-2">SOAR Terminal — soc-response-engine v2.4.1</span>
+            </div>
+            <div id="soar-output" class="space-y-0.5 text-emerald-400"></div>
+            <span id="soar-cursor" class="inline-block w-2 h-3.5 bg-emerald-400 animate-pulse ml-0.5"></span>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Chat con Claude N3 -->
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+        <div class="flex items-center justify-between mb-1">
+            <p class="text-sm font-semibold text-white">IA Colaborativa — Análisis Forense</p>
+            <span class="text-xs text-slate-500 font-mono uppercase tracking-wide">Claude Sonnet 4.6</span>
+        </div>
+        <p class="text-xs text-slate-500 mb-4">Consulta al modelo sobre el incidente. Puedes pedir reglas YARA, análisis de payloads, estrategias de hunting, etc.</p>
+
+        <div id="chat-history" class="space-y-3 mb-4 max-h-80 overflow-y-auto"></div>
+
+        <div class="flex gap-2">
+            <input id="chat-input" type="text"
+                placeholder="Ej: Redactame reglas YARA para este patrón de ataque…"
+                class="flex-1 bg-slate-900/60 border border-slate-700 text-slate-200 placeholder-slate-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button id="chat-send"
+                onclick="sendChat()"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors">
+                Enviar
+            </button>
+        </div>
+    </div>
+
+    <!-- Formulario de cierre / Resumen si ya cerrado -->
+    {% if alert.is_resolved %}
+    <div class="bg-emerald-950/30 border border-emerald-800/40 rounded-lg p-5">
+        <p class="text-sm font-semibold text-emerald-300 mb-4">Incidente cerrado — NIST SP 800-61 RC</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Causa Raíz</p>
+                <p class="text-slate-200">{{ alert.get_root_cause_display|default:"—" }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Cerrado por</p>
+                <p class="text-slate-200">{{ alert.resolved_by.username|default:"—" }} — {{ alert.resolved_at|date:"Y-m-d H:i" }}</p>
+            </div>
+            {% if alert.lessons_learned %}
+            <div class="md:col-span-2">
+                <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Lecciones Aprendidas</p>
+                <p class="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">{{ alert.lessons_learned }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% else %}
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+        <div class="flex items-center justify-between mb-1">
+            <p class="text-sm font-semibold text-white">Cierre Oficial del Incidente</p>
+            <span class="text-xs text-slate-500 font-mono uppercase tracking-wide">NIST SP 800-61 RC</span>
+        </div>
+        <p class="text-xs text-slate-500 mb-4">Completa el análisis post-incidente antes de cerrar. Se registrará el MTTR exacto.</p>
+
+        <div id="close-form" class="space-y-4">
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Causa Raíz <span class="text-red-400">*</span></label>
+                <select id="root-cause"
+                    class="w-full bg-slate-900/60 border border-slate-700 text-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+                    <option value="">Selecciona la causa raíz…</option>
+                    <option value="phishing">Phishing</option>
+                    <option value="unpatched_vuln">Vulnerabilidad no parchada</option>
+                    <option value="malware">Malware / Ransomware</option>
+                    <option value="misconfig">Error de configuración</option>
+                    <option value="insider_threat">Amenaza interna</option>
+                    <option value="other">Otro</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Lecciones Aprendidas</label>
+                <textarea id="lessons-learned" rows="4"
+                    placeholder="Ej: Se solicita parchar el servidor Apache de inmediato y habilitar MFA para todos los usuarios del dominio."
+                    class="w-full bg-slate-900/60 border border-slate-700 text-slate-200 placeholder-slate-600 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
+            </div>
+            <button id="resolve-btn" onclick="resolveIncident()"
+                class="w-full py-3 bg-red-700 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Confirmar Resolución y Cerrar Caso
+            </button>
+        </div>
+
+        <div id="close-success" class="hidden text-center py-4">
+            <p class="text-emerald-400 font-semibold">Incidente cerrado correctamente.</p>
+            <p class="text-slate-400 text-sm mt-1">Recargá la página para ver el resumen final.</p>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+const INCIDENT_PK   = {{ alert.pk }};
+const RESOLVE_URL   = "{% url 'incident_resolve' alert.pk %}";
+const CHAT_URL      = "{% url 'incident_chat' alert.pk %}";
+const CSRF_TOKEN    = "{{ csrf_token }}";
+const DESK_URL      = "{% url 'incident_desk' %}{% if back_qs %}?{{ back_qs }}{% endif %}";
+
+// ── SOAR Simulation ──────────────────────────────────────────────────────────
+const PLAYBOOKS = {
+    block_ip: [
+        '[SOAR] Iniciando playbook: BLOCK_ATTACKER_IP...',
+        '[FIREWALL] Conectando con edge firewall perimetral...',
+        '[FIREWALL] Autenticación exitosa → fw-edge-01.soc.internal',
+        '[FIREWALL] Generando regla: DROP SRC {{ alert.attack_signature|default:"UNKNOWN_SRC"|truncatechars:20 }}...',
+        '[FIREWALL] Regla aplicada en cadena INPUT y FORWARD.',
+        '[FIREWALL] Verificando tráfico bloqueado... OK',
+        '[SUCCESS] IP bloqueada en firewall perimetral. Acción registrada en SIEM.',
+    ],
+    isolate_host: [
+        '[SOAR] Iniciando playbook: ISOLATE_ENDPOINT...',
+        '[AGENT] Conectando con endpoint agent en host comprometido...',
+        '[AGENT] Agente EDR respondiendo → asset: {{ alert.asset_criticality|default:"UNKNOWN" }}',
+        '[AGENT] Enviando señal de aislamiento de red...',
+        '[AGENT] Deshabilitando interfaces de red del host...',
+        '[AGENT] Manteniendo canal de comunicación con agente EDR activo.',
+        '[SUCCESS] Host aislado de la red. Investigación forense puede proceder.',
+    ],
+    revoke_creds: [
+        '[SOAR] Iniciando playbook: REVOKE_COMPROMISED_CREDENTIALS...',
+        '[AD] Conectando con Active Directory → dc01.corp.internal...',
+        '[AD] Buscando sesiones activas asociadas al incidente...',
+        '[AD] Sesión identificada → usuario comprometido detectado.',
+        '[AD] Deshabilitando cuenta de usuario en Active Directory...',
+        '[AD] Terminando sesiones Kerberos activas...',
+        '[AD] Invalidando tokens de acceso en todos los servicios...',
+        '[SUCCESS] Credenciales revocadas. Sesión terminada en todos los endpoints.',
+    ],
+};
+
+let soarRunning = false;
+
+function runPlaybook(name) {
+    if (soarRunning) return;
+    soarRunning = true;
+
+    const terminal = document.getElementById('soar-terminal');
+    const output   = document.getElementById('soar-output');
+    terminal.classList.remove('hidden');
+    output.innerHTML = '';
+
+    const lines = PLAYBOOKS[name];
+    let i = 0;
+
+    function nextLine() {
+        if (i >= lines.length) {
+            soarRunning = false;
+            return;
+        }
+        const line = lines[i++];
+        const el = document.createElement('p');
+        const color = line.startsWith('[SUCCESS]') ? 'text-emerald-300'
+                    : line.startsWith('[SOAR]')    ? 'text-blue-400'
+                    : 'text-emerald-400';
+        el.className = color;
+        el.textContent = '> ' + line;
+        output.appendChild(el);
+        terminal.scrollTop = terminal.scrollHeight;
+        setTimeout(nextLine, 420 + Math.random() * 280);
+    }
+    nextLine();
+}
+
+// ── Claude Chat ───────────────────────────────────────────────────────────────
+function appendMessage(role, text) {
+    const history = document.getElementById('chat-history');
+    const wrapper = document.createElement('div');
+    wrapper.className = role === 'user'
+        ? 'flex justify-end'
+        : 'flex justify-start';
+
+    const bubble = document.createElement('div');
+    bubble.className = role === 'user'
+        ? 'max-w-lg bg-blue-600/20 border border-blue-600/30 text-blue-100 rounded-lg px-3 py-2 text-sm whitespace-pre-wrap'
+        : 'max-w-lg bg-slate-700/60 border border-slate-600 text-slate-200 rounded-lg px-3 py-2 text-sm prose prose-invert prose-sm max-w-none';
+    if (role === 'assistant') {
+        bubble.innerHTML = marked.parse(text);
+    } else {
+        bubble.textContent = text;
+    }
+    wrapper.appendChild(bubble);
+    history.appendChild(wrapper);
+    history.scrollTop = history.scrollHeight;
+}
+
+async function sendChat() {
+    const input  = document.getElementById('chat-input');
+    const btn    = document.getElementById('chat-send');
+    const msg    = input.value.trim();
+    if (!msg) return;
+
+    appendMessage('user', msg);
+    input.value = '';
+    btn.disabled = true;
+    btn.textContent = 'Analizando…';
+
+    const thinking = document.createElement('div');
+    thinking.className = 'flex justify-start';
+    thinking.id = 'chat-thinking';
+    thinking.innerHTML = '<div class="bg-slate-700/60 border border-slate-600 text-slate-400 rounded-lg px-3 py-2 text-sm italic">Claude está analizando…</div>';
+    document.getElementById('chat-history').appendChild(thinking);
+
+    try {
+        const body = new FormData();
+        body.append('message', msg);
+        body.append('csrfmiddlewaretoken', CSRF_TOKEN);
+
+        const res  = await fetch(CHAT_URL, { method: 'POST', body });
+        const data = await res.json();
+
+        document.getElementById('chat-thinking')?.remove();
+
+        if (data.ok) {
+            appendMessage('assistant', data.response);
+        } else {
+            appendMessage('assistant', '⚠ Error: ' + (data.error || 'Respuesta inesperada.'));
+        }
+    } catch (e) {
+        document.getElementById('chat-thinking')?.remove();
+        appendMessage('assistant', '⚠ Error de red. Intenta nuevamente.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Enviar';
+    }
+}
+
+document.getElementById('chat-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+
+// ── Resolve Incident ──────────────────────────────────────────────────────────
+async function resolveIncident() {
+    const rootCause = document.getElementById('root-cause')?.value;
+    const lessons   = document.getElementById('lessons-learned')?.value.trim();
+    const btn       = document.getElementById('resolve-btn');
+
+    if (!rootCause) {
+        Swal.fire({
+            title: 'Causa raíz requerida',
+            text: 'Seleccioná una causa raíz antes de cerrar el incidente.',
+            icon: 'warning',
+            confirmButtonColor: '#3b82f6',
+            background: '#1e293b',
+            color: '#e2e8f0',
+        });
+        return;
+    }
+
+    const result = await Swal.fire({
+        title: '¿Cerrar incidente oficialmente?',
+        html: `Confirmás el cierre del <strong>Incidente #{{ alert.pk }}</strong>.<br><span style="font-size:0.8rem;color:#94a3b8;">Se registrará el MTTR y no podrá deshacerse.</span>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#334155',
+        confirmButtonText: 'Sí, cerrar caso',
+        cancelButtonText: 'Cancelar',
+        background: '#1e293b',
+        color: '#e2e8f0',
+    });
+
+    if (!result.isConfirmed) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Cerrando incidente…';
+
+    try {
+        const body = new FormData();
+        body.append('root_cause', rootCause);
+        body.append('lessons_learned', lessons);
+        body.append('csrfmiddlewaretoken', CSRF_TOKEN);
+
+        const res  = await fetch(RESOLVE_URL, { method: 'POST', body });
+        const data = await res.json();
+
+        if (data.ok) {
+            await Swal.fire({
+                title: 'Incidente cerrado',
+                text: 'El caso fue cerrado oficialmente. Serás redirigido a la mesa.',
+                icon: 'success',
+                confirmButtonColor: '#16a34a',
+                background: '#1e293b',
+                color: '#e2e8f0',
+                timer: 2500,
+                timerProgressBar: true,
+            });
+            window.location.href = DESK_URL;
+        } else {
+            Swal.fire({
+                title: 'Error',
+                text: data.error || 'No se pudo cerrar el incidente.',
+                icon: 'error',
+                confirmButtonColor: '#3b82f6',
+                background: '#1e293b',
+                color: '#e2e8f0',
+            });
+            btn.disabled = false;
+            btn.textContent = 'Confirmar Resolución y Cerrar Caso';
+        }
+    } catch (e) {
+        Swal.fire({
+            title: 'Error de red',
+            text: 'No se pudo conectar. Intentá nuevamente.',
+            icon: 'error',
+            confirmButtonColor: '#3b82f6',
+            background: '#1e293b',
+            color: '#e2e8f0',
+        });
+        btn.disabled = false;
+        btn.textContent = 'Confirmar Resolución y Cerrar Caso';
+    }
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/marked@13/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+{% endblock %}

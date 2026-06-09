@@ -2,6 +2,7 @@ import anthropic
 from django.conf import settings
 
 _client = None
+_async_client = None
 
 
 def _get_client():
@@ -9,6 +10,13 @@ def _get_client():
     if _client is None:
         _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
     return _client
+
+
+def _get_async_client():
+    global _async_client
+    if _async_client is None:
+        _async_client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    return _async_client
 
 
 def _build_prompt(alert, shap_data: dict) -> str:
@@ -64,6 +72,55 @@ def generate_shap_explanation(alert) -> str:
     prompt = _build_prompt(alert, shap_data)
 
     message = _get_client().messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    return message.content[0].text
+
+
+def _build_incident_prompt(alert, user_message: str) -> str:
+    return f"""Eres un asistente experto en ciberseguridad para un SOC. Ayudás a un Analista de Nivel 3 a investigar un incidente activo. Respondé en español, de forma técnica y concisa. Máximo 400 palabras.
+
+CONTEXTO DEL INCIDENTE #{alert.pk}:
+- Clasificación ML: {alert.predicted_class}
+- Risk Score: {round(alert.risk_score or 0, 4)}
+- Severidad: {alert.severity}
+- Categoría del evento: {alert.event_category}
+- Tipo de ataque: {alert.attack_type or 'Desconocido'}
+- Firma del ataque: {alert.attack_signature or 'N/A'}
+- Táctica MITRE ATT&CK: {alert.mitre_tactic}
+- Etapa Kill Chain: {alert.kill_chain_stage}
+- Protocolo: {alert.protocol}
+- Alerta IDS/IPS: {alert.ids_ips_alert}
+- Indicador de malware: {alert.malware_indicator or 'N/A'}
+- Técnicas MITRE: {alert.mitre_techniques or 'N/A'}
+- Criticidad del activo: {alert.asset_criticality}
+
+PREGUNTA DEL ANALISTA N3:
+{user_message}"""
+
+
+async def generate_incident_chat_async(alert, user_message: str) -> str:
+    """Responde preguntas del Analista N3 sobre un incidente activo."""
+    message = await _get_async_client().messages.create(
+        model='claude-sonnet-4-6',
+        max_tokens=1024,
+        messages=[{'role': 'user', 'content': _build_incident_prompt(alert, user_message)}],
+    )
+    return message.content[0].text
+
+
+async def generate_shap_explanation_async(alert) -> str:
+    """
+    Versión async de generate_shap_explanation.
+    Permite manejar múltiples usuarios concurrentes sin bloquear el event loop.
+    """
+    shap_data = alert.shap_values or {}
+    prompt = _build_prompt(alert, shap_data)
+
+    message = await _get_async_client().messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],

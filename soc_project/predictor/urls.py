@@ -8,6 +8,11 @@ from .views import (
     alert_set_status_view,
     alert_assign_view,
     alert_evaluate_view,
+    alert_escalate_view,
+    incident_desk_view,
+    incident_detail_view,
+    incident_resolve_view,
+    incident_chat_view,
     dashboard_view,
     predict_json_view,
     predict_view,
@@ -22,11 +27,13 @@ from .views import (
     report_view,
     report_export_excel_view,
     report_export_pdf_view,
+    report_export_incidents_pdf_view,
 )
 
 urlpatterns = [
     path('', dashboard_view, name='dashboard'),
     path('dashboard/', dashboard_view, name='dashboard'),
+    path('dashboard/turno-nota/', dashboard_view, name='turno_nota_save'),
     path('predict/', predict_view, name='predict'),
     path('predict-json/', predict_json_view, name='predict_json'),
     path('upload-alerts/', upload_alerts_view, name='upload_alerts'),
@@ -39,10 +46,17 @@ urlpatterns = [
     path('alerts/<int:pk>/status/',   alert_set_status_view,   name='alert_set_status'),
     path('alerts/<int:pk>/assign/',    alert_assign_view,    name='alert_assign'),
     path('alerts/<int:pk>/evaluate/',  alert_evaluate_view,  name='alert_evaluate'),
+    path('alerts/<int:pk>/escalate/',  alert_escalate_view,  name='alert_escalate'),
+    # Mesa de Incidentes Activos
+    path('incidents/', incident_desk_view, name='incident_desk'),
+    path('incidents/<int:pk>/', incident_detail_view, name='incident_detail'),
+    path('incidents/<int:pk>/resolve/', incident_resolve_view, name='incident_resolve'),
+    path('incidents/<int:pk>/chat/', incident_chat_view, name='incident_chat'),
     # HU026 / HU027 — Reportes y exportación
     path('reports/', report_view, name='reports'),
     path('reports/export/excel/', report_export_excel_view, name='report_export_excel'),
     path('reports/export/pdf/', report_export_pdf_view, name='report_export_pdf'),
+    path('reports/export/incidents/pdf/', report_export_incidents_pdf_view, name='report_export_incidents_pdf'),
     # HU009 — Pipeline de normalización
     path('pipeline/', pipeline_view, name='pipeline'),
     path('pipeline/upload/', pipeline_upload_view, name='pipeline_upload'),

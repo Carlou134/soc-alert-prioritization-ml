@@ -88,6 +88,31 @@
                     class="w-full bg-slate-700 border border-slate-600 text-slate-300 placeholder-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
 
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Prioridad analista</label>
+                <select name="analyst_priority"
+                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todas</option>
+                    {% for val, label in priority_choices %}
+                    <option value="{{ val }}" {% if priority_filter == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                    <option value="none" {% if priority_filter == 'none' %}selected{% endif %}>Sin ajuste</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Risk Score (min — max)</label>
+                <div class="flex items-center gap-1.5">
+                    <input type="number" name="risk_min" value="{{ risk_min }}" min="0" max="1" step="0.01"
+                        placeholder="0.00"
+                        class="w-full bg-slate-700 border border-slate-600 text-slate-300 placeholder-slate-500 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <span class="text-slate-500 text-xs">—</span>
+                    <input type="number" name="risk_max" value="{{ risk_max }}" min="0" max="1" step="0.01"
+                        placeholder="1.00"
+                        class="w-full bg-slate-700 border border-slate-600 text-slate-300 placeholder-slate-500 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+
         </div>
 
         <div class="flex items-center gap-3 mt-3">
@@ -196,7 +221,7 @@
                         </td>
 
                         <td class="px-4 py-3">
-                            <a href="{% url 'alert_shap' alert.pk %}?readonly=1"
+                            <a href="{% url 'alert_shap' alert.pk %}?readonly=1&next=alert_history{% if query_string %}&back_qs={{ query_string|urlencode }}{% endif %}"
                                class="text-xs text-blue-400 hover:text-blue-300 whitespace-nowrap">
                                 Ver detalle →
                             </a>
@@ -217,19 +242,19 @@
         </p>
         <div class="flex items-center gap-1">
             {% if page_obj.has_previous %}
-            <a href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}"
+            <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}"
                class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">← Anterior</a>
             {% endif %}
             {% for num in page_obj.paginator.page_range %}
                 {% if page_obj.number == num %}
                 <span class="px-3 py-1.5 rounded-md text-xs font-medium bg-blue-500 text-white">{{ num }}</span>
                 {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                <a href="?{{ request.GET.urlencode }}&page={{ num }}"
+                <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ num }}"
                    class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">{{ num }}</a>
                 {% endif %}
             {% endfor %}
             {% if page_obj.has_next %}
-            <a href="?{{ request.GET.urlencode }}&page={{ page_obj.next_page_number }}"
+            <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}"
                class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">Siguiente →</a>
             {% endif %}
         </div>
