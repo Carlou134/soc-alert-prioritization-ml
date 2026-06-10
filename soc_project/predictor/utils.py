@@ -79,7 +79,7 @@ CLASS_LABELS = {0: 'benigno', 1: 'a_investigar', 2: 'malicioso'}
 
 MAP_SEVERITY = {
     'critical'     : 'critical',
-    'high'         : 'unknown',
+    'high'         : 'high',
     'medium'       : 'medium',
     'low'          : 'unknown',
     'informational': 'unknown',
@@ -88,6 +88,8 @@ MAP_SEVERITY = {
     '10': 'medium',   '7' : 'medium',
     '3' : 'unknown',  '1' : 'unknown',
 }
+
+SEVERITY_ORDINAL = {"unknown": 0, "medium": 1, "high": 2, "critical": 3}
 
 MAP_EVENT_CATEGORY = {
     'malware'             : 'malware_activity',
@@ -333,6 +335,10 @@ def preprocess_input(data: dict) -> pd.DataFrame:
     mitre_present = [c for c in df.columns if re.match(r'^mitre_t\d', c)]
     df['n_mitre_techniques'] = df[mitre_present].sum(axis=1).astype(int) if mitre_present else 0
 
+    # severity_num — ordinal encoding, espejea SEVERITY_ORDINAL de train_model.py
+    if 'severity' in df.columns:
+        df['severity_num'] = df['severity'].map(SEVERITY_ORDINAL).fillna(0).astype(int)
+
     # One-hot encoding → alinear con training_columns (regla 5)
     df_enc = pd.get_dummies(df, drop_first=False)
     df_enc = df_enc.reindex(columns=training_columns, fill_value=0)
@@ -357,6 +363,16 @@ def preprocess_input(data: dict) -> pd.DataFrame:
     for col, val in _defaults.items():
         if col in df_enc.columns:
             df_enc[col] = val
+
+    # evidence_density y confirmed_x_evidence — requieren incident features ya seteadas
+    if 'incident_evidence_count' in df_enc.columns and 'incident_log_source_count' in df_enc.columns:
+        df_enc['evidence_density'] = (
+            df_enc['incident_evidence_count'] / (df_enc['incident_log_source_count'] + 1)
+        ).astype(float)
+    if 'incident_has_confirmed' in df_enc.columns and 'incident_evidence_count' in df_enc.columns:
+        df_enc['confirmed_x_evidence'] = (
+            df_enc['incident_has_confirmed'] * np.log1p(df_enc['incident_evidence_count'])
+        ).astype(float)
 
     return df_enc
 
@@ -406,6 +422,10 @@ def preprocess_batch(records: list) -> pd.DataFrame:
     mitre_present = [c for c in df_base.columns if re.match(r'^mitre_t\d', c)]
     df_base['n_mitre_techniques'] = df_base[mitre_present].sum(axis=1).astype(int) if mitre_present else 0
 
+    # severity_num — ordinal encoding, espejea SEVERITY_ORDINAL de train_model.py
+    if 'severity' in df_base.columns:
+        df_base['severity_num'] = df_base['severity'].map(SEVERITY_ORDINAL).fillna(0).astype(int)
+
     # Limpiar columnas auxiliares antes del encoding
     df_base = df_base.drop(columns=['correlation_id', '_mitre_raw'], errors='ignore')
 
@@ -423,6 +443,16 @@ def preprocess_batch(records: list) -> pd.DataFrame:
                 'incident_has_high_asset', 'incident_has_confirmed']:
         if col in df_base.columns and col in df_enc.columns:
             df_enc[col] = df_base[col].values
+
+    # evidence_density y confirmed_x_evidence — requieren incident features reales ya aplicadas
+    if 'incident_evidence_count' in df_enc.columns and 'incident_log_source_count' in df_enc.columns:
+        df_enc['evidence_density'] = (
+            df_enc['incident_evidence_count'] / (df_enc['incident_log_source_count'] + 1)
+        ).astype(float)
+    if 'incident_has_confirmed' in df_enc.columns and 'incident_evidence_count' in df_enc.columns:
+        df_enc['confirmed_x_evidence'] = (
+            df_enc['incident_has_confirmed'] * np.log1p(df_enc['incident_evidence_count'])
+        ).astype(float)
 
     return df_enc
 
@@ -536,6 +566,19 @@ def _display_feature_name(name: str) -> str:
         if name.startswith(prefix):
             value = name[len(prefix):].replace('_', ' ').title()
             return f'{label} = {value}'
+    _named = {
+        'severity_num'          : 'Severity Level (0-3)',
+        'n_mitre_techniques'    : 'MITRE Techniques Count',
+        'anomaly_score'         : 'Anomaly Score',
+        'anomaly_x_asset_high'  : 'Anomaly × High Asset',
+        'evidence_density'      : 'Evidence Density (per log source)',
+        'confirmed_x_evidence'  : 'Confirmed × Evidence Count',
+        'failed_login_attempts' : 'Failed Login Attempts',
+        'request_rate_per_min'  : 'Request Rate (per min)',
+        'has_threat_family'     : 'Known Threat Family',
+    }
+    if name in _named:
+        return _named[name]
     if name.startswith('mitre_t') and len(name) > 7:
         return f'MITRE {name[6:].upper()}'
     return name.replace('_', ' ').title()

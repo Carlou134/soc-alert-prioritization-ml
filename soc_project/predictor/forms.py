@@ -77,7 +77,7 @@ LOG_SOURCE_CHOICES = [
     ('siem', 'SIEM'), ('waf', 'WAF'),
 ]
 FIREWALL_CHOICES = [('', '---'), ('allow', 'Allow'), ('blocked', 'Blocked'), ('unknown', 'Unknown')]
-SEVERITY_CHOICES = [('', '---'), ('low', 'Low'), ('medium', 'Medium'), ('critical', 'Critical'), ('unknown', 'Unknown')]
+SEVERITY_CHOICES = [('', '---'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical'), ('unknown', 'Unknown')]
 EVIDENCE_ROLE_CHOICES = [
     ('', '---'),
     ('attacker', 'Attacker'),

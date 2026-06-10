@@ -200,7 +200,7 @@ def predict_json_view(request):
             payload = form.cleaned_data['payload']
             try:
                 cleaned_payload = extract_valid_fields(payload)
-                missing_fields = [k for k, v in cleaned_payload.items() if v is None]
+                missing_fields = [k for k in REQUIRED_COLUMNS if cleaned_payload.get(k) is None]
 
                 if not missing_fields:
                     result, probabilities = predict_alert(cleaned_payload)
