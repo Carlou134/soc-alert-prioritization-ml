@@ -9,7 +9,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework import status
 
 from .serializers import PredictionRequestSerializer
-from .utils import predict_alert
+from .utils import predict_alert, predict_batch
 
 
 class PredictAPIView(APIView):
@@ -93,18 +93,32 @@ class UploadAlertsAPIView(APIView):
         processed = []
         failed = []
 
+        # Paso 1 — validar todos los registros
+        valid_records = []
         for index, record in enumerate(records, start=1):
             serializer = PredictionRequestSerializer(data=record)
             if serializer.is_valid():
-                data = serializer.validated_data
-                predicted_class, probabilities = predict_alert(data)
+                valid_records.append((index, serializer.validated_data))
+            else:
+                failed.append({'record': index, 'errors': serializer.errors})
 
+        # Paso 2 — batch prediction con fallback a individual
+        if valid_records:
+            valid_data_list = [data for _, data in valid_records]
+            try:
+                batch_results = predict_batch(valid_data_list)
+            except Exception:
+                batch_results = None
+
+            for i, (index, data) in enumerate(valid_records):
+                if batch_results is not None:
+                    predicted_class, probabilities = batch_results[i]
+                else:
+                    predicted_class, probabilities = predict_alert(data)
                 processed.append({
                     'record': index,
                     'predicted_class': predicted_class,
                 })
-            else:
-                failed.append({'record': index, 'errors': serializer.errors})
 
         return Response({
             'success': True,
