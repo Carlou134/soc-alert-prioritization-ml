@@ -1,103 +1,71 @@
 # SOC Alert Prioritization ML
 
-Machine Learning system for cybersecurity alert classification and prioritization using graph analysis.
-Final degree project (UPC).
+Machine Learning system for cybersecurity alert classification and prioritization.
+Final degree project — Universidad Peruana de Ciencias Aplicadas (UPC).
 
 ---
 
-## 📌 Description
+## Description
 
-This project aims to automate the classification and prioritization of cybersecurity alerts in Security Operations Centers (SOC) using Machine Learning and graph-based analysis.
-
-The system is designed to reduce analyst workload, improve response times, and enhance decision-making processes in cybersecurity environments.
+Automates the classification and prioritization of cybersecurity alerts in Security Operations Centers (SOC) using Machine Learning (LightGBM) and graph-based analysis. Reduces analyst workload, improves response times, and enhances decision-making in cybersecurity environments.
 
 ---
 
-## 🎯 General Objective
+## Tech Stack
 
-Develop an automated system for classification and prioritization of cybersecurity alerts with accuracy > 92%, based on Machine Learning and graph analysis techniques, to optimize incident management in SOCs in Lima Metropolitana by reducing manual workload and improving response times to cyberattacks.
-
----
-
-## 🎯 Specific Objectives
-
-* **OE1:** Analyze and evaluate machine learning models and graph-based techniques for alert correlation and cyber campaign detection in SOC environments.
-* **OE2:** Design the physical and logical architecture of a web-based system capable of integrating and managing cybersecurity alert data from multiple sources.
-* **OE3:** Implement and validate the system's performance using real cybersecurity datasets, evaluating accuracy and efficiency.
-* **OE4:** Propose a sustainability plan ensuring economic, financial, and organizational viability of the system.
+| Layer | Technologies |
+|-------|-------------|
+| Backend | Python, Django 6, Django REST Framework, JWT |
+| ML | LightGBM, Scikit-learn, SHAP, Pandas, NumPy |
+| Reporting | ReportLab, Matplotlib, OpenPyXL |
+| AI | Anthropic Claude API |
+| Frontend | Django Templates, Tailwind CSS |
+| Database | SQLite (development) |
 
 ---
 
-## 🛠️ Tech Stack
+## Architecture
 
-* Python
-* Django
-* Django REST Framework
-* JWT Authentication
-* Scikit-learn
-* Pandas / NumPy
-* Joblib
+Django multi-app project under `soc_project/`:
 
----
+- **accounts** — authentication, roles, user management
+- **predictor** — ML pipeline, alert processing, SHAP explanations, PDF/Excel reports
+- **theme** — Tailwind CSS integration
 
-## 🏗️ Architecture
-
-The system follows a modular architecture using Django apps:
-
-* **soc_project:** Core configuration and routing
-* **predictor:** Machine Learning logic, data processing, and predictions
-
-Machine learning models are loaded using Joblib, and predictions are exposed through web views and APIs.
+The ML model (`soc_model.pkl`) is trained automatically on first startup if not present.
 
 ---
 
-## ⚙️ Installation Guide
+## Running the project
 
-### 🔹 1. Install Python
+### 1. Prerequisites
 
-Download and install Python from:
-https://www.python.org/downloads/
+- Python 3.11+
+- pip
 
-👉 Verify installation:
+Verify:
 
 ```bash
 python --version
-```
-
----
-
-### 🔹 2. Verify pip
-
-```bash
 pip --version
 ```
 
-If needed, update pip:
-
-```bash
-python -m pip install --upgrade pip
-```
-
 ---
 
-### 🔹 3. Clone the repository
+### 2. Clone the repository
 
 ```bash
-git clone https://github.com/TU_USUARIO/soc-alert-prioritization-ml.git
+git clone https://github.com/Carlou134/soc-alert-prioritization-ml.git
 cd soc-alert-prioritization-ml
 ```
 
 ---
 
-### 🔹 4. Create virtual environment
+### 3. Create and activate virtual environment
 
 ```bash
 python -m venv venv
 ```
-
----
-
-### 🔹 5. Activate virtual environment
 
 **Windows:**
 
@@ -113,7 +81,7 @@ source venv/bin/activate
 
 ---
 
-### 🔹 6. Install dependencies
+### 4. Install dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -121,61 +89,79 @@ pip install -r requirements.txt
 
 ---
 
-### 🔹 7. Apply migrations
+### 5. Configure environment variables
+
+Copy the example file and fill in your values:
 
 ```bash
-python manage.py migrate
+cp .env.example .env
 ```
+
+Edit `.env` at the project root:
+
+```env
+DJANGO_SECRET_KEY=your-secret-key-here
+ANTHROPIC_API_KEY=your-anthropic-api-key-here
+```
+
+> The `ANTHROPIC_API_KEY` is required for the AI-assisted alert analysis feature.
 
 ---
 
-### 🔹 8. Run the server
+### 6. Apply migrations
+
+Move into the Django project folder first:
+
+```bash
+cd soc_project
+python manage.py migrate
+```
+
+This single command does three things automatically:
+1. Creates the SQLite database schema
+2. Seeds the default users (see credentials below)
+3. **Trains the ML model** — if `predictor/ml/soc_model.pkl` does not exist, the model is trained from `dataset_soc_alertas_train.csv` automatically. This may take a few minutes on first run.
+
+---
+
+### 7. Run the development server
 
 ```bash
 python manage.py runserver
 ```
 
----
+Open your browser at:
 
-### 🔹 9. Access the application
-
-Open your browser and go to:
-
-```text
+```
 http://127.0.0.1:8000/
 ```
 
 ---
 
-## 🚀 Usage
+## Default credentials
 
-The system allows users to:
+These users are created automatically by the migrations:
 
-* Input cybersecurity alert data
-* Classify alerts using ML models
-* Prioritize alerts based on risk level
-* Analyze historical alert data
-
----
-
-## 🎓 Academic Context
-
-This project was developed as a final degree project at
-**Universidad Peruana de Ciencias Aplicadas (UPC)**.
+| Username | Password | Role |
+|----------|----------|------|
+| `admin_soc` | `Admin@2025` | Admin |
+| `jacobo` | `Jacobo@2025` | Analyst N1 |
+| `gian` | `Gian@2025` | Analyst N2 |
+| `senior` | `Senior@2025` | Analyst N3 |
+| `practicante_rios` | `Practicante@2025` | Trainee |
 
 ---
 
-## 👨‍💻 Authors
+## ML Model
 
-- Carlos Vásquez
-- Giancarlo Moreno
+The model is trained from `soc_project/dataset_soc_alertas_train.csv` and saved to `soc_project/predictor/ml/soc_model.pkl`.
+
+If you need to retrain from scratch, delete `soc_model.pkl` and restart the server.
 
 ---
 
-## 📌 Notes
+## Academic Context
 
-* The database is generated automatically using Django migrations.
-* Machine learning models must be available in the expected paths for predictions to work.
-* This project is intended for academic and research purposes.
+Developed as a final degree project at **Universidad Peruana de Ciencias Aplicadas (UPC)**.
 
------
+**Authors:** Carlos Vásquez · Giancarlo Moreno
