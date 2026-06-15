@@ -284,9 +284,12 @@ fi_s1 = pd.DataFrame({
     "feature"   : X_encoded.columns,
     "importance": rf_s1.feature_importances_,
 }).sort_values("importance", ascending=False)
+
+_lgbm_imp = lgbm_s2.feature_importances_.astype(float)
+_lgbm_imp = _lgbm_imp / _lgbm_imp.sum()
 fi_s2 = pd.DataFrame({
     "feature"   : s2_cols,
-    "importance": lgbm_s2.feature_importances_,
+    "importance": _lgbm_imp,
 }).sort_values("importance", ascending=False)
 
 fi_combined = (
@@ -297,10 +300,12 @@ fi_combined = (
 )
 top15 = fi_combined.head(15).iloc[::-1]
 fig, ax = plt.subplots(figsize=(10, 7))
-ax.barh(top15["feature"], top15["importance"], color="#1f77b4")
-ax.set_title("Top 15 Variables Más Importantes")
-ax.set_xlabel("Importancia")
-ax.set_ylabel("Variable")
+bars = ax.barh(top15["feature"], top15["importance"], color="#1f77b4")
+for bar, val in zip(bars, top15["importance"]):
+    ax.text(val + 0.001, bar.get_y() + bar.get_height() / 2,
+            f"{val:.4f}", va="center", ha="left", fontsize=9)
+ax.set_title("Top 15 Variables Más Importantes — RF SOC", fontsize=13, fontweight="bold")
+ax.set_xlabel("Importancia (gain)")
 plt.tight_layout()
 plt.savefig(os.path.join(REPORTS_DIR, "feature_importance.png"), dpi=150, bbox_inches='tight')
 plt.close()
