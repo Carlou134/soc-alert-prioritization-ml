@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
-"""
-Modelo final — adaptado para ejecución local en VSCode
-Original: Google Colab
-"""
+# Modelo final — adaptado para ejecución local en VSCode
+# Original: Google Colab
 
 import pandas as pd
 import numpy as np
@@ -10,7 +8,7 @@ import os
 
 # -- Carga de datos ----------------------------------------------------------
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 file_path = os.path.join(BASE_DIR, 'dataset_soc_alertas_train.csv')
 df = pd.read_csv(file_path)
 print("Dimensiones iniciales:", df.shape)
@@ -98,8 +96,6 @@ cols_excluir = ["label", "attack_type", "attack_signature", "malware_indicator",
 X = df_clean.drop(columns=cols_excluir, errors="ignore")
 y = df_clean["label"]
 
-# groups para GroupShuffleSplit: garantiza que ningún incidente aparezca en train Y test
-groups = df_clean["correlation_id"].values if "correlation_id" in df_clean.columns else None
 
 SEVERITY_ORDINAL = {"unknown": 0, "medium": 1, "high": 2, "critical": 3}
 if "severity" in X.columns:
@@ -121,16 +117,12 @@ print(y.value_counts())
 
 # -- Feature engineering adicional --------------------------------------------
 
-from sklearn.model_selection import train_test_split, GroupShuffleSplit
+from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (accuracy_score, classification_report,
-                              f1_score, recall_score,
+from sklearn.metrics import (accuracy_score, classification_report, f1_score,
                               confusion_matrix, ConfusionMatrixDisplay,
                               roc_curve, auc)
 from sklearn.preprocessing import label_binarize
-from sklearn.linear_model import LogisticRegression
-from sklearn.dummy import DummyClassifier
-from sklearn.tree import DecisionTreeClassifier
 from lightgbm import LGBMClassifier
 import matplotlib
 matplotlib.use('Agg')
@@ -162,20 +154,32 @@ if "incident_has_confirmed" in X_encoded.columns and "incident_evidence_count" i
     ).astype(float)
     print("Feature cruzada confirmed_x_evidence creada")
 
+# anomaly_z_score: cuánto se desvía el evento del promedio de anomalía de su incidente
+if all(c in X_encoded.columns for c in ["anomaly_score", "incident_mean_anomaly", "incident_std_anomaly"]):
+    X_encoded["anomaly_z_score"] = (
+        (X_encoded["anomaly_score"] - X_encoded["incident_mean_anomaly"]) /
+        (X_encoded["incident_std_anomaly"] + 0.001)
+    ).astype(float)
+    print("Feature anomaly_z_score creada")
+
+# anomaly_vs_max: qué tan cerca está el evento del pico de anomalía del incidente
+if all(c in X_encoded.columns for c in ["anomaly_score", "incident_max_anomaly"]):
+    X_encoded["anomaly_vs_max"] = (
+        X_encoded["anomaly_score"] / (X_encoded["incident_max_anomaly"] + 0.001)
+    ).astype(float)
+    print("Feature anomaly_vs_max creada")
+
 print("Features finales:", X_encoded.shape)
 
-if groups is not None:
-    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
-    train_idx, test_idx = next(gss.split(X_encoded, y, groups=groups))
-    X_train = X_encoded.iloc[train_idx]
-    X_test  = X_encoded.iloc[test_idx]
-    y_train = y.iloc[train_idx]
-    y_test  = y.iloc[test_idx]
-    print("Split por CorrelationId (sin leakage entre incidentes)")
-else:
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_encoded, y, test_size=0.2, random_state=42, stratify=y)
-    print("Fallback: train_test_split sin group constraint")
+all_idx = np.arange(len(X_encoded))
+train_idx, test_idx = train_test_split(
+    all_idx, test_size=0.2, random_state=42, stratify=y
+)
+X_train = X_encoded.iloc[train_idx]
+X_test  = X_encoded.iloc[test_idx]
+y_train = y.iloc[train_idx]
+y_test  = y.iloc[test_idx]
+print("Split: train_test_split estratificado")
 
 print("X_train:", X_train.shape)
 print("X_test :", X_test.shape)
@@ -208,79 +212,43 @@ mask_s2    = y_train != 2
 X_train_s2 = X_train[mask_s2]
 y_train_s2 = y_train[mask_s2]
 
-rf_s2 = RandomForestClassifier(
-    n_estimators=500,
-    max_depth=15,
-    min_samples_split=5,
-    min_samples_leaf=2,
-    max_features="sqrt",
-    random_state=42,
-    class_weight={0: 1, 1: 2},
-    oob_score=True,
-    n_jobs=-1
+# Feature pruning: primer LightGBM para detectar features de baja importancia
+_lgbm_s2_full = LGBMClassifier(
+    n_estimators=700, learning_rate=0.05, num_leaves=63,
+    class_weight={0: 1.5, 1: 1}, random_state=42, n_jobs=-1, verbose=-1
 )
-rf_s2.fit(X_train_s2, y_train_s2)
-print(f"Stage 2 OOB Score (full): {rf_s2.oob_score_:.4f}")
+_lgbm_s2_full.fit(X_train_s2, y_train_s2)
 
-# Feature pruning: reentrenar Stage 2 sin features de baja importancia
-_fi_s2 = pd.Series(rf_s2.feature_importances_, index=X_encoded.columns)
-s2_cols = _fi_s2[_fi_s2 > 0.005].index.tolist()
-print(f"Stage 2 feature pruning: {len(X_encoded.columns)} -> {len(s2_cols)} features (importancia > 0.005)")
+_fi_s2 = pd.Series(_lgbm_s2_full.feature_importances_, index=X_encoded.columns)
+s2_cols = _fi_s2[_fi_s2 > 0.003].index.tolist()
+print(f"Stage 2 feature pruning: {len(X_encoded.columns)} -> {len(s2_cols)} features (importancia > 0.003)")
 
-rf_s2 = RandomForestClassifier(
-    n_estimators=500,
-    max_depth=15,
-    min_samples_split=5,
-    min_samples_leaf=2,
-    max_features="sqrt",
-    random_state=42,
-    class_weight={0: 1, 1: 2},
-    oob_score=True,
-    n_jobs=-1
+# LightGBM final con features seleccionadas
+lgbm_s2 = LGBMClassifier(
+    n_estimators=700, learning_rate=0.05, num_leaves=63,
+    class_weight={0: 1.5, 1: 1}, random_state=42, n_jobs=-1, verbose=-1
 )
-rf_s2.fit(X_train_s2[s2_cols], y_train_s2)
-print(f"Stage 2 OOB Score (pruned): {rf_s2.oob_score_:.4f}")
-
-# -- Calibración Platt (sigmoid) sobre OOB probs de Stage 2 ------------------─
-# Las probabilidades OOB son out-of-sample para cada árbol -> sin leakage.
-# LogisticRegression aprende a corregir el sesgo de las probs raw del RF.
-oob_s2_raw = rf_s2.oob_decision_function_
-_ok         = ~np.isnan(oob_s2_raw).any(axis=1)
-_oob_p      = oob_s2_raw[_ok]
-_y_oob      = y_train_s2.values[_ok]
-
-platt_s2 = LogisticRegression(max_iter=1000, C=1.0, random_state=42)
-platt_s2.fit(_oob_p, _y_oob)
-print(f"Stage 2 Platt calibration fitted ({_ok.sum()} muestras OOB)")
-
-class _CalibratedS2:
-    """Wrapper: raw RF probs -> Platt sigmoid -> calibrated probs."""
-    def __init__(self, rf, lr):
-        self.rf = rf; self.lr = lr
-        self.classes_ = lr.classes_
-    def predict_proba(self, X):
-        return self.lr.predict_proba(self.rf.predict_proba(X))
-
-rf_s2_cal = _CalibratedS2(rf_s2, platt_s2)
+lgbm_s2.fit(X_train_s2[s2_cols], y_train_s2)
+print(f"Stage 2 LightGBM entrenado — clases: {lgbm_s2.classes_}")
 
 # Índices de clase — se fijan aquí para no asumir orden en todo el script
 idx_mal_s1 = list(rf_s1.classes_).index(1)
-idx_inv_s2 = list(rf_s2_cal.classes_).index(1) if 1 in rf_s2_cal.classes_ else 1
-idx_ben_s2 = list(rf_s2_cal.classes_).index(0) if 0 in rf_s2_cal.classes_ else 0
+idx_inv_s2 = list(lgbm_s2.classes_).index(1) if 1 in lgbm_s2.classes_ else 1
+idx_ben_s2 = list(lgbm_s2.classes_).index(0) if 0 in lgbm_s2.classes_ else 0
 
 # -- Predicción jerárquica ----------------------------------------------------─
 
 def predict_hierarchical(X, t1=0.5, t2=0.5):
     """Stage 1 -> Malicioso si P(Malicioso) >= t1. Stage 2 calibrado -> A_Investigar si P >= t2."""
     is_mal = rf_s1.predict_proba(X)[:, idx_mal_s1] >= t1
-    is_inv = rf_s2_cal.predict_proba(X[s2_cols])[:, idx_inv_s2] >= t2
+    is_inv = lgbm_s2.predict_proba(X[s2_cols])[:, idx_inv_s2] >= t2
     return np.where(is_mal, 2, np.where(is_inv, 1, 0))
 
 
 def composite_proba(X):
     """Probabilidades compuestas: P(clase) = P(Stage1) * P(Stage2_calibrado|no-Malicioso)."""
     p_mal = rf_s1.predict_proba(X)[:, idx_mal_s1]
-    p_s2  = rf_s2_cal.predict_proba(X[s2_cols])
+    p_s2  = lgbm_s2.predict_proba(X[s2_cols])
     out   = np.zeros((len(X), 3))
     out[:, 2] = p_mal
     out[:, 0] = (1 - p_mal) * p_s2[:, idx_ben_s2]
@@ -288,156 +256,70 @@ def composite_proba(X):
     return out
 
 
-y_pred_base = predict_hierarchical(X_test)
-print("\n-- RF Jerárquico — baseline (t1=0.5, t2=0.5) --")
-print("Accuracy:", accuracy_score(y_test, y_pred_base))
-print("F1 Macro:", f1_score(y_test, y_pred_base, average="macro"))
-print(classification_report(y_test, y_pred_base,
+best_t1, best_t2 = 0.50, 0.50
+
+# -- Reportes visuales ---------------------------------------------------------
+
+REPORTS_DIR = os.path.join(BASE_DIR, "reports", "figures")
+os.makedirs(REPORTS_DIR, exist_ok=True)
+
+y_pred = predict_hierarchical(X_test, best_t1, best_t2)
+
+print("\n-- RF Jerárquico (t1=0.5, t2=0.5) --")
+print("Accuracy    :", accuracy_score(y_test, y_pred))
+print("F1 Macro    :", f1_score(y_test, y_pred, average="macro"))
+print("F1 Weighted :", f1_score(y_test, y_pred, average="weighted"))
+print(classification_report(y_test, y_pred,
       target_names=["Benigno", "A_Investigar", "Malicioso"]))
 
-cm_base = confusion_matrix(y_test, y_pred_base, labels=[0, 1, 2])
-disp_base = ConfusionMatrixDisplay(confusion_matrix=cm_base,
-            display_labels=[0, 1, 2])
-disp_base.plot(cmap="Blues", xticks_rotation=45)
-plt.title("Matriz de Confusión — RF Jerárquico baseline")
-plt.tight_layout()
-plt.savefig(os.path.join(BASE_DIR, "reports", "figures", "cm_baseline.png"), dpi=150, bbox_inches="tight")
+cm = confusion_matrix(y_test, y_pred, labels=[0, 1, 2])
+ConfusionMatrixDisplay(confusion_matrix=cm,
+    display_labels=["0", "1", "2"]
+).plot(cmap="Blues", xticks_rotation=45)
+plt.title("Matriz de Confusión — RF Jerárquico SOC")
+plt.savefig(os.path.join(REPORTS_DIR, "cm_baseline.png"), dpi=150, bbox_inches='tight')
 plt.close()
-
-# -- Optimización de umbrales por etapa (OOB, sin data leakage) --------------─
-
-MIN_RECALL_S2 = 0.60   # relajado para que el optimizer explore t2 < 0.50 con el nuevo class_weight
-grid          = np.arange(0.20, 0.71, 0.01)
-
-# Stage 1: t1 fijo en 0.50 — el default ya da recall(Malicioso)=0.97.
-# El optimizer elige t1=0.61 (OOB recall >= MIN_RECALL_S1 por pelos)
-# pero en test reduce recall Malicioso 0.97->0.93 sin mejorar F1 global.
-best_t1    = 0.50
-best_f1_s1 = 0.0
-
-# Stage 2: optimizar t2 sobre probabilidades calibradas OOB (sin leakage)
-cal_probs_s2 = platt_s2.predict_proba(_oob_p)
-
-best_t2, best_f1_s2 = 0.5, 0.0
-for t2 in grid:
-    p  = (cal_probs_s2[:, idx_inv_s2] >= t2).astype(int)
-    rs = recall_score(_y_oob, p, average=None, zero_division=0)
-    f  = f1_score(_y_oob, p, average="macro", zero_division=0)
-    if len(rs) >= 2 and rs[idx_inv_s2] >= MIN_RECALL_S2 and f > best_f1_s2:
-        best_f1_s2, best_t2 = f, round(float(t2), 2)
-
-print(f"\n-- Umbrales optimos (OOB) --")
-print(f"t1 (Malicioso, fijo): {best_t1}")
-print(f"t2 (A_Investigar, recall>={MIN_RECALL_S2}): {best_t2}  — F1 Macro OOB Stage 2: {best_f1_s2:.4f}")
-
-y_pred_opt = predict_hierarchical(X_test, best_t1, best_t2)
-print("\n-- RF Jerárquico + Umbrales Optimizados (test) --")
-print("Accuracy:", accuracy_score(y_test, y_pred_opt))
-print("F1 Macro:", f1_score(y_test, y_pred_opt, average="macro"))
-print(classification_report(y_test, y_pred_opt,
-      target_names=["Benigno", "A_Investigar", "Malicioso"]))
-
-cm_opt = confusion_matrix(y_test, y_pred_opt, labels=[0, 1, 2])
-disp_opt = ConfusionMatrixDisplay(confusion_matrix=cm_opt,
-           display_labels=[0, 1, 2])
-disp_opt.plot(cmap="Greens", xticks_rotation=45)
-plt.title("Matriz de Confusión — RF Jerárquico + Umbrales")
-plt.tight_layout()
-plt.savefig(os.path.join(BASE_DIR, "reports", "figures", "cm_optimizado.png"), dpi=150, bbox_inches="tight")
-plt.close()
-
-fp_real      = (y_test == 0).sum()
-fp_correctos = ((y_pred_opt == 0) & (y_test == 0)).sum()
-fp_escapados = ((y_pred_opt != 0) & (y_test == 0)).sum()
-falsa_alarma = ((y_pred_opt == 0) & (y_test != 0)).sum()
-print(f"\n-- Detección de alertas benignas (FP del SOC) --")
-print(f"Benignas reales en test  : {fp_real}")
-print(f"Detectadas correctamente : {fp_correctos} ({fp_correctos/fp_real*100:.1f}%)")
-print(f"No detectadas            : {fp_escapados} ({fp_escapados/fp_real*100:.1f}%)")
-print(f"Falsas alarmas           : {falsa_alarma}")
-
-# -- Feature importance (ambas etapas) ----------------------------------------
 
 fi_s1 = pd.DataFrame({
     "feature"   : X_encoded.columns,
-    "importance": rf_s1.feature_importances_
+    "importance": rf_s1.feature_importances_,
 }).sort_values("importance", ascending=False)
-
 fi_s2 = pd.DataFrame({
     "feature"   : s2_cols,
-    "importance": rf_s2.feature_importances_
+    "importance": lgbm_s2.feature_importances_,
 }).sort_values("importance", ascending=False)
-
-print("\n-- Top 15 features — Stage 1 (Malicioso vs resto) --")
-print(fi_s1.head(15).to_string(index=False))
-print("\n-- Top 15 features — Stage 2 (Benigno vs A_Investigar) --")
-print(fi_s2.head(15).to_string(index=False))
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 top1 = fi_s1.head(15)
 ax1.barh(top1["feature"][::-1], top1["importance"][::-1])
 ax1.set_title("Top 15 — Stage 1 (Malicioso vs resto)")
 ax1.set_xlabel("Importancia")
-
 top2 = fi_s2.head(15)
 ax2.barh(top2["feature"][::-1], top2["importance"][::-1])
 ax2.set_title("Top 15 — Stage 2 (Benigno vs A_Investigar)")
 ax2.set_xlabel("Importancia")
 plt.tight_layout()
-plt.savefig(os.path.join(BASE_DIR, "reports", "figures", "feature_importance.png"), dpi=150, bbox_inches="tight")
+plt.savefig(os.path.join(REPORTS_DIR, "feature_importance.png"), dpi=150, bbox_inches='tight')
 plt.close()
 
-# -- Curvas ROC ----------------------------------------------------------------
-
-classes  = [0, 1, 2]
-nombres  = ["Benigno", "A_Investigar", "Malicioso"]
-colores  = ["#1D9E75", "#7F77DD", "#D85A30"]
-
-y_test_bin     = label_binarize(y_test, classes=classes)
+y_test_bin     = label_binarize(y_test, classes=[0, 1, 2])
 prob_comp_test = composite_proba(X_test)
-
+nombres = ["Benigno", "A_Investigar", "Malicioso"]
+colores = ["#1D9E75", "#7F77DD", "#D85A30"]
 plt.figure(figsize=(8, 6))
 for i, (nombre, color) in enumerate(zip(nombres, colores)):
     fpr, tpr, _ = roc_curve(y_test_bin[:, i], prob_comp_test[:, i])
-    roc_auc     = auc(fpr, tpr)
-    plt.plot(fpr, tpr, color=color, lw=2,
-             label=f"{nombre} (AUC = {roc_auc:.3f})")
-
-plt.plot([0,1],[0,1], "k--", lw=1, label="Aleatorio (AUC = 0.5)")
+    plt.plot(fpr, tpr, color=color, lw=2, label=f"{nombre} (AUC = {auc(fpr, tpr):.3f})")
+plt.plot([0, 1], [0, 1], "k--", lw=1, label="Aleatorio (AUC = 0.5)")
 plt.xlabel("False Positive Rate")
 plt.ylabel("True Positive Rate")
 plt.title("Curvas ROC — RF Jerárquico SOC")
 plt.legend(loc="lower right")
 plt.tight_layout()
-plt.savefig(os.path.join(BASE_DIR, "reports", "figures", "roc_curves.png"), dpi=150, bbox_inches="tight")
+plt.savefig(os.path.join(REPORTS_DIR, "roc_curves.png"), dpi=150, bbox_inches='tight')
 plt.close()
 
-# -- Comparación con modelos baseline ----------------------------------------─
-
-baselines = {
-    "Dummy (majority)"  : DummyClassifier(strategy="most_frequent", random_state=42),
-    "Árbol de decisión" : DecisionTreeClassifier(max_depth=10, random_state=42),
-    "LightGBM"          : LGBMClassifier(
-                              n_estimators=500, learning_rate=0.05,
-                              num_leaves=63, class_weight="balanced",
-                              random_state=42, n_jobs=-1, verbose=-1),
-    "RF Jerárquico"     : None,
-}
-
-print("\n-- Comparación con modelos baseline --")
-print(f"{'Modelo':<22} {'Accuracy':>10} {'F1 Macro':>10} {'F1 Weighted':>12}")
-print("-" * 58)
-
-for nombre, modelo in baselines.items():
-    if modelo is not None:
-        modelo.fit(X_train, y_train)
-        pred = modelo.predict(X_test)
-    else:
-        pred = y_pred_opt
-    acc = accuracy_score(y_test, pred)
-    f1m = f1_score(y_test, pred, average="macro")
-    f1w = f1_score(y_test, pred, average="weighted")
-    print(f"{nombre:<22} {acc:>10.4f} {f1m:>10.4f} {f1w:>12.4f}")
+print(f"\nReportes guardados en {REPORTS_DIR}")
 
 # -- Predicción sobre 10 muestras reales del test set (estratificado por severity) ---
 # Cubre los 4 niveles reales del dataset: unknown, medium, critical, high.
@@ -449,17 +331,20 @@ _sev_test  = df_clean.iloc[test_idx]["severity"].values   # severidad de cada fi
 
 # Índices por severidad dentro del test set
 _i_unk  = np.where(_sev_test == "unknown" )[0]
+_i_low  = np.where(_sev_test == "low"     )[0]
 _i_med  = np.where(_sev_test == "medium"  )[0]
 _i_crit = np.where(_sev_test == "critical")[0]
 _i_high = np.where(_sev_test == "high"    )[0]  # casi todo Canvia
 
-# 3 unknown + 3 medium + 2 critical + 2 high (Canvia)
-_sel = np.concatenate([
-    _rng_demo.choice(_i_unk,  size=3, replace=False),
-    _rng_demo.choice(_i_med,  size=3, replace=False),
-    _rng_demo.choice(_i_crit, size=2, replace=False),
-    _rng_demo.choice(_i_high, size=2, replace=False),
-])
+# 2 unknown + 2 low + 2 medium + 2 critical + 2 high (Canvia)
+_parts = [
+    _rng_demo.choice(_i_unk,  size=min(2, len(_i_unk)),  replace=False),
+    _rng_demo.choice(_i_low,  size=min(2, len(_i_low)),  replace=False),
+    _rng_demo.choice(_i_med,  size=min(2, len(_i_med)),  replace=False),
+    _rng_demo.choice(_i_crit, size=min(2, len(_i_crit)), replace=False),
+    _rng_demo.choice(_i_high, size=min(2, len(_i_high)), replace=False),
+]
+_sel = np.concatenate([p for p in _parts if len(p) > 0])
 
 _X_demo     = X_test.iloc[_sel]
 _preds_demo = predict_hierarchical(_X_demo, best_t1, best_t2)
@@ -494,7 +379,7 @@ print(f"\nCorrectas: {_correctas_demo}/10 ({_correctas_demo*10:.0f}%)")
 print(f"Incorrectas: {10 - _correctas_demo}/10")
 print("\nClassification Report:")
 print(classification_report(_labels_demo, list(_preds_demo),
-      target_names=["Benigno", "A_Investigar", "Malicioso"], zero_division=0))
+      labels=[0, 1, 2], target_names=["Benigno", "A_Investigar", "Malicioso"], zero_division=0))
 
 # -- Exportar modelo ----------------------------------------------------------─
 # IMPORTANTE: la app Django necesita actualizar su carga para usar
@@ -502,13 +387,13 @@ print(classification_report(_labels_demo, list(_preds_demo),
 
 artifact = {
     "model_s1"         : rf_s1,
-    "model_s2"         : rf_s2_cal,
+    "model_s2"         : lgbm_s2,
     "training_columns" : X_encoded.columns.tolist(),
     "s2_columns"       : s2_cols,
     "target_classes"   : [0, 1, 2],
     "thresholds"       : {"t1": best_t1, "t2": best_t2},
     "stage1_classes"   : rf_s1.classes_.tolist(),
-    "stage2_classes"   : rf_s2_cal.classes_.tolist(),
+    "stage2_classes"   : lgbm_s2.classes_.tolist(),
     "idx_mal_s1"       : idx_mal_s1,
     "idx_inv_s2"       : idx_inv_s2,
     "idx_ben_s2"       : idx_ben_s2,
@@ -517,5 +402,5 @@ artifact = {
 model_path = os.path.join(BASE_DIR, "predictor", "ml", "soc_model.pkl")
 os.makedirs(os.path.dirname(model_path), exist_ok=True)
 joblib.dump(artifact, model_path)
-print("\nModelo guardado como soc_model.pkl")
+print(f"\nModelo guardado en {model_path}")
 print(f"Umbrales exportados: t1 (Malicioso)={best_t1}, t2 (A_Investigar)={best_t2}")
