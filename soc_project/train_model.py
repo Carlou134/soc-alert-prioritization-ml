@@ -289,15 +289,18 @@ fi_s2 = pd.DataFrame({
     "importance": lgbm_s2.feature_importances_,
 }).sort_values("importance", ascending=False)
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
-top1 = fi_s1.head(15)
-ax1.barh(top1["feature"][::-1], top1["importance"][::-1])
-ax1.set_title("Top 15 — Stage 1 (Malicioso vs resto)")
-ax1.set_xlabel("Importancia")
-top2 = fi_s2.head(15)
-ax2.barh(top2["feature"][::-1], top2["importance"][::-1])
-ax2.set_title("Top 15 — Stage 2 (Benigno vs A_Investigar)")
-ax2.set_xlabel("Importancia")
+fi_combined = (
+    pd.concat([fi_s1, fi_s2])
+    .groupby("feature", as_index=False)["importance"]
+    .sum()
+    .sort_values("importance", ascending=False)
+)
+top15 = fi_combined.head(15).iloc[::-1]
+fig, ax = plt.subplots(figsize=(10, 7))
+ax.barh(top15["feature"], top15["importance"], color="#1f77b4")
+ax.set_title("Top 15 Variables Más Importantes")
+ax.set_xlabel("Importancia")
+ax.set_ylabel("Variable")
 plt.tight_layout()
 plt.savefig(os.path.join(REPORTS_DIR, "feature_importance.png"), dpi=150, bbox_inches='tight')
 plt.close()
