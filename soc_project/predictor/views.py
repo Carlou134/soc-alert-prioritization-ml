@@ -327,171 +327,164 @@ def alert_history_view(request):
     })
 
 
+_UPLOAD_PREVIEW_SIZE = 10
+
+
+def _build_alert_instance(record, predicted_class, probabilities, user):
+    return Alert(
+        event_category        = record.get('event_category', ''),
+        protocol              = record.get('protocol', ''),
+        traffic_type          = record.get('traffic_type', ''),
+        mitre_tactic          = record.get('mitre_tactic', ''),
+        kill_chain_stage      = record.get('kill_chain_stage', ''),
+        failed_login_attempts = record.get('failed_login_attempts', 0),
+        request_rate_per_min  = record.get('request_rate_per_min', 0.0),
+        ids_ips_alert         = record.get('ids_ips_alert', ''),
+        asset_criticality     = record.get('asset_criticality', ''),
+        log_source            = record.get('log_source', ''),
+        firewall_action       = record.get('firewall_action', ''),
+        severity              = record.get('severity', ''),
+        has_threat_family     = record.get('has_threat_family', 0),
+        evidence_role         = record.get('evidence_role', 'unknown'),
+        os_family             = record.get('os_family', 'unknown'),
+        correlation_id        = record.get('correlation_id', 'unknown'),
+        mitre_techniques      = record.get('mitre_techniques', ''),
+        attack_type           = record.get('attack_type', ''),
+        attack_signature      = record.get('attack_signature', ''),
+        malware_indicator     = record.get('malware_indicator', ''),
+        label                 = record.get('label', ''),
+        predicted_class       = predicted_class,
+        risk_score            = calculate_risk_score(probabilities),
+        probabilities         = probabilities,
+        shap_values           = None,
+        created_by            = user,
+    )
+
+
 @login_required
 @analyst_required
 def upload_alerts_view(request):
-    context = {'processed': [], 'failed': [], 'error': None, 'summary': None}
-
     if request.method != 'POST':
-        return render(request, 'predictor/upload_alerts.html', context)
+        return render(request, 'predictor/upload_alerts.html', {})
 
-    file = request.FILES.get('file')
+    # ── Phase 2: procesar registros restantes desde sesión ───────────────
+    if request.POST.get('phase') == 'complete':
+        remaining = request.session.pop('upload_remaining_records', [])
+        total     = request.session.pop('upload_total_records', 0)
+        filename  = request.session.pop('upload_filename', '')
+        request.session.modified = True
 
-    if not file:
-        context['error'] = 'No se seleccionó ningún archivo.'
-        return render(request, 'predictor/upload_alerts.html', context)
+        if not remaining:
+            return JsonResponse({'saved': 0, 'failed': 0})
 
-    if file.size == 0:
-        context['error'] = 'El archivo está vacío.'
-        return render(request, 'predictor/upload_alerts.html', context)
+        try:
+            batch_results = predict_batch(remaining)
+        except Exception as exc:
+            log_error(request.user, 'upload_complete_predict', str(exc))
+            batch_results = None
 
-    if file.size > 10 * 1024 * 1024:
-        context['error'] = 'El archivo supera el límite de 10 MB.'
-        return render(request, 'predictor/upload_alerts.html', context)
-
-    filename = file.name.lower()
-
-    if filename.endswith('.json'):
-        records, error = _parse_json_file(file)
-        source = 'upload_json'
-    elif filename.endswith('.csv'):
-        records, error = _parse_csv_file(file)
-        source = 'upload_csv'
-    else:
-        context['error'] = f'Tipo de archivo no soportado: "{file.name}". Use .json o .csv.'
-        return render(request, 'predictor/upload_alerts.html', context)
-
-    if error:
-        context['error'] = error
-        return render(request, 'predictor/upload_alerts.html', context)
-
-    if not records:
-        context['error'] = 'El archivo no contiene registros.'
-        return render(request, 'predictor/upload_alerts.html', context)
-
-    processed = []
-    failed = []
-    error_count = 0
-
-    try:
-        # Fase 1 — validación y limpieza vectorizada con pandas
-        _, missing_cols = validate_columns(records)
-        if missing_cols:
-            context['error'] = f'El archivo no contiene las columnas requeridas: {", ".join(missing_cols)}'
-            return render(request, 'predictor/upload_alerts.html', context)
-
-        clean, stats = clean_records(records)
-
-        if not clean:
-            context['error'] = 'Ningún registro pasó la validación. Verificá el formato del archivo.'
-            return render(request, 'predictor/upload_alerts.html', context)
-
-        error_count = stats['duplicates_removed'] + stats['invalid_rows_removed']
-        if error_count > 0:
-            parts = []
-            if stats['duplicates_removed']:
-                parts.append(f'{stats["duplicates_removed"]} duplicados')
-            if stats['invalid_rows_removed']:
-                parts.append(f'{stats["invalid_rows_removed"]} con valores inválidos')
-            failed.append({
-                'record': '—',
-                'errors': f'Registros removidos durante limpieza: {", ".join(parts)}.',
-            })
-
-        valid_records = [(i + 1, rec, rec) for i, rec in enumerate(clean)]
-
-        if valid_records:
-            # Fase 2 — predicción en batch
-            valid_data_list = [d for _, _, d in valid_records]
+        instances    = []
+        failed_count = 0
+        for i, record in enumerate(remaining):
             try:
-                batch_results = predict_batch(valid_data_list)
+                if batch_results is not None:
+                    predicted_class, probabilities = batch_results[i]
+                else:
+                    predicted_class, probabilities = predict_alert(record)
+                instances.append(_build_alert_instance(record, predicted_class, probabilities, request.user))
             except Exception as exc:
-                log_error(request.user, 'upload_alerts', f'predict_batch falló, usando predict_alert por registro: {exc}')
-                batch_results = None
+                log_error(request.user, 'upload_complete_build', str(exc))
+                failed_count += 1
 
-            # Fase 3 — construir instancias Alert sin tocar la DB
-            alert_instances = []
-            pending_processed = []
-            for i, (index, record, data) in enumerate(valid_records):
-                try:
-                    if batch_results is not None:
-                        predicted_class, probabilities = batch_results[i]
-                    else:
-                        predicted_class, probabilities = predict_alert(data)
-                    risk_score = calculate_risk_score(probabilities)
-                    shap_data = None  # se calcula lazy al primer clic en SHAP
+        if instances:
+            try:
+                Alert.objects.bulk_create(instances, batch_size=500)
+            except Exception as exc:
+                log_error(request.user, 'upload_complete_bulk', str(exc))
+                failed_count += len(instances)
+                instances = []
 
-                    alert_instances.append(Alert(
-                        event_category=data.get('event_category', ''),
-                        protocol=data.get('protocol', ''),
-                        traffic_type=data.get('traffic_type', ''),
-                        mitre_tactic=data.get('mitre_tactic', ''),
-                        kill_chain_stage=data.get('kill_chain_stage', ''),
-                        failed_login_attempts=data.get('failed_login_attempts', 0),
-                        request_rate_per_min=data.get('request_rate_per_min', 0.0),
-                        ids_ips_alert=data.get('ids_ips_alert', ''),
-                        asset_criticality=data.get('asset_criticality', ''),
-                        log_source=data.get('log_source', ''),
-                        firewall_action=data.get('firewall_action', ''),
-                        severity=data.get('severity', ''),
-                        has_threat_family=data.get('has_threat_family', 0),
-                        evidence_role=data.get('evidence_role', 'unknown'),
-                        os_family=data.get('os_family', 'unknown'),
-                        correlation_id=data.get('correlation_id', 'unknown'),
-                        mitre_techniques=data.get('mitre_techniques', ''),
-                        attack_type=record.get('attack_type', ''),
-                        attack_signature=record.get('attack_signature', ''),
-                        malware_indicator=record.get('malware_indicator', ''),
-                        label=record.get('label', ''),
-                        predicted_class=predicted_class,
-                        risk_score=risk_score,
-                        probabilities=probabilities,
-                        shap_values=shap_data,
-                        created_by=request.user,
-                    ))
-                    pending_processed.append({'record': index, 'predicted_class': predicted_class, 'risk_score': risk_score})
-
-                except Exception as exc:
-                    log_error(request.user, 'upload_alerts', f'Registro #{index}: {exc}')
-                    failed.append({
-                        'record': index,
-                        'errors': {'_error': ['Error interno al procesar este registro. El resto del archivo se procesó normalmente.']},
-                    })
-
-            # Fase 4 — un único INSERT para todos los registros válidos
-            if alert_instances:
-                Alert.objects.bulk_create(alert_instances)
-                processed.extend(pending_processed)
-
-    except Exception as exc:
-        log_error(request.user, 'upload_alerts', str(exc))
-        context['error'] = (
-            'Ocurrió un error inesperado durante el procesamiento del archivo. '
-            'Verifique el formato e intente nuevamente.'
-        )
-        return render(request, 'predictor/upload_alerts.html', context)
-
-    if processed:
         log_action(
             request.user,
             ACTION_UPLOAD_ALERTS,
-            f'Archivo "{file.name}" subido: {len(processed)} alertas importadas, {error_count} con errores.',
+            f'Archivo "{filename}" completado: {total} alertas importadas.',
         )
-        messages.success(
-            request,
-            f'Alertas importadas: {len(processed)} de {len(records)} registros procesados correctamente.'
-        )
-        return redirect('alert_list')
+        return JsonResponse({'saved': len(instances), 'failed': failed_count})
 
-    context['processed'] = processed
-    context['failed'] = failed
-    context['summary'] = {
-        'file': file.name,
-        'total': len(records),
-        'ok': len(processed),
-        'errors': error_count,
-    }
-    return render(request, 'predictor/upload_alerts.html', context)
+    # ── Phase 1: parsear archivo, preview primeros N, guardar resto en sesión ─
+    file = request.FILES.get('file')
+    if not file:
+        return JsonResponse({'error': 'No se seleccionó ningún archivo.'}, status=400)
+    if file.size == 0:
+        return JsonResponse({'error': 'El archivo está vacío.'}, status=400)
+    if file.size > 10 * 1024 * 1024:
+        return JsonResponse({'error': 'El archivo supera el límite de 10 MB.'}, status=400)
+
+    fname = file.name.lower()
+    if fname.endswith('.json'):
+        records, error = _parse_json_file(file)
+    elif fname.endswith('.csv'):
+        records, error = _parse_csv_file(file)
+    else:
+        return JsonResponse({'error': f'Tipo de archivo no soportado: "{file.name}". Use .json o .csv.'}, status=400)
+
+    if error:
+        return JsonResponse({'error': error}, status=400)
+    if not records:
+        return JsonResponse({'error': 'El archivo no contiene registros.'}, status=400)
+
+    _, missing_cols = validate_columns(records)
+    if missing_cols:
+        return JsonResponse({'error': f'Faltan columnas requeridas: {", ".join(missing_cols)}'}, status=400)
+
+    clean, stats = clean_records(records)
+    if not clean:
+        return JsonResponse({'error': 'Ningún registro pasó la validación. Verificá el formato del archivo.'}, status=400)
+
+    preview_records   = clean[:_UPLOAD_PREVIEW_SIZE]
+    remaining_records = clean[_UPLOAD_PREVIEW_SIZE:]
+
+    try:
+        preview_batch = predict_batch(preview_records)
+    except Exception as exc:
+        log_error(request.user, 'upload_preview_predict', str(exc))
+        preview_batch = None
+
+    instances    = []
+    preview_data = []
+    for i, record in enumerate(preview_records):
+        try:
+            if preview_batch is not None:
+                predicted_class, probabilities = preview_batch[i]
+            else:
+                predicted_class, probabilities = predict_alert(record)
+            instances.append(_build_alert_instance(record, predicted_class, probabilities, request.user))
+            preview_data.append({
+                'record':          i + 1,
+                'predicted_class': predicted_class,
+                'risk_score':      round(calculate_risk_score(probabilities), 4),
+            })
+        except Exception as exc:
+            log_error(request.user, 'upload_preview_build', str(exc))
+
+    if instances:
+        Alert.objects.bulk_create(instances, batch_size=500)
+
+    request.session['upload_remaining_records'] = remaining_records
+    request.session['upload_total_records']     = len(clean)
+    request.session['upload_filename']          = file.name
+    request.session.modified = True
+
+    return JsonResponse({
+        'preview':       preview_data,
+        'total':         len(clean),
+        'preview_count': len(preview_data),
+        'remaining':     len(remaining_records),
+        'stats': {
+            'duplicates_removed':   stats.get('duplicates_removed', 0),
+            'invalid_rows_removed': stats.get('invalid_rows_removed', 0),
+        },
+    })
 
 
 def _friendly_serializer_errors(errors: dict) -> dict:
@@ -1067,7 +1060,7 @@ def pipeline_normalize_view(request):
 
         if alert_instances:
             try:
-                Alert.objects.bulk_create(alert_instances)
+                Alert.objects.bulk_create(alert_instances, batch_size=500)
                 saved_count = len(alert_instances)
             except Exception as exc:
                 log_error(request.user, 'pipeline_normalize_save', f'bulk_create: {exc}')

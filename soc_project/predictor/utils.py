@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import re
-import __main__
 import logging
 from pathlib import Path
 
@@ -12,21 +11,6 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR   = Path(__file__).resolve().parent
 MODEL_PATH = BASE_DIR / 'ml' / 'soc_model.pkl'
-
-
-class _CalibratedS2:
-    """
-    Wrapper Platt: raw RF probs → LogisticRegression sigmoid → calibrated probs.
-    Debe estar definida aquí e inyectada en __main__ antes de joblib.load()
-    porque fue serializada desde __main__ en train_model.py.
-    """
-    def __init__(self, rf, lr):
-        self.rf = rf
-        self.lr = lr
-        self.classes_ = lr.classes_
-
-    def predict_proba(self, X):
-        return self.lr.predict_proba(self.rf.predict_proba(X))
 
 
 # Lazy-loaded — se inicializan en _load_model() al primer uso
@@ -53,7 +37,6 @@ def _load_model() -> bool:
         logger.critical('soc_model.pkl no encontrado — modelo ML no disponible.')
         return False
     try:
-        __main__._CalibratedS2 = _CalibratedS2
         artifact         = joblib.load(MODEL_PATH)
         rf_s1            = artifact['model_s1']
         rf_s2_cal        = artifact['model_s2']
@@ -230,17 +213,20 @@ def _compute_anomaly_score(ids_ips_alert: str, severity: str, firewall_action: s
     Réplica exacta de la fórmula del pipeline de entrenamiento (regla 7).
     Opera sobre valores ya normalizados (post-mapeo).
 
-    Equivalencia con training:
+    Equivalencia con training (verificada contra dataset_soc_alertas_train.csv):
       0.40 * (LastVerdict == "Malicious")       → ids == "confirmed malicious indicator"
       0.20 * (LastVerdict == "Suspicious")      → ids == "suspicious pattern"
-      0.25 * (SuspicionLevel == "Incriminated") → severity == "critical"
+      0.25 * (SuspicionLevel == "Incriminated") → severity == "high"   ← NOT "critical"
       0.10 * (SuspicionLevel == "Suspicious")   → severity == "medium"
       0.05 * (ActionGrouped in [block, ...])    → firewall_action == "blocked"
+
+    Nota: severity="critical" en el dataset no corresponde a "Incriminated" —
+    contribuye 0 al anomaly_score, aunque sí aporta como feature categórica/ordinal.
     """
     return float(min(
         0.40 * (ids_ips_alert == 'confirmed malicious indicator') +
         0.20 * (ids_ips_alert == 'suspicious pattern') +
-        0.25 * (severity == 'critical') +
+        0.25 * (severity == 'high') +
         0.10 * (severity == 'medium') +
         0.05 * (firewall_action == 'blocked'),
         1.0,
@@ -374,6 +360,16 @@ def preprocess_input(data: dict) -> pd.DataFrame:
             df_enc['incident_has_confirmed'] * np.log1p(df_enc['incident_evidence_count'])
         ).astype(float)
 
+    # anomaly_z_score y anomaly_vs_max — espeja train_model.py; requieren incident features ya seteadas
+    if 'anomaly_z_score' in df_enc.columns:
+        inc_mean = float(df_enc['incident_mean_anomaly'].iloc[0]) if 'incident_mean_anomaly' in df_enc.columns else anomaly_score
+        inc_std  = float(df_enc['incident_std_anomaly'].iloc[0])  if 'incident_std_anomaly' in df_enc.columns else 0.0
+        df_enc['anomaly_z_score'] = float((anomaly_score - inc_mean) / (inc_std + 0.001))
+
+    if 'anomaly_vs_max' in df_enc.columns:
+        inc_max = float(df_enc['incident_max_anomaly'].iloc[0]) if 'incident_max_anomaly' in df_enc.columns else anomaly_score
+        df_enc['anomaly_vs_max'] = float(anomaly_score / (inc_max + 0.001))
+
     return df_enc
 
 
@@ -399,6 +395,7 @@ def preprocess_batch(records: list) -> pd.DataFrame:
             incident_evidence_count   = ('anomaly_score', 'count'),
             incident_max_anomaly      = ('anomaly_score', 'max'),
             incident_mean_anomaly     = ('anomaly_score', 'mean'),
+            incident_std_anomaly      = ('anomaly_score', 'std'),
             incident_category_count   = ('event_category', 'nunique'),
             incident_log_source_count = ('log_source', 'nunique'),
             incident_has_high_asset   = ('asset_criticality',
@@ -410,6 +407,7 @@ def preprocess_batch(records: list) -> pd.DataFrame:
         )
         .reset_index()
     )
+    agg['incident_std_anomaly'] = agg['incident_std_anomaly'].fillna(0.0)
     df_base = df_base.merge(agg, on='correlation_id', how='left')
 
     # Columnas MITRE binarias
@@ -439,7 +437,7 @@ def preprocess_batch(records: list) -> pd.DataFrame:
 
     # Sobreescribir incident features con los valores reales (ya están en df_enc desde agg)
     for col in ['incident_evidence_count', 'incident_max_anomaly', 'incident_mean_anomaly',
-                'incident_category_count', 'incident_log_source_count',
+                'incident_std_anomaly', 'incident_category_count', 'incident_log_source_count',
                 'incident_has_high_asset', 'incident_has_confirmed']:
         if col in df_base.columns and col in df_enc.columns:
             df_enc[col] = df_base[col].values
@@ -452,6 +450,18 @@ def preprocess_batch(records: list) -> pd.DataFrame:
     if 'incident_has_confirmed' in df_enc.columns and 'incident_evidence_count' in df_enc.columns:
         df_enc['confirmed_x_evidence'] = (
             df_enc['incident_has_confirmed'] * np.log1p(df_enc['incident_evidence_count'])
+        ).astype(float)
+
+    # anomaly_z_score y anomaly_vs_max — espeja train_model.py; requieren incident features reales
+    if all(c in df_enc.columns for c in ['anomaly_z_score', 'anomaly_score', 'incident_mean_anomaly', 'incident_std_anomaly']):
+        df_enc['anomaly_z_score'] = (
+            (df_enc['anomaly_score'] - df_enc['incident_mean_anomaly']) /
+            (df_enc['incident_std_anomaly'] + 0.001)
+        ).astype(float)
+
+    if all(c in df_enc.columns for c in ['anomaly_vs_max', 'anomaly_score', 'incident_max_anomaly']):
+        df_enc['anomaly_vs_max'] = (
+            df_enc['anomaly_score'] / (df_enc['incident_max_anomaly'] + 0.001)
         ).astype(float)
 
     return df_enc
@@ -543,7 +553,7 @@ def _get_shap_explainers():
     if _shap_exp_s1 is None:
         import shap
         _shap_exp_s1 = shap.TreeExplainer(rf_s1)
-        _shap_exp_s2 = shap.TreeExplainer(rf_s2_cal.rf)
+        _shap_exp_s2 = shap.TreeExplainer(rf_s2_cal)
     return _shap_exp_s1, _shap_exp_s2
 
 
@@ -584,19 +594,36 @@ def _display_feature_name(name: str) -> str:
     return name.replace('_', ' ').title()
 
 
+def _shap_row(sv, class_idx: int) -> np.ndarray:
+    """Normaliza los tres formatos que SHAP puede devolver:
+    - list of 2D arrays (nuevo, binario): sv[class_idx][0, :]
+    - ndarray 2D (n_samples, n_features): sv[0, :]  — clase positiva implícita
+    - ndarray 3D (n_samples, n_features, n_classes): sv[0, :, class_idx]
+    """
+    if isinstance(sv, list):
+        return np.asarray(sv[class_idx])[0, :]
+    sv = np.asarray(sv)
+    if sv.ndim == 2:
+        return sv[0, :]
+    return sv[0, :, class_idx]
+
+
+def _shap_base(expected_value, class_idx: int) -> float:
+    ev = np.asarray(expected_value)
+    if ev.ndim == 0:
+        return float(ev)
+    return float(ev.flat[class_idx])
+
+
 def calculate_shap_values(data: dict, top_n: int = 15) -> dict:
-    """
-    SHAP values for a single alert using the hierarchical model.
-    SHAP 0.51 returns sv of shape (n_samples, n_features, n_classes).
-    """
     if not _load_model():
         raise RuntimeError('Modelo ML no disponible. Verificá los logs para más detalles.')
     X = preprocess_input(data)
     exp_s1, exp_s2 = _get_shap_explainers()
 
-    sv_s1 = exp_s1.shap_values(X)
-    sv_mal = sv_s1[0, :, _idx_mal_s1]
-    base_s1 = float(exp_s1.expected_value[_idx_mal_s1])
+    sv_s1  = exp_s1.shap_values(X)
+    sv_mal = _shap_row(sv_s1, _idx_mal_s1)
+    base_s1 = _shap_base(exp_s1.expected_value, _idx_mal_s1)
 
     s1_features = sorted(
         [{'name': _display_feature_name(n), 'value': float(v), 'shap': float(s)}
@@ -605,10 +632,10 @@ def calculate_shap_values(data: dict, top_n: int = 15) -> dict:
         reverse=True,
     )[:top_n]
 
-    X_s2 = X[s2_columns]
-    sv_s2 = exp_s2.shap_values(X_s2)
-    sv_inv = sv_s2[0, :, _idx_inv_s2]
-    base_s2 = float(exp_s2.expected_value[_idx_inv_s2])
+    X_s2   = X[s2_columns]
+    sv_s2  = exp_s2.shap_values(X_s2)
+    sv_inv = _shap_row(sv_s2, _idx_inv_s2)
+    base_s2 = _shap_base(exp_s2.expected_value, _idx_inv_s2)
 
     s2_features = sorted(
         [{'name': _display_feature_name(n), 'value': float(v), 'shap': float(s)}
