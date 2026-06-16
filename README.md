@@ -20,7 +20,8 @@ Automates the classification and prioritization of cybersecurity alerts in Secur
 | Reporting | ReportLab, Matplotlib, OpenPyXL |
 | AI | Anthropic Claude API |
 | Frontend | Django Templates, Tailwind CSS |
-| Database | SQLite (development) |
+| Database | SQLite (development) · PostgreSQL (production) |
+| Deployment | Azure App Service · Gunicorn |
 
 ---
 
@@ -100,11 +101,24 @@ cp .env.example .env
 Edit `.env` at the project root:
 
 ```env
+# Django
 DJANGO_SECRET_KEY=your-secret-key-here
+DJANGO_DEBUG=True
+ALLOWED_HOSTS=
+
+# Anthropic
 ANTHROPIC_API_KEY=your-anthropic-api-key-here
+
+# PostgreSQL (leave DB_HOST empty to use SQLite in local development)
+DB_NAME=soc_db
+DB_USER=postgres
+DB_PASSWORD=your-db-password
+DB_HOST=
+DB_PORT=5432
 ```
 
-> The `ANTHROPIC_API_KEY` is required for the AI-assisted alert analysis feature.
+> `ANTHROPIC_API_KEY` is required for the AI-assisted alert analysis feature.  
+> Set `DB_HOST` only for PostgreSQL (production/Azure). Leave empty to use SQLite locally.
 
 ---
 
@@ -117,8 +131,8 @@ cd soc_project
 python manage.py migrate
 ```
 
-This single command does three things automatically:
-1. Creates the SQLite database schema
+This command does three things automatically:
+1. Creates the database schema (SQLite locally, PostgreSQL in production)
 2. Seeds the default users (see credentials below)
 3. **Trains the ML model** — if `predictor/ml/soc_model.pkl` does not exist, the model is trained from `dataset_soc_alertas_train.csv` automatically. This may take a few minutes on first run.
 
