@@ -21,3 +21,5 @@ reportlab==4.5.1
 lightgbm
 matplotlib==3.10.9
 django-tailwind==4.4.2
+psycopg2-binary==2.9.10
+gunicorn==23.0.0

@@ -460,7 +460,7 @@ def upload_alerts_view(request):
 
             # Fase 4 — un único INSERT para todos los registros válidos
             if alert_instances:
-                Alert.objects.bulk_create(alert_instances)
+                Alert.objects.bulk_create(alert_instances, batch_size=500)
                 processed.extend(pending_processed)
 
     except Exception as exc:
@@ -1067,7 +1067,7 @@ def pipeline_normalize_view(request):
 
         if alert_instances:
             try:
-                Alert.objects.bulk_create(alert_instances)
+                Alert.objects.bulk_create(alert_instances, batch_size=500)
                 saved_count = len(alert_instances)
             except Exception as exc:
                 log_error(request.user, 'pipeline_normalize_save', f'bulk_create: {exc}')
