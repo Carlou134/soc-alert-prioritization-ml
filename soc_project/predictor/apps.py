@@ -13,18 +13,20 @@ class PredictorConfig(AppConfig):
     name = 'predictor'
 
     def ready(self):
-        if _MODEL_PATH.exists():
-            logger.info('soc_model.pkl encontrado — entrenamiento omitido.')
-            return
+        if not _MODEL_PATH.exists():
+            if not _TRAIN_SCRIPT.exists():
+                logger.critical(f'train_model.py no encontrado en {_TRAIN_SCRIPT} — modelo no disponible.')
+                return
+            logger.warning('soc_model.pkl no encontrado — iniciando entrenamiento del modelo ML...')
+            import subprocess
+            try:
+                subprocess.run([sys.executable, str(_TRAIN_SCRIPT)], check=True)
+                logger.info('Modelo ML entrenado y guardado exitosamente.')
+            except subprocess.CalledProcessError as e:
+                logger.critical(f'Entrenamiento del modelo falló con código {e.returncode}.')
+                return
 
-        if not _TRAIN_SCRIPT.exists():
-            logger.critical(f'train_model.py no encontrado en {_TRAIN_SCRIPT} — modelo no disponible.')
-            return
-
-        logger.warning('soc_model.pkl no encontrado — iniciando entrenamiento del modelo ML...')
-        import subprocess
-        try:
-            subprocess.run([sys.executable, str(_TRAIN_SCRIPT)], check=True)
-            logger.info('Modelo ML entrenado y guardado exitosamente.')
-        except subprocess.CalledProcessError as e:
-            logger.critical(f'Entrenamiento del modelo falló con código {e.returncode}.')
+        from .utils import _load_model, _get_shap_explainers
+        if _load_model():
+            _get_shap_explainers()
+            logger.info('Modelo ML y explainers SHAP precargados en memoria.')
