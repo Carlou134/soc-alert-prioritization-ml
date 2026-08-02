@@ -107,6 +107,10 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
+# HU005 — sesión del navegador expira tras 1h de inactividad (no 1h fija desde el login)
+SESSION_COOKIE_AGE = 3600
+SESSION_SAVE_EVERY_REQUEST = True
+
 from datetime import timedelta
 
 REST_FRAMEWORK = {
