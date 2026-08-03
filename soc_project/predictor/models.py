@@ -35,14 +35,18 @@ class Dataset(models.Model):
     """Lote de alertas subido — antes los uploads no dejaban rastro de su origen (Track 1)."""
 
     STATUS_CHOICES = [
-        ('pending',   'Pendiente'),
-        ('processed', 'Procesado'),
-        ('failed',    'Fallido'),
+        ('pending',    'Pendiente'),
+        ('processing', 'Procesando'),
+        ('processed',  'Procesado'),
+        ('failed',     'Fallido'),
     ]
 
-    filename    = models.CharField(max_length=255)
-    row_count   = models.IntegerField(default=0)
-    status      = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    filename      = models.CharField(max_length=255)
+    row_count     = models.IntegerField(default=0)
+    saved_count   = models.IntegerField(default=0)
+    failed_count  = models.IntegerField(default=0)
+    error_message = models.TextField(blank=True, default='')
+    status        = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     uploaded_by = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name='datasets'
     )

@@ -23,6 +23,7 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
+    'django_q',
 
     'accounts',
     'predictor',
@@ -128,6 +129,20 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+# Cola de tareas en background (Track 5) — broker ORM, sin Redis (fuera de
+# presupuesto del plan de estudiante de Azure). Requiere `python manage.py
+# qcluster` corriendo aparte (local: segunda terminal; Azure: backgroundeado
+# en startup.sh, necesita "Always On" para correr de forma continua).
+Q_CLUSTER = {
+    'name': 'soc_alerts',
+    'workers': 2,
+    'timeout': 90,
+    'retry': 120,
+    'queue_limit': 50,
+    'bulk': 10,
+    'orm': 'default',
 }
 
 TAILWIND_APP_NAME = 'theme'

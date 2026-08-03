@@ -48,8 +48,10 @@ ASSIGNMENT_TARGETS = {
     'analyst_n1': ('analyst_n1', 'analyst_n2', 'trainee'),
     'trainee':    (),
 }
+from django_q.tasks import async_task
+
 from .forms import PredictionForm, JSONPredictionForm
-from .models import Alert, AlertWorkflow, Incident, PredictionLog, TurnoNota, log_error
+from .models import Alert, AlertWorkflow, Dataset, Incident, PredictionLog, TurnoNota, log_error
 from .utils import (
     predict_alert, predict_batch, extract_valid_fields, calculate_risk_score,
     calculate_shap_values, compute_shap_safe, get_active_model_version,
@@ -332,9 +334,6 @@ def alert_history_view(request):
     })
 
 
-_UPLOAD_PREVIEW_SIZE = 10
-
-
 def _build_alert_instance(record, predicted_class, probabilities, user):
     """Devuelve (alert, prediction_kwargs) — sin guardar.
 
@@ -416,51 +415,6 @@ def upload_alerts_view(request):
     if request.method != 'POST':
         return render(request, 'predictor/upload_alerts.html', {})
 
-    # ── Phase 2: procesar registros restantes desde sesión ───────────────
-    if request.POST.get('phase') == 'complete':
-        remaining = request.session.pop('upload_remaining_records', [])
-        total     = request.session.pop('upload_total_records', 0)
-        filename  = request.session.pop('upload_filename', '')
-        request.session.modified = True
-
-        if not remaining:
-            return JsonResponse({'saved': 0, 'failed': 0})
-
-        try:
-            batch_results = predict_batch(remaining)
-        except Exception as exc:
-            log_error(request.user, 'upload_complete_predict', str(exc))
-            batch_results = None
-
-        instances    = []
-        failed_count = 0
-        for i, record in enumerate(remaining):
-            try:
-                if batch_results is not None:
-                    predicted_class, probabilities = batch_results[i]
-                else:
-                    predicted_class, probabilities = predict_alert(record)
-                instances.append(_build_alert_instance(record, predicted_class, probabilities, request.user))
-            except Exception as exc:
-                log_error(request.user, 'upload_complete_build', str(exc))
-                failed_count += 1
-
-        if instances:
-            try:
-                _bulk_create_alerts(instances, request.user)
-            except Exception as exc:
-                log_error(request.user, 'upload_complete_bulk', str(exc))
-                failed_count += len(instances)
-                instances = []
-
-        log_action(
-            request.user,
-            ACTION_UPLOAD_ALERTS,
-            f'Archivo "{filename}" completado: {total} alertas importadas.',
-        )
-        return JsonResponse({'saved': len(instances), 'failed': failed_count})
-
-    # ── Phase 1: parsear archivo, preview primeros N, guardar resto en sesión ─
     file = request.FILES.get('file')
     if not file:
         return JsonResponse({'error': 'No se seleccionó ningún archivo.'}, status=400)
@@ -490,49 +444,44 @@ def upload_alerts_view(request):
     if not clean:
         return JsonResponse({'error': 'Ningún registro pasó la validación. Verificá el formato del archivo.'}, status=400)
 
-    preview_records   = clean[:_UPLOAD_PREVIEW_SIZE]
-    remaining_records = clean[_UPLOAD_PREVIEW_SIZE:]
+    dataset = Dataset.objects.create(
+        filename=file.name,
+        row_count=len(clean),
+        uploaded_by=request.user,
+    )
+    async_task('predictor.tasks.process_alert_batch', dataset.pk, clean, request.user.pk)
 
-    try:
-        preview_batch = predict_batch(preview_records)
-    except Exception as exc:
-        log_error(request.user, 'upload_preview_predict', str(exc))
-        preview_batch = None
-
-    instances    = []
-    preview_data = []
-    for i, record in enumerate(preview_records):
-        try:
-            if preview_batch is not None:
-                predicted_class, probabilities = preview_batch[i]
-            else:
-                predicted_class, probabilities = predict_alert(record)
-            instances.append(_build_alert_instance(record, predicted_class, probabilities, request.user))
-            preview_data.append({
-                'record':          i + 1,
-                'predicted_class': predicted_class,
-                'risk_score':      round(calculate_risk_score(probabilities), 4),
-            })
-        except Exception as exc:
-            log_error(request.user, 'upload_preview_build', str(exc))
-
-    if instances:
-        _bulk_create_alerts(instances, request.user)
-
-    request.session['upload_remaining_records'] = remaining_records
-    request.session['upload_total_records']     = len(clean)
-    request.session['upload_filename']          = file.name
-    request.session.modified = True
+    log_action(
+        request.user,
+        ACTION_UPLOAD_ALERTS,
+        (
+            f'Archivo "{file.name}" encolado para procesamiento en segundo plano '
+            f'({len(clean)} registros, dataset #{dataset.pk}).'
+        ),
+    )
 
     return JsonResponse({
-        'preview':       preview_data,
-        'total':         len(clean),
-        'preview_count': len(preview_data),
-        'remaining':     len(remaining_records),
+        'dataset_id': dataset.pk,
+        'total':      len(clean),
         'stats': {
             'duplicates_removed':   stats.get('duplicates_removed', 0),
             'invalid_rows_removed': stats.get('invalid_rows_removed', 0),
         },
+    })
+
+
+@login_required
+@analyst_required
+def dataset_status_view(request, pk):
+    """JSON de estado/progreso de un Dataset — usado por el polling de
+    upload_alerts.html y pipeline.html (Track 5)."""
+    dataset = get_object_or_404(Dataset, pk=pk)
+    return JsonResponse({
+        'status':        dataset.status,
+        'row_count':     dataset.row_count,
+        'saved_count':   dataset.saved_count,
+        'failed_count':  dataset.failed_count,
+        'error_message': dataset.error_message,
     })
 
 
@@ -1063,69 +1012,14 @@ def pipeline_normalize_view(request):
         request.session['pipeline_clean_records'] = clean
         request.session['pipeline_stats'] = stats
 
-        # Batch prediction — aprovecha correlation_id para features reales por incidente.
-        # Si falla (datos corruptos, columnas inesperadas), cae al fallback por registro.
-        try:
-            batch_results = predict_batch(clean)
-        except Exception as exc:
-            log_error(request.user, 'pipeline_normalize_predict', str(exc))
-            batch_results = None
+        dataset = Dataset.objects.create(
+            filename=filename,
+            row_count=len(clean),
+            uploaded_by=request.user,
+        )
+        async_task('predictor.tasks.process_alert_batch', dataset.pk, clean, request.user.pk)
 
-        saved_count = 0
-        failed_count = 0
-
-        alert_instances = []
-        for i, record in enumerate(clean):
-            try:
-                if batch_results is not None:
-                    predicted_class, probabilities = batch_results[i]
-                else:
-                    predicted_class, probabilities = predict_alert(record)
-                alert = Alert(
-                    event_category=record.get('event_category', ''),
-                    protocol=record.get('protocol', ''),
-                    traffic_type=record.get('traffic_type', ''),
-                    mitre_tactic=record.get('mitre_tactic', ''),
-                    kill_chain_stage=record.get('kill_chain_stage', ''),
-                    failed_login_attempts=int(record.get('failed_login_attempts') or 0),
-                    request_rate_per_min=float(record.get('request_rate_per_min') or 0.0),
-                    ids_ips_alert=record.get('ids_ips_alert', ''),
-                    asset_criticality=record.get('asset_criticality', ''),
-                    log_source=record.get('log_source', ''),
-                    firewall_action=record.get('firewall_action', ''),
-                    severity=record.get('severity', ''),
-                    has_threat_family=int(record.get('has_threat_family') or 0),
-                    evidence_role=record.get('evidence_role', 'unknown'),
-                    os_family=record.get('os_family', 'unknown'),
-                    correlation_id=record.get('correlation_id', 'unknown'),
-                    mitre_techniques=record.get('mitre_techniques', ''),
-                    attack_type=record.get('attack_type', ''),
-                    attack_signature=record.get('attack_signature', ''),
-                    malware_indicator=record.get('malware_indicator', ''),
-                    label=record.get('label', ''),
-                    created_by=request.user,
-                )
-                prediction_kwargs = {
-                    'predicted_class': predicted_class,
-                    'risk_score': calculate_risk_score(probabilities),
-                    'probabilities': probabilities,
-                    'shap_values': None,  # se calcula lazy al primer clic en SHAP
-                }
-                alert_instances.append((alert, prediction_kwargs))
-            except Exception as exc:
-                log_error(request.user, 'pipeline_normalize_save', str(exc))
-                failed_count += 1
-
-        if alert_instances:
-            try:
-                _bulk_create_alerts(alert_instances, request.user)
-                saved_count = len(alert_instances)
-            except Exception as exc:
-                log_error(request.user, 'pipeline_normalize_save', f'bulk_create: {exc}')
-                failed_count += len(alert_instances)
-
-        request.session['pipeline_saved_count'] = saved_count
-        request.session['pipeline_failed_count'] = failed_count
+        request.session['pipeline_dataset_id'] = dataset.pk
         request.session['pipeline_already_saved'] = True
         request.session.modified = True
 
@@ -1137,7 +1031,7 @@ def pipeline_normalize_view(request):
                 f'Registros procesados: {stats["total_clean"]}. '
                 f'Duplicados eliminados: {stats["duplicates_removed"]}. '
                 f'Nulos rellenados: {stats["nulls_filled"]}. '
-                f'Alertas guardadas: {saved_count}.'
+                f'Guardado en segundo plano (dataset #{dataset.pk}).'
             ),
         )
         return redirect('pipeline_preview')
@@ -1177,8 +1071,7 @@ def pipeline_preview_view(request):
         'required_cols': REQUIRED_COLUMNS,
         'preview_rows': preview_rows,
         'total_records': len(clean),
-        'saved_count': request.session.get('pipeline_saved_count', 0),
-        'failed_count': request.session.get('pipeline_failed_count', 0),
+        'dataset_id': request.session.get('pipeline_dataset_id'),
     })
 
 

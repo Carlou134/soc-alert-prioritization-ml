@@ -450,24 +450,61 @@
         </div>
         {% endif %}
 
-        <!-- Confirmación automática de guardado -->
-        {% if saved_count %}
-        <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-3 flex items-start gap-3">
-            <svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+        <!-- Progreso de guardado en segundo plano (Track 5) -->
+        {% if dataset_id %}
+        <div id="pipeline-save-status" class="bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-3 flex items-start gap-3">
+            <svg id="pipeline-save-icon" class="w-4 h-4 text-blue-400 mt-0.5 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
             </svg>
             <div>
-                <p class="text-sm font-semibold text-emerald-400">
-                    {{ saved_count }} alerta{{ saved_count|pluralize:"s" }} guardada{{ saved_count|pluralize:"s" }} en el sistema
-                </p>
-                <p class="text-xs text-emerald-300/70 mt-0.5">
-                    Clasificadas con ML y risk score asignado.
-                    {% if failed_count %}
-                    <span class="text-amber-400">{{ failed_count }} registro{{ failed_count|pluralize:"s" }} no pudo{{ failed_count|pluralize:"n" }} guardarse.</span>
-                    {% endif %}
+                <p id="pipeline-save-title" class="text-sm font-semibold text-blue-400">Guardando alertas en el sistema…</p>
+                <p id="pipeline-save-detail" class="text-xs text-slate-400 mt-0.5">
+                    Corre en segundo plano — puedes navegar sin perder los datos.
                 </p>
             </div>
         </div>
+        <script>
+        (function() {
+            const statusUrl = "{% url 'dataset_status' dataset_id %}";
+            const box    = document.getElementById('pipeline-save-status');
+            const icon   = document.getElementById('pipeline-save-icon');
+            const title  = document.getElementById('pipeline-save-title');
+            const detail = document.getElementById('pipeline-save-detail');
+
+            function poll() {
+                fetch(statusUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'processed') {
+                            box.classList.remove('bg-blue-500/10', 'border-blue-500/20');
+                            box.classList.add('bg-emerald-500/10', 'border-emerald-500/20');
+                            icon.classList.remove('animate-spin', 'text-blue-400');
+                            icon.classList.add('text-emerald-400');
+                            icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>';
+                            title.classList.remove('text-blue-400');
+                            title.classList.add('text-emerald-400');
+                            title.textContent = data.saved_count + ' alerta' + (data.saved_count === 1 ? '' : 's') + ' guardada' + (data.saved_count === 1 ? '' : 's') + ' en el sistema';
+                            detail.textContent = data.failed_count
+                                ? data.failed_count + ' registro(s) no pudieron guardarse.'
+                                : 'Clasificadas con ML y risk score asignado.';
+                        } else if (data.status === 'failed') {
+                            box.classList.remove('bg-blue-500/10', 'border-blue-500/20');
+                            box.classList.add('bg-red-500/10', 'border-red-500/20');
+                            icon.classList.remove('animate-spin', 'text-blue-400');
+                            icon.classList.add('text-red-400');
+                            title.classList.remove('text-blue-400');
+                            title.classList.add('text-red-400');
+                            title.textContent = 'No se pudo completar el guardado';
+                            detail.textContent = data.error_message || 'Ocurrió un error inesperado.';
+                        } else {
+                            setTimeout(poll, 2000);
+                        }
+                    })
+                    .catch(() => setTimeout(poll, 3000));
+            }
+            poll();
+        })();
+        </script>
         {% endif %}
 
         <!-- Descargar archivo (opcional) -->

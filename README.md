@@ -147,6 +147,25 @@ Open your browser at:
 http://127.0.0.1:8000/
 ```
 
+### 8. Run the background worker (required for alert uploads)
+
+Alert uploads (both the simple upload form and the normalization pipeline) are processed asynchronously via [django-q2](https://django-q2.readthedocs.io/), so predictions are saved even if you navigate away mid-upload. This needs its own process — open a **second terminal** (with the same virtualenv activated) and run:
+
+```bash
+cd soc_project
+python manage.py qcluster
+```
+
+Without this running, uploaded datasets stay stuck in `pending` status and never get classified or saved.
+
+> **Windows note:** `qcluster` spawns its workers via `multiprocessing`, and on Windows `Ctrl+C` doesn't always stop them cleanly — they can survive and keep `db.sqlite3` locked. If that happens, kill them by command line instead of by PID (PowerShell):
+>
+> ```powershell
+> Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
+>     Where-Object { $_.CommandLine -match 'qcluster' } |
+>     ForEach-Object { taskkill /F /T /PID $_.ProcessId }
+> ```
+
 ---
 
 ## 🔑 Default credentials
