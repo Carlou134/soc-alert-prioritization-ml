@@ -102,7 +102,7 @@
                 <tr class="hover:bg-slate-700/20 transition-colors">
                     <td class="px-4 py-3 text-slate-500 font-mono text-xs">{{ alert.pk }}</td>
                     <td class="px-4 py-3">
-                        {% if alert.is_resolved %}
+                        {% if alert.incident.is_resolved %}
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>Resuelto
                             </span>
@@ -113,16 +113,16 @@
                         {% endif %}
                     </td>
                     <td class="px-4 py-3">
-                        {% if alert.predicted_class == 'malicioso' %}
+                        {% if alert.latest_prediction.predicted_class == 'malicioso' %}
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/25">Malicioso</span>
-                        {% elif alert.predicted_class == 'a_investigar' %}
+                        {% elif alert.latest_prediction.predicted_class == 'a_investigar' %}
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/25">A investigar</span>
                         {% else %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-600/50 text-slate-400">{{ alert.predicted_class|default:"—" }}</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-600/50 text-slate-400">{{ alert.latest_prediction.predicted_class|default:"—" }}</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-3 font-mono text-xs {% if alert.risk_score >= 0.7 %}text-red-400{% elif alert.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
-                        {% if alert.risk_score is not None %}{{ alert.risk_score|floatformat:4 }}{% else %}—{% endif %}
+                    <td class="px-4 py-3 font-mono text-xs {% if alert.latest_prediction.risk_score >= 0.7 %}text-red-400{% elif alert.latest_prediction.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
+                        {% if alert.latest_prediction.risk_score is not None %}{{ alert.latest_prediction.risk_score|floatformat:4 }}{% else %}—{% endif %}
                     </td>
                     <td class="px-4 py-3">
                         <p class="text-slate-200 font-medium">{{ alert.event_category|default:"—" }}</p>
@@ -131,9 +131,9 @@
                         {% endif %}
                     </td>
                     <td class="px-4 py-3 text-slate-300 text-xs">{{ alert.mitre_tactic|default:"—" }}</td>
-                    <td class="px-4 py-3 text-slate-300 text-xs">{{ alert.escalated_by.username|default:"—" }}</td>
+                    <td class="px-4 py-3 text-slate-300 text-xs">{{ alert.incident.escalated_by.username|default:"—" }}</td>
                     <td class="px-4 py-3 text-slate-400 font-mono text-xs">
-                        {% if alert.escalated_at %}{{ alert.escalated_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+                        {% if alert.incident.escalated_at %}{{ alert.incident.escalated_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
                     </td>
                     <td class="px-4 py-3 text-right">
                         <a href="{% url 'incident_detail' alert.pk %}{% if query_string %}?back_qs={{ query_string|urlencode }}{% endif %}"

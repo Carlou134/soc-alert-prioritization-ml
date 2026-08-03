@@ -19,6 +19,7 @@ from django.utils import timezone
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, F, Q
 from django.db.models.functions import TruncDate
 from django.http import HttpResponse
@@ -48,8 +49,11 @@ ASSIGNMENT_TARGETS = {
     'trainee':    (),
 }
 from .forms import PredictionForm, JSONPredictionForm
-from .models import Alert, TurnoNota, log_error
-from .utils import predict_alert, predict_batch, extract_valid_fields, calculate_risk_score, calculate_shap_values, compute_shap_safe
+from .models import Alert, AlertWorkflow, Incident, PredictionLog, TurnoNota, log_error
+from .utils import (
+    predict_alert, predict_batch, extract_valid_fields, calculate_risk_score,
+    calculate_shap_values, compute_shap_safe, get_active_model_version,
+)
 from .pipeline import (
     REQUIRED_COLUMNS,
     OPTIONAL_COLUMNS,
@@ -78,12 +82,12 @@ def dashboard_view(request):
     alerts = Alert.objects.all()
 
     total_alerts     = alerts.count()
-    total_pending    = alerts.filter(predicted_class='').count()
-    total_malicioso  = alerts.filter(predicted_class='malicioso').count()
-    total_investigar = alerts.filter(predicted_class='a_investigar').count()
-    total_benigno    = alerts.filter(predicted_class='benigno').count()
+    total_pending    = alerts.filter(predictionlog__isnull=True).distinct().count()
+    total_malicioso  = alerts.filter(predictionlog__predicted_class='malicioso').distinct().count()
+    total_investigar = alerts.filter(predictionlog__predicted_class='a_investigar').distinct().count()
+    total_benigno    = alerts.filter(predictionlog__predicted_class='benigno').distinct().count()
 
-    recent_alerts = alerts.order_by('-created_at')[:6]
+    recent_alerts = alerts.select_related('workflow', 'incident').order_by('-created_at')[:6]
 
     tactic_qs = (
         alerts
@@ -234,8 +238,8 @@ def predict_json_view(request):
 def alert_history_view(request):
     qs = (
         Alert.objects
-        .exclude(predicted_class='')
-        .select_related('created_by', 'investigated_by', 'assigned_to', 'ml_evaluated_by')
+        .exclude(predictionlog__isnull=True)
+        .select_related('created_by', 'workflow', 'workflow__investigated_by', 'workflow__assigned_to', 'workflow__ml_evaluated_by')
         .order_by('-created_at')
     )
 
@@ -249,11 +253,11 @@ def alert_history_view(request):
 
     class_filter = request.GET.get('predicted_class', '').strip()
     if class_filter:
-        qs = qs.filter(predicted_class=class_filter)
+        qs = qs.filter(predictionlog__predicted_class=class_filter)
 
     status_filter = request.GET.get('investigation_status', '').strip()
     if status_filter:
-        qs = qs.filter(investigation_status=status_filter)
+        qs = qs.filter(workflow__investigation_status=status_filter)
 
     tactic_filter = request.GET.get('mitre_tactic', '').strip()
     if tactic_filter:
@@ -265,33 +269,34 @@ def alert_history_view(request):
 
     eval_filter = request.GET.get('ml_evaluation', '').strip()
     if eval_filter == '__none__':
-        qs = qs.filter(ml_evaluation='')
+        qs = qs.filter(workflow__ml_evaluation='')
     elif eval_filter:
-        qs = qs.filter(ml_evaluation=eval_filter)
+        qs = qs.filter(workflow__ml_evaluation=eval_filter)
 
     analyst_filter = request.GET.get('analyst', '').strip()
     if analyst_filter:
-        qs = qs.filter(investigated_by__username__icontains=analyst_filter)
+        qs = qs.filter(workflow__investigated_by__username__icontains=analyst_filter)
 
     priority_filter = request.GET.get('analyst_priority', '').strip()
     if priority_filter == 'none':
-        qs = qs.filter(analyst_priority='')
+        qs = qs.filter(workflow__analyst_priority='')
     elif priority_filter:
-        qs = qs.filter(analyst_priority=priority_filter)
+        qs = qs.filter(workflow__analyst_priority=priority_filter)
 
     risk_min = request.GET.get('risk_min', '').strip()
     risk_max = request.GET.get('risk_max', '').strip()
     try:
         if risk_min:
-            qs = qs.filter(risk_score__gte=float(risk_min))
+            qs = qs.filter(predictionlog__risk_score__gte=float(risk_min))
     except ValueError:
         risk_min = ''
     try:
         if risk_max:
-            qs = qs.filter(risk_score__lte=float(risk_max))
+            qs = qs.filter(predictionlog__risk_score__lte=float(risk_max))
     except ValueError:
         risk_max = ''
 
+    qs = qs.distinct()
     total_count = qs.count()
     paginator = Paginator(qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
@@ -320,9 +325,9 @@ def alert_history_view(request):
         'risk_min':         risk_min,
         'risk_max':         risk_max,
         'mitre_tactics':    mitre_tactics,
-        'status_choices':   Alert.INVESTIGATION_STATUS_CHOICES,
-        'eval_choices':     Alert.ML_EVALUATION_CHOICES,
-        'priority_choices': Alert.ANALYST_PRIORITY_CHOICES,
+        'status_choices':   AlertWorkflow.INVESTIGATION_STATUS_CHOICES,
+        'eval_choices':     AlertWorkflow.ML_EVALUATION_CHOICES,
+        'priority_choices': AlertWorkflow.ANALYST_PRIORITY_CHOICES,
         'query_string':     _p.urlencode(),
     })
 
@@ -331,7 +336,12 @@ _UPLOAD_PREVIEW_SIZE = 10
 
 
 def _build_alert_instance(record, predicted_class, probabilities, user):
-    return Alert(
+    """Devuelve (alert, prediction_kwargs) — sin guardar.
+
+    Los campos de predicción ya no viven en Alert (Track 1); se devuelven
+    aparte para construir el PredictionLog pareado en _bulk_create_alerts().
+    """
+    alert = Alert(
         event_category        = record.get('event_category', ''),
         protocol              = record.get('protocol', ''),
         traffic_type          = record.get('traffic_type', ''),
@@ -343,7 +353,7 @@ def _build_alert_instance(record, predicted_class, probabilities, user):
         asset_criticality     = record.get('asset_criticality', ''),
         log_source            = record.get('log_source', ''),
         firewall_action       = record.get('firewall_action', ''),
-        severity              = record.get('severity', ''),
+        severity               = record.get('severity', ''),
         has_threat_family     = record.get('has_threat_family', 0),
         evidence_role         = record.get('evidence_role', 'unknown'),
         os_family             = record.get('os_family', 'unknown'),
@@ -353,12 +363,51 @@ def _build_alert_instance(record, predicted_class, probabilities, user):
         attack_signature      = record.get('attack_signature', ''),
         malware_indicator     = record.get('malware_indicator', ''),
         label                 = record.get('label', ''),
-        predicted_class       = predicted_class,
-        risk_score            = calculate_risk_score(probabilities),
-        probabilities         = probabilities,
-        shap_values           = None,
         created_by            = user,
     )
+    prediction_kwargs = {
+        'predicted_class': predicted_class,
+        'risk_score': calculate_risk_score(probabilities),
+        'probabilities': probabilities,
+        'shap_values': None,
+    }
+    return alert, prediction_kwargs
+
+
+@transaction.atomic
+def _bulk_create_alerts(pairs, user):
+    """Crea Alert + AlertWorkflow pareado (siempre) + PredictionLog (si hubo predicción).
+
+    `pairs` es una lista de (alert, prediction_kwargs) sin guardar todavía.
+    bulk_create no dispara save()/señales, así que el pareo se arma a mano acá
+    en vez de depender de un hook automático. Devuelve los Alert ya guardados,
+    en el mismo orden que `pairs`.
+
+    @transaction.atomic a propósito: si algo falla a mitad de camino (ej.
+    get_active_model_version()), todo se revierte — nunca quedan Alert o
+    AlertWorkflow huérfanos sin su PredictionLog.
+    """
+    if not pairs:
+        return []
+
+    alerts = [alert for alert, _ in pairs]
+    created = Alert.objects.bulk_create(alerts, batch_size=500)
+
+    AlertWorkflow.objects.bulk_create(
+        [AlertWorkflow(alert=alert, created_by=alert.created_by) for alert in created],
+        batch_size=500,
+    )
+
+    model_version = get_active_model_version()
+    predictions = [
+        PredictionLog(alert=alert, model_version=model_version, **kwargs)
+        for alert, (_, kwargs) in zip(created, pairs)
+        if kwargs is not None
+    ]
+    if predictions:
+        PredictionLog.objects.bulk_create(predictions, batch_size=500)
+
+    return created
 
 
 @login_required
@@ -398,7 +447,7 @@ def upload_alerts_view(request):
 
         if instances:
             try:
-                Alert.objects.bulk_create(instances, batch_size=500)
+                _bulk_create_alerts(instances, request.user)
             except Exception as exc:
                 log_error(request.user, 'upload_complete_bulk', str(exc))
                 failed_count += len(instances)
@@ -468,7 +517,7 @@ def upload_alerts_view(request):
             log_error(request.user, 'upload_preview_build', str(exc))
 
     if instances:
-        Alert.objects.bulk_create(instances, batch_size=500)
+        _bulk_create_alerts(instances, request.user)
 
     request.session['upload_remaining_records'] = remaining_records
     request.session['upload_total_records']     = len(clean)
@@ -518,13 +567,17 @@ def _friendly_serializer_errors(errors: dict) -> dict:
 def alert_list_view(request):
     is_admin = request.user.profile.is_admin
     role     = request.user.profile.role
-    qs = Alert.objects.select_related('created_by', 'assigned_to').filter(is_incident=False)
+    qs = (
+        Alert.objects
+        .select_related('created_by', 'workflow', 'workflow__assigned_to')
+        .filter(incident__isnull=True)
+    )
 
     # Filtros automáticos por rol — no pueden ser sobreescritos por el usuario
     if role in ('analyst_n1', 'trainee'):
-        qs = qs.filter(predicted_class='benigno')
+        qs = qs.filter(predictionlog__predicted_class='benigno')
     elif role == 'analyst_n2':
-        qs = qs.exclude(predicted_class__in=('benigno', ''))
+        qs = qs.exclude(predictionlog__isnull=True).exclude(predictionlog__predicted_class='benigno')
 
     # Toggle "Mis alertas" / "Todas las alertas"
     mine = request.GET.get('mine', '').strip()
@@ -551,21 +604,21 @@ def alert_list_view(request):
     # Filtro por clase ML ('pending' → sin clasificar)
     class_filter = request.GET.get('predicted_class', '').strip()
     if class_filter == 'pending':
-        qs = qs.filter(predicted_class='')
+        qs = qs.filter(predictionlog__isnull=True)
     elif class_filter:
-        qs = qs.filter(predicted_class=class_filter)
+        qs = qs.filter(predictionlog__predicted_class=class_filter)
 
     # Filtro por estado de investigación
     status_filter = request.GET.get('investigation_status', '').strip()
     if status_filter:
-        qs = qs.filter(investigation_status=status_filter)
+        qs = qs.filter(workflow__investigation_status=status_filter)
 
     # Filtro por prioridad del analista ('none' → sin ajuste)
     priority_filter = request.GET.get('analyst_priority', '').strip()
     if priority_filter == 'none':
-        qs = qs.filter(analyst_priority='')
+        qs = qs.filter(workflow__analyst_priority='')
     elif priority_filter:
-        qs = qs.filter(analyst_priority=priority_filter)
+        qs = qs.filter(workflow__analyst_priority=priority_filter)
 
     # Filtro por usuario: admins pueden filtrar por cualquier usuario;
     # usuarios normales solo pueden aplicar el toggle "mine"
@@ -585,27 +638,27 @@ def alert_list_view(request):
     risk_max = request.GET.get('risk_max', '').strip()
     try:
         if risk_min:
-            qs = qs.filter(risk_score__gte=float(risk_min))
+            qs = qs.filter(predictionlog__risk_score__gte=float(risk_min))
     except ValueError:
         risk_min = ''
     try:
         if risk_max:
-            qs = qs.filter(risk_score__lte=float(risk_max))
+            qs = qs.filter(predictionlog__risk_score__lte=float(risk_max))
     except ValueError:
         risk_max = ''
 
     assigned_filter = request.GET.get('assigned_to', '').strip()
     if assigned_filter:
-        qs = qs.filter(assigned_to__username__icontains=assigned_filter)
+        qs = qs.filter(workflow__assigned_to__username__icontains=assigned_filter)
 
     order = request.GET.get('order', 'date_desc').strip()
     _order_map = {
-        'risk_desc': F('risk_score').desc(nulls_last=True),
-        'risk_asc':  F('risk_score').asc(nulls_last=True),
+        'risk_desc': F('predictionlog__risk_score').desc(nulls_last=True),
+        'risk_asc':  F('predictionlog__risk_score').asc(nulls_last=True),
         'date_desc': '-created_at',
         'date_asc':  'created_at',
     }
-    qs = qs.order_by(_order_map.get(order, '-created_at'))
+    qs = qs.order_by(_order_map.get(order, '-created_at')).distinct()
 
     severity_choices = (
         Alert.objects.values_list('severity', flat=True)
@@ -614,10 +667,10 @@ def alert_list_view(request):
     )
 
     # Contador de alertas pendientes (sin clasificar) para mostrar el botón
-    pending_base = Alert.objects.filter(predicted_class='')
+    pending_base = Alert.objects.filter(predictionlog__isnull=True)
     if not is_admin:
         pending_base = pending_base.filter(created_by=request.user)
-    pending_count = pending_base.count()
+    pending_count = pending_base.distinct().count()
 
     paginator = Paginator(qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
@@ -658,11 +711,12 @@ def predict_pending_view(request):
         return redirect('alert_list')
 
     is_admin = request.user.profile.is_admin
-    qs = Alert.objects.filter(predicted_class='')
+    qs = Alert.objects.filter(predictionlog__isnull=True).distinct()
     if not is_admin:
         qs = qs.filter(created_by=request.user)
 
     classified = 0
+    model_version = get_active_model_version()
     for alert in qs.iterator():
         data = {
             'event_category'        : alert.event_category,
@@ -685,11 +739,14 @@ def predict_pending_view(request):
         }
         try:
             predicted_class, probabilities = predict_alert(data)
-            alert.predicted_class = predicted_class
-            alert.risk_score = calculate_risk_score(probabilities)
-            alert.probabilities = probabilities
-            alert.shap_values = compute_shap_safe(data)
-            alert.save(update_fields=['predicted_class', 'risk_score', 'probabilities', 'shap_values'])
+            PredictionLog.objects.create(
+                alert=alert,
+                model_version=model_version,
+                predicted_class=predicted_class,
+                risk_score=calculate_risk_score(probabilities),
+                probabilities=probabilities,
+                shap_values=compute_shap_safe(data),
+            )
             classified += 1
         except Exception as exc:
             log_error(request.user, 'predict_pending', str(exc))
@@ -1024,9 +1081,7 @@ def pipeline_normalize_view(request):
                     predicted_class, probabilities = batch_results[i]
                 else:
                     predicted_class, probabilities = predict_alert(record)
-                risk_score = calculate_risk_score(probabilities)
-                shap_data = None  # se calcula lazy al primer clic en SHAP
-                alert_instances.append(Alert(
+                alert = Alert(
                     event_category=record.get('event_category', ''),
                     protocol=record.get('protocol', ''),
                     traffic_type=record.get('traffic_type', ''),
@@ -1048,19 +1103,22 @@ def pipeline_normalize_view(request):
                     attack_signature=record.get('attack_signature', ''),
                     malware_indicator=record.get('malware_indicator', ''),
                     label=record.get('label', ''),
-                    predicted_class=predicted_class,
-                    risk_score=risk_score,
-                    probabilities=probabilities,
-                    shap_values=shap_data,
                     created_by=request.user,
-                ))
+                )
+                prediction_kwargs = {
+                    'predicted_class': predicted_class,
+                    'risk_score': calculate_risk_score(probabilities),
+                    'probabilities': probabilities,
+                    'shap_values': None,  # se calcula lazy al primer clic en SHAP
+                }
+                alert_instances.append((alert, prediction_kwargs))
             except Exception as exc:
                 log_error(request.user, 'pipeline_normalize_save', str(exc))
                 failed_count += 1
 
         if alert_instances:
             try:
-                Alert.objects.bulk_create(alert_instances, batch_size=500)
+                _bulk_create_alerts(alert_instances, request.user)
                 saved_count = len(alert_instances)
             except Exception as exc:
                 log_error(request.user, 'pipeline_normalize_save', f'bulk_create: {exc}')
@@ -1177,10 +1235,10 @@ def alert_set_status_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-    alert = get_object_or_404(Alert, pk=pk)
+    alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
 
     profile = request.user.profile
-    if profile.is_trainee and alert.assigned_to_id != request.user.pk:
+    if profile.is_trainee and alert.workflow.assigned_to_id != request.user.pk:
         return JsonResponse({'error': 'No tenés permisos para modificar esta alerta.'}, status=403)
 
     try:
@@ -1195,11 +1253,12 @@ def alert_set_status_view(request, pk):
     if status_value not in valid:
         return JsonResponse({'error': 'Estado inválido'}, status=400)
 
-    alert.investigation_status = status_value
-    alert.investigation_notes  = notes
-    alert.investigated_by      = request.user
-    alert.investigated_at      = timezone.now()
-    alert.save(update_fields=[
+    workflow = alert.workflow
+    workflow.investigation_status = status_value
+    workflow.investigation_notes  = notes
+    workflow.investigated_by      = request.user
+    workflow.investigated_at      = timezone.now()
+    workflow.save(update_fields=[
         'investigation_status', 'investigation_notes',
         'investigated_by', 'investigated_at',
     ])
@@ -1208,7 +1267,7 @@ def alert_set_status_view(request, pk):
         'ok':       True,
         'status':   status_value,
         'by':       request.user.username,
-        'at':       alert.investigated_at.strftime('%Y-%m-%d %H:%M'),
+        'at':       workflow.investigated_at.strftime('%Y-%m-%d %H:%M'),
     })
 
 
@@ -1219,7 +1278,7 @@ def alert_set_priority_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-    alert = get_object_or_404(Alert, pk=pk)
+    alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
 
     try:
         data = json.loads(request.body)
@@ -1232,9 +1291,10 @@ def alert_set_priority_view(request, pk):
     if priority not in {'', 'low', 'medium', 'high', 'critical'}:
         return JsonResponse({'error': 'Prioridad inválida'}, status=400)
 
-    alert.analyst_priority = priority
-    alert.analyst_note     = note
-    alert.save(update_fields=['analyst_priority', 'analyst_note'])
+    workflow = alert.workflow
+    workflow.analyst_priority = priority
+    workflow.analyst_note     = note
+    workflow.save(update_fields=['analyst_priority', 'analyst_note'])
 
     return JsonResponse({'ok': True, 'priority': priority})
 
@@ -1244,13 +1304,14 @@ def alert_shap_view(request, pk):
     from django.shortcuts import get_object_or_404
     import json as _json
 
-    alert = get_object_or_404(Alert, pk=pk)
+    alert = get_object_or_404(Alert.objects.select_related('workflow', 'incident'), pk=pk)
 
-    if not alert.predicted_class:
+    prediction = alert.latest_prediction
+    if prediction is None:
         messages.warning(request, 'Esta alerta no está clasificada. Clasificala primero para ver la explicabilidad.')
         return redirect('alert_list')
 
-    shap_data = alert.shap_values
+    shap_data = prediction.shap_values
 
     if shap_data is None:
         data = {
@@ -1273,8 +1334,8 @@ def alert_shap_view(request, pk):
             'mitre_techniques'     : alert.mitre_techniques,
         }
         shap_data = calculate_shap_values(data)
-        alert.shap_values = shap_data
-        alert.save(update_fields=['shap_values'])
+        prediction.shap_values = shap_data
+        prediction.save(update_fields=['shap_values'])
 
     user_role = request.user.profile.role
     allowed_roles = ASSIGNMENT_TARGETS.get(user_role, ())
@@ -1289,8 +1350,8 @@ def alert_shap_view(request, pk):
     can_evaluate = request.user.profile.role in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1')
     can_escalate = (
         user_role in ('admin', 'analyst_n2')
-        and not alert.is_incident
-        and alert.predicted_class in ('malicioso', 'a_investigar')
+        and alert.incident_id is None
+        and prediction.predicted_class in ('malicioso', 'a_investigar')
     )
     readonly     = request.GET.get('readonly') == '1'
 
@@ -1312,14 +1373,15 @@ def alert_shap_view(request, pk):
 
     return render(request, 'predictor/alert_shap.html', {
         'alert'              : alert,
+        'prediction'         : prediction,
         'shap_s1'            : _json.dumps(shap_data['s1']),
         'shap_s2'            : _json.dumps(shap_data['s2']),
-        'status_choices'     : Alert.INVESTIGATION_STATUS_CHOICES,
-        'evaluation_choices' : Alert.ML_EVALUATION_CHOICES,
+        'status_choices'     : AlertWorkflow.INVESTIGATION_STATUS_CHOICES,
+        'evaluation_choices' : AlertWorkflow.ML_EVALUATION_CHOICES,
         'can_assign'         : bool(allowed_roles),
         'assignable_users'   : assignable_users,
         'is_trainee'         : is_trainee,
-        'assigned_to_me'     : alert.assigned_to_id == request.user.pk,
+        'assigned_to_me'     : alert.workflow.assigned_to_id == request.user.pk,
         'can_evaluate'       : can_evaluate,
         'can_escalate'       : can_escalate,
         'readonly'           : readonly,
@@ -1330,6 +1392,7 @@ def alert_shap_view(request, pk):
 
 @login_required
 async def alert_explain_view(request, pk):
+    from asgiref.sync import sync_to_async
     from .claude_service import generate_shap_explanation_async
 
     if request.method != 'POST':
@@ -1340,19 +1403,20 @@ async def alert_explain_view(request, pk):
     except Alert.DoesNotExist:
         return JsonResponse({'error': 'Alerta no encontrada.'}, status=404)
 
-    if not alert.predicted_class:
+    prediction = await sync_to_async(lambda: alert.latest_prediction)()
+    if prediction is None:
         return JsonResponse({'error': 'La alerta no está clasificada.'}, status=400)
 
-    if not alert.shap_values:
+    if not prediction.shap_values:
         return JsonResponse({'error': 'Esta alerta no tiene valores SHAP calculados.'}, status=400)
 
-    if alert.shap_explanation:
-        return JsonResponse({'explanation': alert.shap_explanation, 'cached': True})
+    if prediction.shap_explanation:
+        return JsonResponse({'explanation': prediction.shap_explanation, 'cached': True})
 
     try:
-        explanation = await generate_shap_explanation_async(alert)
-        alert.shap_explanation = explanation
-        await alert.asave(update_fields=['shap_explanation'])
+        explanation = await generate_shap_explanation_async(alert, prediction)
+        prediction.shap_explanation = explanation
+        await prediction.asave(update_fields=['shap_explanation'])
         return JsonResponse({'explanation': explanation, 'cached': False})
     except Exception as exc:
         return JsonResponse({'error': f'Error al generar la explicación: {exc}'}, status=500)
@@ -1364,7 +1428,7 @@ def alert_assign_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-    alert = get_object_or_404(Alert, pk=pk)
+    alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
     assigner_role = request.user.profile.role
     allowed_roles = ASSIGNMENT_TARGETS.get(assigner_role, ())
 
@@ -1374,10 +1438,11 @@ def alert_assign_view(request, pk):
         return JsonResponse({'error': 'JSON inválido'}, status=400)
 
     assigned_to_id = data.get('assigned_to')
+    workflow = alert.workflow
 
     if not assigned_to_id:
-        alert.assigned_to = None
-        alert.save(update_fields=['assigned_to'])
+        workflow.assigned_to = None
+        workflow.save(update_fields=['assigned_to'])
         log_action(request.user, ACTION_ALERT_ASSIGNED, f'Alerta #{pk} desasignada.')
         return JsonResponse({'ok': True, 'assigned_to': None, 'username': ''})
 
@@ -1387,8 +1452,8 @@ def alert_assign_view(request, pk):
     if target_profile is None or target_profile.role not in allowed_roles:
         return JsonResponse({'error': 'No tenés permisos para asignar a ese analista.'}, status=403)
 
-    alert.assigned_to = target_user
-    alert.save(update_fields=['assigned_to'])
+    workflow.assigned_to = target_user
+    workflow.save(update_fields=['assigned_to'])
     log_action(
         request.user,
         ACTION_ALERT_ASSIGNED,
@@ -1410,9 +1475,9 @@ def alert_evaluate_view(request, pk):
     if profile.role not in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1'):
         return JsonResponse({'error': 'No tenés permisos para evaluar decisiones ML.'}, status=403)
 
-    alert = get_object_or_404(Alert, pk=pk)
+    alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
 
-    if not alert.predicted_class:
+    if alert.latest_prediction is None:
         return JsonResponse({'error': 'La alerta no está clasificada aún.'}, status=400)
 
     try:
@@ -1427,15 +1492,16 @@ def alert_evaluate_view(request, pk):
     if evaluation not in valid:
         return JsonResponse({'error': 'Evaluación inválida.'}, status=400)
 
-    alert.ml_evaluation       = evaluation
-    alert.ml_evaluation_notes = notes
-    alert.ml_evaluated_by     = request.user
-    alert.ml_evaluated_at     = timezone.now()
-    alert.save(update_fields=[
+    workflow = alert.workflow
+    workflow.ml_evaluation       = evaluation
+    workflow.ml_evaluation_notes = notes
+    workflow.ml_evaluated_by     = request.user
+    workflow.ml_evaluated_at     = timezone.now()
+    workflow.save(update_fields=[
         'ml_evaluation', 'ml_evaluation_notes', 'ml_evaluated_by', 'ml_evaluated_at',
     ])
 
-    LABELS = dict(Alert.ML_EVALUATION_CHOICES)
+    LABELS = dict(AlertWorkflow.ML_EVALUATION_CHOICES)
     log_action(
         request.user,
         ACTION_ALERT_EVALUATED,
@@ -1447,7 +1513,7 @@ def alert_evaluate_view(request, pk):
         'evaluation': evaluation,
         'label':      LABELS[evaluation],
         'by':         request.user.username,
-        'at':         alert.ml_evaluated_at.strftime('%Y-%m-%d %H:%M'),
+        'at':         workflow.ml_evaluated_at.strftime('%Y-%m-%d %H:%M'),
     })
 
 
@@ -1474,7 +1540,7 @@ def _build_report_queryset(params):
 
     predicted_class = params.get('predicted_class', '').strip()
     if predicted_class:
-        qs = qs.filter(predicted_class=predicted_class)
+        qs = qs.filter(predictionlog__predicted_class=predicted_class)
 
     severity = params.get('severity', '').strip()
     if severity:
@@ -1482,29 +1548,29 @@ def _build_report_queryset(params):
 
     investigation_status = params.get('investigation_status', '').strip()
     if investigation_status:
-        qs = qs.filter(investigation_status=investigation_status)
+        qs = qs.filter(workflow__investigation_status=investigation_status)
 
     ml_evaluation = params.get('ml_evaluation', '').strip()
     if ml_evaluation == '__none__':
-        qs = qs.filter(ml_evaluation='')
+        qs = qs.filter(workflow__ml_evaluation='')
     elif ml_evaluation:
-        qs = qs.filter(ml_evaluation=ml_evaluation)
+        qs = qs.filter(workflow__ml_evaluation=ml_evaluation)
 
     analyst_priority = params.get('analyst_priority', '').strip()
     if analyst_priority == 'none':
-        qs = qs.filter(analyst_priority='')
+        qs = qs.filter(workflow__analyst_priority='')
     elif analyst_priority:
-        qs = qs.filter(analyst_priority=analyst_priority)
+        qs = qs.filter(workflow__analyst_priority=analyst_priority)
 
-    return qs
+    return qs.distinct()
 
 
 def _build_report_summary(qs):
     total     = qs.count()
-    by_class  = dict(qs.values_list('predicted_class').annotate(n=Count('id')).order_by())
-    by_status = dict(qs.values_list('investigation_status').annotate(n=Count('id')).order_by())
-    by_sev    = dict(qs.values_list('severity').annotate(n=Count('id')).order_by())
-    by_eval   = dict(qs.exclude(ml_evaluation='').values_list('ml_evaluation').annotate(n=Count('id')).order_by())
+    by_class  = dict(qs.values_list('predictionlog__predicted_class').annotate(n=Count('id', distinct=True)).order_by())
+    by_status = dict(qs.values_list('workflow__investigation_status').annotate(n=Count('id', distinct=True)).order_by())
+    by_sev    = dict(qs.values_list('severity').annotate(n=Count('id', distinct=True)).order_by())
+    by_eval   = dict(qs.exclude(workflow__ml_evaluation='').values_list('workflow__ml_evaluation').annotate(n=Count('id', distinct=True)).order_by())
     return {
         'total':       total,
         'by_class':    by_class,
@@ -1518,17 +1584,17 @@ def _build_report_summary(qs):
 def _compute_executive_kpis(qs):
     total = qs.count()
     noise_count = qs.filter(
-        Q(predicted_class='benigno') | Q(investigation_status='false_positive')
-    ).count()
+        Q(predictionlog__predicted_class='benigno') | Q(workflow__investigation_status='false_positive')
+    ).distinct().count()
     noise_pct = round(noise_count / total * 100, 1) if total > 0 else 0.0
 
     matrix = {}
     for row in (
-        qs.exclude(ml_evaluation='')
-          .values('predicted_class', 'ml_evaluation')
-          .annotate(n=Count('id'))
+        qs.exclude(workflow__ml_evaluation='')
+          .values('predictionlog__predicted_class', 'workflow__ml_evaluation')
+          .annotate(n=Count('id', distinct=True))
     ):
-        matrix[(row['predicted_class'] or '', row['ml_evaluation'])] = row['n']
+        matrix[(row['predictionlog__predicted_class'] or '', row['workflow__ml_evaluation'])] = row['n']
 
     return {
         'total': total,
@@ -1536,7 +1602,7 @@ def _compute_executive_kpis(qs):
         'noise_pct': noise_pct,
         'manually_reviewed': total - noise_count,
         'matrix': matrix,
-        'evaluated_count': qs.exclude(ml_evaluation='').count(),
+        'evaluated_count': qs.exclude(workflow__ml_evaluation='').distinct().count(),
     }
 
 
@@ -1614,7 +1680,7 @@ def report_view(request):
     qs = _build_report_queryset(params)
     summary = _build_report_summary(qs)
 
-    alerts_page = Paginator(qs.select_related('created_by', 'assigned_to'), 10).get_page(
+    alerts_page = Paginator(qs.select_related('created_by', 'workflow', 'workflow__assigned_to'), 10).get_page(
         params.get('page')
     )
 
@@ -1631,11 +1697,11 @@ def report_view(request):
 
     status_breakdown = [
         (label, summary['by_status'].get(val, 0))
-        for val, label in Alert.INVESTIGATION_STATUS_CHOICES
+        for val, label in AlertWorkflow.INVESTIGATION_STATUS_CHOICES
     ]
     eval_breakdown = [
         (label, summary['by_eval'].get(val, 0))
-        for val, label in Alert.ML_EVALUATION_CHOICES
+        for val, label in AlertWorkflow.ML_EVALUATION_CHOICES
     ]
 
     return render(request, 'predictor/reports.html', {
@@ -1644,9 +1710,9 @@ def report_view(request):
         'params':            params,
         'severities':        severities,
         'class_choices':     class_choices,
-        'status_choices':    Alert.INVESTIGATION_STATUS_CHOICES,
-        'eval_choices':      Alert.ML_EVALUATION_CHOICES,
-        'priority_choices':  Alert.ANALYST_PRIORITY_CHOICES,
+        'status_choices':    AlertWorkflow.INVESTIGATION_STATUS_CHOICES,
+        'eval_choices':      AlertWorkflow.ML_EVALUATION_CHOICES,
+        'priority_choices':  AlertWorkflow.ANALYST_PRIORITY_CHOICES,
         'status_breakdown':  status_breakdown,
         'eval_breakdown':    eval_breakdown,
         'query_string':      _qs_params.urlencode(),
@@ -1679,11 +1745,13 @@ def report_export_excel_view(request):
         cell.font   = header_font
         cell.alignment = center_align
 
-    STATUS_LABELS = dict(Alert.INVESTIGATION_STATUS_CHOICES)
-    PRIORITY_LABELS = dict(Alert.ANALYST_PRIORITY_CHOICES)
-    EVAL_LABELS = dict(Alert.ML_EVALUATION_CHOICES)
+    STATUS_LABELS = dict(AlertWorkflow.INVESTIGATION_STATUS_CHOICES)
+    PRIORITY_LABELS = dict(AlertWorkflow.ANALYST_PRIORITY_CHOICES)
+    EVAL_LABELS = dict(AlertWorkflow.ML_EVALUATION_CHOICES)
 
-    for alert in qs.select_related('created_by', 'assigned_to'):
+    for alert in qs.select_related('created_by', 'workflow', 'workflow__assigned_to'):
+        prediction = alert.latest_prediction
+        workflow = alert.workflow
         ws.append([
             alert.pk,
             alert.created_at.strftime('%Y-%m-%d %H:%M') if alert.created_at else '',
@@ -1691,12 +1759,12 @@ def report_export_excel_view(request):
             alert.protocol,
             alert.mitre_tactic,
             alert.severity,
-            alert.predicted_class or 'Sin clasificar',
-            round(alert.risk_score, 4) if alert.risk_score is not None else '',
-            STATUS_LABELS.get(alert.investigation_status, alert.investigation_status),
-            PRIORITY_LABELS.get(alert.analyst_priority, '') if alert.analyst_priority else '',
-            EVAL_LABELS.get(alert.ml_evaluation, '') if alert.ml_evaluation else 'Sin evaluar',
-            alert.assigned_to.username if alert.assigned_to else '',
+            prediction.predicted_class if prediction else 'Sin clasificar',
+            round(prediction.risk_score, 4) if prediction and prediction.risk_score is not None else '',
+            STATUS_LABELS.get(workflow.investigation_status, workflow.investigation_status),
+            PRIORITY_LABELS.get(workflow.analyst_priority, '') if workflow.analyst_priority else '',
+            EVAL_LABELS.get(workflow.ml_evaluation, '') if workflow.ml_evaluation else 'Sin evaluar',
+            workflow.assigned_to.username if workflow.assigned_to else '',
             alert.created_by.username if alert.created_by else '',
         ])
 
@@ -1776,8 +1844,8 @@ def report_export_pdf_view(request):
     story.append(Paragraph('Resumen ejecutivo', section_style))
 
     CLASS_LABELS = {'malicioso': 'Malicioso', 'a_investigar': 'A investigar', 'benigno': 'Benigno', '': 'Sin clasificar'}
-    STATUS_LABELS = dict(Alert.INVESTIGATION_STATUS_CHOICES)
-    EVAL_LABELS   = dict(Alert.ML_EVALUATION_CHOICES)
+    STATUS_LABELS = dict(AlertWorkflow.INVESTIGATION_STATUS_CHOICES)
+    EVAL_LABELS   = dict(AlertWorkflow.ML_EVALUATION_CHOICES)
 
     summary_data = [['Métrica', 'Valor']]
     summary_data.append(['Total de alertas', str(summary['total'])])
@@ -1882,17 +1950,20 @@ def report_export_pdf_view(request):
     ]
     detail_data = [detail_headers]
 
-    for alert in qs.select_related('assigned_to')[:500]:
+    for alert in qs.select_related('workflow', 'workflow__assigned_to')[:500]:
+        prediction = alert.latest_prediction
+        workflow = alert.workflow
+        pc = prediction.predicted_class if prediction else ''
         detail_data.append([
             str(alert.pk),
             alert.created_at.strftime('%Y-%m-%d') if alert.created_at else '',
             alert.event_category[:20],
             alert.mitre_tactic[:18],
             alert.severity,
-            CLASS_LABELS.get(alert.predicted_class, alert.predicted_class or 'Sin clasificar'),
-            STATUS_LABELS.get(alert.investigation_status, alert.investigation_status),
-            EVAL_LABELS.get(alert.ml_evaluation, '—') if alert.ml_evaluation else '—',
-            alert.assigned_to.username[:12] if alert.assigned_to else '—',
+            CLASS_LABELS.get(pc, pc or 'Sin clasificar'),
+            STATUS_LABELS.get(workflow.investigation_status, workflow.investigation_status),
+            EVAL_LABELS.get(workflow.ml_evaluation, '—') if workflow.ml_evaluation else '—',
+            workflow.assigned_to.username[:12] if workflow.assigned_to else '—',
         ])
 
     col_widths = [1.2*cm, 2.3*cm, 3.5*cm, 4*cm, 2.2*cm, 2.8*cm, 3*cm, 3*cm, 2.7*cm]
@@ -1936,7 +2007,7 @@ def report_export_incidents_pdf_view(request):
     import matplotlib.pyplot as plt
 
     params   = request.GET
-    qs       = Alert.objects.filter(is_incident=True)
+    qs       = Alert.objects.filter(incident__isnull=False).select_related('incident', 'workflow')
 
     date_from = params.get('date_from')
     date_to   = params.get('date_to')
@@ -1952,19 +2023,21 @@ def report_export_incidents_pdf_view(request):
             pass
 
     total_incidents = qs.count()
-    resolved_qs     = qs.filter(is_resolved=True, resolved_at__isnull=False, escalated_at__isnull=False)
-    detected_qs     = qs.filter(investigated_at__isnull=False)
+    resolved_qs     = qs.filter(
+        incident__is_resolved=True, incident__resolved_at__isnull=False, incident__escalated_at__isnull=False,
+    )
+    detected_qs     = qs.filter(workflow__investigated_at__isnull=False)
 
     # MTTD y MTTR calculados en Python para evitar problemas con SQLite + duraciones
     mttd_secs = [
-        (a.investigated_at - a.created_at).total_seconds()
+        (a.workflow.investigated_at - a.created_at).total_seconds()
         for a in detected_qs
-        if a.investigated_at and a.created_at
+        if a.workflow.investigated_at and a.created_at
     ]
     mttr_secs = [
-        (a.resolved_at - a.escalated_at).total_seconds()
+        (a.incident.resolved_at - a.incident.escalated_at).total_seconds()
         for a in resolved_qs
-        if a.resolved_at and a.escalated_at
+        if a.incident.resolved_at and a.incident.escalated_at
     ]
     mttd_avg = sum(mttd_secs) / len(mttd_secs) if mttd_secs else None
     mttr_avg = sum(mttr_secs) / len(mttr_secs) if mttr_secs else None
@@ -1978,7 +2051,7 @@ def report_export_incidents_pdf_view(request):
 
     # Gráfico MTTR por incidente (últimos 20 resueltos)
     recent_resolved = list(
-        resolved_qs.select_related('resolved_by').order_by('-resolved_at')[:20]
+        resolved_qs.select_related('incident', 'incident__resolved_by').order_by('-incident__resolved_at')[:20]
     )
     recent_resolved.reverse()
 
@@ -1986,7 +2059,7 @@ def report_export_incidents_pdf_view(request):
     if recent_resolved:
         ids_ch   = [f'#{a.pk}' for a in recent_resolved]
         mttr_vals = [
-            (a.resolved_at - a.escalated_at).total_seconds() / 3600
+            (a.incident.resolved_at - a.incident.escalated_at).total_seconds() / 3600
             for a in recent_resolved
         ]
         bar_colors = ['#EF4444' if v > 4 else '#F59E0B' if v > 1 else '#10B981' for v in mttr_vals]
@@ -2090,7 +2163,7 @@ def report_export_incidents_pdf_view(request):
 
     # Tabla detalle de incidentes
     story.append(Paragraph('Detalle de Incidentes', section_style))
-    ROOT_LABELS = dict(Alert.ROOT_CAUSE_CHOICES)
+    ROOT_LABELS = dict(Incident.ROOT_CAUSE_CHOICES)
     CLASS_MAP   = {'malicioso': 'Malicioso', 'a_investigar': 'A Invest.', 'benigno': 'Benigno'}
 
     detail_headers = [
@@ -2099,21 +2172,23 @@ def report_export_incidents_pdf_view(request):
     ]
     detail_data = [detail_headers]
 
-    for a in qs.select_related('resolved_by').order_by('-escalated_at')[:200]:
-        if a.resolved_at and a.escalated_at:
-            mttr_str = fmt_duration((a.resolved_at - a.escalated_at).total_seconds())
+    for a in qs.select_related('incident', 'incident__resolved_by').order_by('-incident__escalated_at')[:200]:
+        incident   = a.incident
+        prediction = a.latest_prediction
+        if incident.resolved_at and incident.escalated_at:
+            mttr_str = fmt_duration((incident.resolved_at - incident.escalated_at).total_seconds())
         else:
             mttr_str = '—'
         detail_data.append([
             str(a.pk),
             a.created_at.strftime('%Y-%m-%d')       if a.created_at  else '',
             (a.event_category or '')[:18],
-            CLASS_MAP.get(a.predicted_class, '—'),
-            a.escalated_at.strftime('%d/%m/%Y %H:%M') if a.escalated_at else '—',
-            a.resolved_at.strftime('%d/%m/%Y %H:%M')  if a.resolved_at  else 'Pendiente',
+            CLASS_MAP.get(prediction.predicted_class if prediction else '', '—'),
+            incident.escalated_at.strftime('%d/%m/%Y %H:%M') if incident.escalated_at else '—',
+            incident.resolved_at.strftime('%d/%m/%Y %H:%M')  if incident.resolved_at  else 'Pendiente',
             mttr_str,
-            ROOT_LABELS.get(a.root_cause, '—')       if a.root_cause  else '—',
-            a.resolved_by.username[:12]               if a.resolved_by else '—',
+            ROOT_LABELS.get(incident.root_cause, '—')       if incident.root_cause  else '—',
+            incident.resolved_by.username[:12]               if incident.resolved_by else '—',
         ])
 
     col_widths = [1.2*cm, 2.5*cm, 3.5*cm, 2.5*cm, 3.8*cm, 3.8*cm, 2.2*cm, 3.8*cm, 2.7*cm]
@@ -2161,21 +2236,38 @@ def alert_escalate_view(request, pk):
 
     alert = get_object_or_404(Alert, pk=pk)
 
-    if alert.is_incident:
+    if alert.incident_id is not None:
         return JsonResponse({'error': 'Esta alerta ya fue escalada a incidente.'}, status=400)
 
-    if not alert.predicted_class or alert.predicted_class == 'benigno':
+    prediction = alert.latest_prediction
+    predicted_class = prediction.predicted_class if prediction else ''
+    if not predicted_class or predicted_class == 'benigno':
         return JsonResponse({'error': 'Solo se pueden escalar alertas maliciosas o a investigar.'}, status=400)
 
-    alert.is_incident  = True
-    alert.escalated_at = timezone.now()
-    alert.escalated_by = request.user
-    alert.save(update_fields=['is_incident', 'escalated_at', 'escalated_by'])
+    raw_correlation = (alert.correlation_id or '').strip()
+    is_real = bool(raw_correlation) and raw_correlation.lower() != 'unknown'
+
+    if is_real:
+        # Alertas con el mismo correlation_id real comparten un mismo Incident.
+        incident, _ = Incident.objects.get_or_create(
+            correlation_id=raw_correlation,
+            defaults={'escalated_at': timezone.now(), 'escalated_by': request.user},
+        )
+    else:
+        # Sin correlation_id real no se agrupa — evita fusionar incidentes no relacionados.
+        incident = Incident.objects.create(
+            correlation_id=f'alert-{alert.pk}',
+            escalated_at=timezone.now(),
+            escalated_by=request.user,
+        )
+
+    alert.incident = incident
+    alert.save(update_fields=['incident'])
 
     log_action(
         request.user,
         ACTION_ALERT_ESCALATED,
-        f'Escaló alerta #{alert.pk} ({alert.predicted_class}) a incidente activo.',
+        f'Escaló alerta #{alert.pk} ({predicted_class}) a incidente activo.',
     )
 
     return JsonResponse({
@@ -2187,17 +2279,24 @@ def alert_escalate_view(request, pk):
 @login_required
 @role_required('admin', 'analyst_n3')
 def incident_detail_view(request, pk):
-    alert = get_object_or_404(Alert, pk=pk, is_incident=True)
+    alert = get_object_or_404(
+        Alert.objects.select_related('incident', 'workflow'),
+        pk=pk, incident__isnull=False,
+    )
+    incident = alert.incident
+    prediction = alert.latest_prediction
     mttr = None
-    if alert.is_resolved and alert.resolved_at and alert.escalated_at:
-        delta = alert.resolved_at - alert.escalated_at
+    if incident.is_resolved and incident.resolved_at and incident.escalated_at:
+        delta = incident.resolved_at - incident.escalated_at
         total_minutes = max(int(delta.total_seconds() / 60), 0)
         mttr = f"{total_minutes // 60}h {total_minutes % 60}m"
     back_qs = request.GET.get('back_qs', '')
     return render(request, 'predictor/incident_detail.html', {
-        'alert':   alert,
-        'mttr':    mttr,
-        'back_qs': back_qs,
+        'alert':      alert,
+        'incident':   incident,
+        'prediction': prediction,
+        'mttr':       mttr,
+        'back_qs':    back_qs,
     })
 
 
@@ -2206,19 +2305,20 @@ def incident_detail_view(request, pk):
 def incident_resolve_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
-    alert = get_object_or_404(Alert, pk=pk, is_incident=True)
-    if alert.is_resolved:
+    alert = get_object_or_404(Alert.objects.select_related('incident'), pk=pk, incident__isnull=False)
+    incident = alert.incident
+    if incident.is_resolved:
         return JsonResponse({'error': 'Este incidente ya fue cerrado.'}, status=400)
     root_cause      = request.POST.get('root_cause', '').strip()
     lessons_learned = request.POST.get('lessons_learned', '').strip()
     if not root_cause:
         return JsonResponse({'error': 'La causa raíz es obligatoria.'}, status=400)
-    alert.root_cause      = root_cause
-    alert.lessons_learned = lessons_learned
-    alert.is_resolved     = True
-    alert.resolved_at     = timezone.now()
-    alert.resolved_by     = request.user
-    alert.save(update_fields=['root_cause', 'lessons_learned', 'is_resolved', 'resolved_at', 'resolved_by'])
+    incident.root_cause      = root_cause
+    incident.lessons_learned = lessons_learned
+    incident.is_resolved     = True
+    incident.resolved_at     = timezone.now()
+    incident.resolved_by     = request.user
+    incident.save(update_fields=['root_cause', 'lessons_learned', 'is_resolved', 'resolved_at', 'resolved_by'])
     log_action(
         request.user,
         ACTION_INCIDENT_RESOLVED,
@@ -2238,15 +2338,16 @@ async def incident_chat_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
     try:
-        alert = await Alert.objects.aget(pk=pk, is_incident=True)
+        alert = await Alert.objects.aget(pk=pk, incident__isnull=False)
     except Alert.DoesNotExist:
         return JsonResponse({'error': 'Incidente no encontrado.'}, status=404)
+    prediction = await sync_to_async(lambda: alert.latest_prediction)()
     message = request.POST.get('message', '').strip()
     if not message:
         return JsonResponse({'error': 'Mensaje vacío.'}, status=400)
     try:
         from .claude_service import generate_incident_chat_async
-        response = await generate_incident_chat_async(alert, message)
+        response = await generate_incident_chat_async(alert, prediction, message)
         return JsonResponse({'ok': True, 'response': response})
     except Exception as exc:
         return JsonResponse({'error': str(exc)}, status=500)
@@ -2257,8 +2358,11 @@ async def incident_chat_view(request, pk):
 def incident_desk_view(request):
     qs = (
         Alert.objects
-        .filter(is_incident=True)
-        .select_related('created_by', 'assigned_to', 'escalated_by', 'investigated_by')
+        .filter(incident__isnull=False)
+        .select_related(
+            'created_by', 'workflow', 'workflow__assigned_to', 'workflow__investigated_by',
+            'incident', 'incident__escalated_by',
+        )
     )
 
     search = request.GET.get('q', '').strip()
@@ -2273,30 +2377,30 @@ def incident_desk_view(request):
 
     class_filter = request.GET.get('predicted_class', '').strip()
     if class_filter:
-        qs = qs.filter(predicted_class=class_filter)
+        qs = qs.filter(predictionlog__predicted_class=class_filter)
 
     date_from = request.GET.get('date_from', '').strip()
     if date_from:
-        qs = qs.filter(escalated_at__date__gte=date_from)
+        qs = qs.filter(incident__escalated_at__date__gte=date_from)
 
     date_to = request.GET.get('date_to', '').strip()
     if date_to:
-        qs = qs.filter(escalated_at__date__lte=date_to)
+        qs = qs.filter(incident__escalated_at__date__lte=date_to)
 
     resolved_filter = request.GET.get('resolved_filter', '').strip()
     if resolved_filter == 'active':
-        qs = qs.filter(is_resolved=False)
+        qs = qs.filter(incident__is_resolved=False)
     elif resolved_filter == 'resolved':
-        qs = qs.filter(is_resolved=True)
+        qs = qs.filter(incident__is_resolved=True)
 
     order = request.GET.get('order', 'date_desc').strip()
     _order_map = {
-        'risk_desc':    F('risk_score').desc(nulls_last=True),
-        'risk_asc':     F('risk_score').asc(nulls_last=True),
-        'date_desc':    '-escalated_at',
-        'date_asc':     'escalated_at',
+        'risk_desc':    F('predictionlog__risk_score').desc(nulls_last=True),
+        'risk_asc':     F('predictionlog__risk_score').asc(nulls_last=True),
+        'date_desc':    '-incident__escalated_at',
+        'date_asc':     'incident__escalated_at',
     }
-    qs = qs.order_by(_order_map.get(order, '-escalated_at'))
+    qs = qs.order_by(_order_map.get(order, '-incident__escalated_at')).distinct()
 
     from urllib.parse import quote as _quote
 

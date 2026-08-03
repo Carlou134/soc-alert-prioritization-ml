@@ -189,7 +189,7 @@
                 </thead>
                 <tbody class="divide-y divide-slate-700/50">
                     {% for alert in recent_alerts %}
-                    <tr class="hover:bg-slate-700/30 transition-colors {% if alert.predicted_class == 'malicioso' %}border-l-2 border-l-red-500{% endif %}">
+                    <tr class="hover:bg-slate-700/30 transition-colors {% if alert.latest_prediction.predicted_class == 'malicioso' %}border-l-2 border-l-red-500{% endif %}">
                         <td class="px-5 py-3 text-xs font-mono text-slate-400 whitespace-nowrap">{{ alert.created_at|date:"Y-m-d H:i" }}</td>
 
                         <!-- Severidad -->
@@ -205,11 +205,11 @@
 
                         <!-- Clasificación ML -->
                         <td class="px-5 py-3">
-                            {% if alert.predicted_class == 'malicioso' %}
+                            {% if alert.latest_prediction.predicted_class == 'malicioso' %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">Malicioso</span>
-                            {% elif alert.predicted_class == 'a_investigar' %}
+                            {% elif alert.latest_prediction.predicted_class == 'a_investigar' %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">A investigar</span>
-                            {% elif alert.predicted_class == 'benigno' %}
+                            {% elif alert.latest_prediction.predicted_class == 'benigno' %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Benigno</span>
                             {% else %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-600/50 text-slate-400 border border-slate-600">Pendiente</span>
@@ -218,21 +218,21 @@
 
                         <!-- Risk Score -->
                         <td class="px-5 py-3">
-                            {% if alert.risk_score is not None %}
-                                {% if alert.risk_score >= 0.7 %}
+                            {% if alert.latest_prediction.risk_score is not None %}
+                                {% if alert.latest_prediction.risk_score >= 0.7 %}
                                     <span class="inline-flex items-center gap-1 text-xs font-semibold text-red-400">
                                         <span class="w-1.5 h-1.5 rounded-full bg-red-400 inline-block"></span>
-                                        {{ alert.risk_score|floatformat:2 }}
+                                        {{ alert.latest_prediction.risk_score|floatformat:2 }}
                                     </span>
-                                {% elif alert.risk_score >= 0.3 %}
+                                {% elif alert.latest_prediction.risk_score >= 0.3 %}
                                     <span class="inline-flex items-center gap-1 text-xs font-semibold text-amber-400">
                                         <span class="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>
-                                        {{ alert.risk_score|floatformat:2 }}
+                                        {{ alert.latest_prediction.risk_score|floatformat:2 }}
                                     </span>
                                 {% else %}
                                     <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400">
                                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
-                                        {{ alert.risk_score|floatformat:2 }}
+                                        {{ alert.latest_prediction.risk_score|floatformat:2 }}
                                     </span>
                                 {% endif %}
                             {% else %}
@@ -245,7 +245,7 @@
 
                         <!-- Acción SHAP -->
                         <td class="px-5 py-3">
-                            {% if alert.predicted_class %}
+                            {% if alert.latest_prediction.predicted_class %}
                             <a href="{% url 'alert_shap' alert.pk %}?next=dashboard"
                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-colors">
                                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">

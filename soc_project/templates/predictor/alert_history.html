@@ -149,8 +149,8 @@
                 <tbody class="divide-y divide-slate-700/50">
                     {% for alert in page_obj %}
                     <tr class="hover:bg-slate-700/30 transition-colors
-                        {% if alert.predicted_class == 'malicioso' %}border-l-2 border-l-red-500
-                        {% elif alert.predicted_class == 'a_investigar' %}border-l-2 border-l-amber-500
+                        {% if alert.latest_prediction.predicted_class == 'malicioso' %}border-l-2 border-l-red-500
+                        {% elif alert.latest_prediction.predicted_class == 'a_investigar' %}border-l-2 border-l-amber-500
                         {% else %}border-l-2 border-l-emerald-500{% endif %}">
 
                         <td class="px-4 py-3 text-xs font-mono text-slate-400 whitespace-nowrap">
@@ -171,9 +171,9 @@
                         </td>
 
                         <td class="px-4 py-3 whitespace-nowrap">
-                            {% if alert.predicted_class == 'malicioso' %}
+                            {% if alert.latest_prediction.predicted_class == 'malicioso' %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">Malicioso</span>
-                            {% elif alert.predicted_class == 'a_investigar' %}
+                            {% elif alert.latest_prediction.predicted_class == 'a_investigar' %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">A investigar</span>
                             {% else %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Benigno</span>
@@ -181,30 +181,30 @@
                         </td>
 
                         <td class="px-4 py-3 font-mono text-xs
-                            {% if alert.risk_score >= 0.7 %}text-red-400
-                            {% elif alert.risk_score >= 0.3 %}text-amber-400
+                            {% if alert.latest_prediction.risk_score >= 0.7 %}text-red-400
+                            {% elif alert.latest_prediction.risk_score >= 0.3 %}text-amber-400
                             {% else %}text-emerald-400{% endif %}">
-                            {% if alert.risk_score is not None %}{{ alert.risk_score|floatformat:3 }}{% else %}—{% endif %}
+                            {% if alert.latest_prediction.risk_score is not None %}{{ alert.latest_prediction.risk_score|floatformat:3 }}{% else %}—{% endif %}
                         </td>
 
                         <td class="px-4 py-3 whitespace-nowrap">
-                            {% if alert.investigation_status == 'new' %}
+                            {% if alert.workflow.investigation_status == 'new' %}
                                 <span class="text-xs text-slate-500">Nueva</span>
-                            {% elif alert.investigation_status == 'investigating' %}
+                            {% elif alert.workflow.investigation_status == 'investigating' %}
                                 <span class="text-xs text-blue-400">En investigación</span>
-                            {% elif alert.investigation_status == 'investigated' %}
+                            {% elif alert.workflow.investigation_status == 'investigated' %}
                                 <span class="text-xs text-emerald-400">Investigada</span>
-                            {% elif alert.investigation_status == 'false_positive' %}
+                            {% elif alert.workflow.investigation_status == 'false_positive' %}
                                 <span class="text-xs text-violet-400">Falso positivo</span>
                             {% endif %}
                         </td>
 
                         <td class="px-4 py-3 whitespace-nowrap">
-                            {% if alert.ml_evaluation == 'correct' %}
+                            {% if alert.workflow.ml_evaluation == 'correct' %}
                                 <span class="text-xs text-emerald-400">Correcta</span>
-                            {% elif alert.ml_evaluation == 'partially_correct' %}
+                            {% elif alert.workflow.ml_evaluation == 'partially_correct' %}
                                 <span class="text-xs text-amber-400">Parcial</span>
-                            {% elif alert.ml_evaluation == 'incorrect' %}
+                            {% elif alert.workflow.ml_evaluation == 'incorrect' %}
                                 <span class="text-xs text-red-400">Incorrecta</span>
                             {% else %}
                                 <span class="text-xs text-slate-600">—</span>
@@ -212,9 +212,9 @@
                         </td>
 
                         <td class="px-4 py-3">
-                            {% if alert.investigated_by %}
-                            <p class="text-xs text-slate-300">{{ alert.investigated_by.username }}</p>
-                            <p class="text-xs text-slate-600 font-mono">{{ alert.investigated_at|date:"Y-m-d" }}</p>
+                            {% if alert.workflow.investigated_by %}
+                            <p class="text-xs text-slate-300">{{ alert.workflow.investigated_by.username }}</p>
+                            <p class="text-xs text-slate-600 font-mono">{{ alert.workflow.investigated_at|date:"Y-m-d" }}</p>
                             {% else %}
                             <span class="text-xs text-slate-600">—</span>
                             {% endif %}

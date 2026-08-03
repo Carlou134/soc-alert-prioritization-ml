@@ -206,39 +206,39 @@
                             <span class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">{{ alert.severity }}</span>
                         </td>
                         <td class="px-4 py-3">
-                            {% if alert.predicted_class == 'malicioso' %}
+                            {% if alert.latest_prediction.predicted_class == 'malicioso' %}
                             <span class="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">Malicioso</span>
-                            {% elif alert.predicted_class == 'a_investigar' %}
+                            {% elif alert.latest_prediction.predicted_class == 'a_investigar' %}
                             <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">A investigar</span>
-                            {% elif alert.predicted_class == 'benigno' %}
+                            {% elif alert.latest_prediction.predicted_class == 'benigno' %}
                             <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">Benigno</span>
                             {% else %}
                             <span class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-400">Sin clasificar</span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3">
-                            {% if alert.investigation_status == 'new' %}
+                            {% if alert.workflow.investigation_status == 'new' %}
                             <span class="text-xs text-slate-400">Nueva</span>
-                            {% elif alert.investigation_status == 'investigating' %}
+                            {% elif alert.workflow.investigation_status == 'investigating' %}
                             <span class="text-xs text-blue-400">En investigación</span>
-                            {% elif alert.investigation_status == 'investigated' %}
+                            {% elif alert.workflow.investigation_status == 'investigated' %}
                             <span class="text-xs text-emerald-400">Investigada</span>
-                            {% elif alert.investigation_status == 'false_positive' %}
+                            {% elif alert.workflow.investigation_status == 'false_positive' %}
                             <span class="text-xs text-slate-500">Falso positivo</span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3">
-                            {% if alert.ml_evaluation == 'correct' %}
+                            {% if alert.workflow.ml_evaluation == 'correct' %}
                             <span class="text-xs text-emerald-400">Correcta</span>
-                            {% elif alert.ml_evaluation == 'partially_correct' %}
+                            {% elif alert.workflow.ml_evaluation == 'partially_correct' %}
                             <span class="text-xs text-amber-400">Parcial</span>
-                            {% elif alert.ml_evaluation == 'incorrect' %}
+                            {% elif alert.workflow.ml_evaluation == 'incorrect' %}
                             <span class="text-xs text-red-400">Incorrecta</span>
                             {% else %}
                             <span class="text-xs text-slate-600">—</span>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 text-slate-400">{{ alert.assigned_to.username|default:"—" }}</td>
+                        <td class="px-4 py-3 text-slate-400">{{ alert.workflow.assigned_to.username|default:"—" }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

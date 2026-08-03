@@ -19,10 +19,10 @@ def _get_async_client():
     return _async_client
 
 
-def _build_prompt(alert, shap_data: dict) -> str:
-    predicted = alert.predicted_class
-    risk = round(alert.risk_score or 0, 4)
-    probabilities = alert.probabilities or {}
+def _build_prompt(alert, prediction, shap_data: dict) -> str:
+    predicted = prediction.predicted_class
+    risk = round(prediction.risk_score or 0, 4)
+    probabilities = prediction.probabilities or {}
 
     s1 = shap_data.get('s1', {})
     s2 = shap_data.get('s2', {})
@@ -63,13 +63,13 @@ INSTRUCCIONES:
 5. Máximo 350 palabras."""
 
 
-def generate_shap_explanation(alert) -> str:
+def generate_shap_explanation(alert, prediction) -> str:
     """
     Genera explicación en lenguaje natural de los valores SHAP de una alerta.
     Lanza excepción si la API falla — el caller decide cómo manejarlo.
     """
-    shap_data = alert.shap_values or {}
-    prompt = _build_prompt(alert, shap_data)
+    shap_data = prediction.shap_values or {}
+    prompt = _build_prompt(alert, prediction, shap_data)
 
     message = _get_client().messages.create(
         model="claude-sonnet-4-6",
@@ -80,12 +80,14 @@ def generate_shap_explanation(alert) -> str:
     return message.content[0].text
 
 
-def _build_incident_prompt(alert, user_message: str) -> str:
+def _build_incident_prompt(alert, prediction, user_message: str) -> str:
+    predicted = prediction.predicted_class if prediction else 'Sin clasificar'
+    risk = round(prediction.risk_score or 0, 4) if prediction else 0
     return f"""Eres un asistente experto en ciberseguridad para un SOC. Ayudás a un Analista de Nivel 3 a investigar un incidente activo. Respondé en español, de forma técnica y concisa. Máximo 400 palabras.
 
 CONTEXTO DEL INCIDENTE #{alert.pk}:
-- Clasificación ML: {alert.predicted_class}
-- Risk Score: {round(alert.risk_score or 0, 4)}
+- Clasificación ML: {predicted}
+- Risk Score: {risk}
 - Severidad: {alert.severity}
 - Categoría del evento: {alert.event_category}
 - Tipo de ataque: {alert.attack_type or 'Desconocido'}
@@ -102,23 +104,23 @@ PREGUNTA DEL ANALISTA N3:
 {user_message}"""
 
 
-async def generate_incident_chat_async(alert, user_message: str) -> str:
+async def generate_incident_chat_async(alert, prediction, user_message: str) -> str:
     """Responde preguntas del Analista N3 sobre un incidente activo."""
     message = await _get_async_client().messages.create(
         model='claude-sonnet-4-6',
         max_tokens=1024,
-        messages=[{'role': 'user', 'content': _build_incident_prompt(alert, user_message)}],
+        messages=[{'role': 'user', 'content': _build_incident_prompt(alert, prediction, user_message)}],
     )
     return message.content[0].text
 
 
-async def generate_shap_explanation_async(alert) -> str:
+async def generate_shap_explanation_async(alert, prediction) -> str:
     """
     Versión async de generate_shap_explanation.
     Permite manejar múltiples usuarios concurrentes sin bloquear el event loop.
     """
-    shap_data = alert.shap_values or {}
-    prompt = _build_prompt(alert, shap_data)
+    shap_data = prediction.shap_values or {}
+    prompt = _build_prompt(alert, prediction, shap_data)
 
     message = await _get_async_client().messages.create(
         model="claude-sonnet-4-6",

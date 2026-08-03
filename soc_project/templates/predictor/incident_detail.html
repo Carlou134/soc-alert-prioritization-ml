@@ -12,7 +12,7 @@
                 <a href="{% url 'incident_desk' %}{% if back_qs %}?{{ back_qs }}{% endif %}" class="text-slate-400 hover:text-white text-sm transition-colors">← Mesa de Incidentes</a>
                 <span class="text-slate-600">/</span>
                 <h1 class="text-xl font-semibold text-white">Incidente #{{ alert.pk }}</h1>
-                {% if alert.is_resolved %}
+                {% if incident.is_resolved %}
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>RESUELTO
                     </span>
@@ -35,20 +35,20 @@
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Risk Score</p>
             <p class="text-2xl font-bold mt-1 font-mono
-                {% if alert.risk_score >= 0.7 %}text-red-400{% elif alert.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
-                {{ alert.risk_score|floatformat:4|default:"—" }}
+                {% if prediction.risk_score >= 0.7 %}text-red-400{% elif prediction.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
+                {{ prediction.risk_score|floatformat:4|default:"—" }}
             </p>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Clasificación ML</p>
             <p class="text-sm font-semibold mt-2
-                {% if alert.predicted_class == 'malicioso' %}text-red-400{% elif alert.predicted_class == 'a_investigar' %}text-amber-400{% else %}text-emerald-400{% endif %}">
-                {{ alert.predicted_class|default:"—"|capfirst }}
+                {% if prediction.predicted_class == 'malicioso' %}text-red-400{% elif prediction.predicted_class == 'a_investigar' %}text-amber-400{% else %}text-emerald-400{% endif %}">
+                {{ prediction.predicted_class|default:"—"|capfirst }}
             </p>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Escalado el</p>
-            <p class="text-sm font-mono text-slate-200 mt-2">{{ alert.escalated_at|date:"Y-m-d H:i"|default:"—" }}</p>
+            <p class="text-sm font-mono text-slate-200 mt-2">{{ incident.escalated_at|date:"Y-m-d H:i"|default:"—" }}</p>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
             <p class="text-xs text-slate-400 uppercase tracking-wide">MTTR</p>
@@ -76,13 +76,13 @@
             <div><p class="text-xs text-slate-500 uppercase tracking-wide">Firma del ataque</p><p class="text-slate-200 mt-0.5">{{ alert.attack_signature|default:"—" }}</p></div>
             <div><p class="text-xs text-slate-500 uppercase tracking-wide">Indicador malware</p><p class="text-slate-200 mt-0.5">{{ alert.malware_indicator|default:"—" }}</p></div>
             <div><p class="text-xs text-slate-500 uppercase tracking-wide">Correlation ID</p><p class="text-slate-200 mt-0.5 font-mono text-xs">{{ alert.correlation_id|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Escalado por</p><p class="text-slate-200 mt-0.5">{{ alert.escalated_by.username|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Escalado por</p><p class="text-slate-200 mt-0.5">{{ incident.escalated_by.username|default:"—" }}</p></div>
             {% endwith %}
         </div>
     </div>
 
     <!-- SOAR Simulado -->
-    {% if not alert.is_resolved %}
+    {% if not incident.is_resolved %}
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
         <div class="flex items-center justify-between mb-1">
             <p class="text-sm font-semibold text-white">Acciones de Contención Inmediata</p>
@@ -162,22 +162,22 @@
     </div>
 
     <!-- Formulario de cierre / Resumen si ya cerrado -->
-    {% if alert.is_resolved %}
+    {% if incident.is_resolved %}
     <div class="bg-emerald-950/30 border border-emerald-800/40 rounded-lg p-5">
         <p class="text-sm font-semibold text-emerald-300 mb-4">Incidente cerrado — NIST SP 800-61 RC</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
                 <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Causa Raíz</p>
-                <p class="text-slate-200">{{ alert.get_root_cause_display|default:"—" }}</p>
+                <p class="text-slate-200">{{ incident.get_root_cause_display|default:"—" }}</p>
             </div>
             <div>
                 <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Cerrado por</p>
-                <p class="text-slate-200">{{ alert.resolved_by.username|default:"—" }} — {{ alert.resolved_at|date:"Y-m-d H:i" }}</p>
+                <p class="text-slate-200">{{ incident.resolved_by.username|default:"—" }} — {{ incident.resolved_at|date:"Y-m-d H:i" }}</p>
             </div>
-            {% if alert.lessons_learned %}
+            {% if incident.lessons_learned %}
             <div class="md:col-span-2">
                 <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Lecciones Aprendidas</p>
-                <p class="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">{{ alert.lessons_learned }}</p>
+                <p class="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">{{ incident.lessons_learned }}</p>
             </div>
             {% endif %}
         </div>
