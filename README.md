@@ -41,16 +41,22 @@ Django multi-app project under `soc_project/`:
 Key decisions:
 - **Two-stage hierarchical classification model** (stage 1: filters benign vs. the rest; stage 2: distinguishes to-investigate vs. malicious), trained with LightGBM and exposed via `predict_alert`/`predict_batch`.
 - The ML model and SHAP explainers are **preloaded into memory** on Django startup (`predictor/apps.py.ready()`) — if `soc_model.pkl` doesn't exist, it's trained automatically on first run.
-- Two **independent** authentication mechanisms: Django sessions for the web UI, JWT for the REST API (`/api/...`), intended for external integrations (e.g. SIEM/SOAR tools).
+- Two **independent** authentication mechanisms: Django sessions for the web UI, JWT for the REST API (`/api/...`), intended for external integrations (e.g. SIEM/SOAR tools). Endpoints documented in **[docs/api-reference.md](docs/api-reference.md)**.
+- Alert uploads are processed **asynchronously** (`django-q2`, no Redis) so predictions are never lost if the analyst navigates away mid-upload.
+
+📄 Full system diagram, data model, and deployment topology: **[docs/architecture.md](docs/architecture.md)**
 
 ---
 
 ## 🧠 Technical challenges and decisions
 
-- **Problem:** the alert model concentrated 45+ fields in a single table (ML input data, prediction output, investigation status, priority, evaluation, incident closure) → **Solution:** ongoing migration to a normalized schema (`Alert`, `AlertWorkflow`, `Incident`, `ModelVersion`, `PredictionLog`) → **Why:** separate raw data from operational workflow and enable model versioning + a feedback loop (comparing past predictions against the actual root cause the N3 analyst logs when closing an incident).
-- **Problem:** computing SHAP during ingestion added ~25-30s per batch of alerts → **Solution:** *lazy* SHAP computation (on-demand, only when an analyst opens an alert's detail view) → **Why:** in practice an analyst only reviews explainability for 2-3 alerts, not the entire ingested batch.
+- **Problem:** the alert model concentrated 45+ fields in a single table (ML input data, prediction output, investigation status, priority, evaluation, incident closure) → **Solution:** migrated to a normalized schema (`Alert`, `AlertWorkflow`, `Incident`, `ModelVersion`, `PredictionLog`, `Dataset`) → **Why:** separate raw data from operational workflow and enable model versioning + a feedback loop (comparing past predictions against the actual root cause the N3 analyst logs when closing an incident).
+- **Problem:** uploading alerts depended on the browser tab staying open — navigating away silently dropped everything past the first preview rows → **Solution:** background processing via `django-q2` with an ORM broker (no Redis budget) — the upload returns instantly and a worker finishes the job independently of the request → **Why:** the task is persisted to the database before the HTTP response is sent, so it survives regardless of what the browser does next.
+- **Problem:** computing SHAP during ingestion added significant latency per batch of alerts → **Solution:** *lazy* SHAP computation (on-demand, only when an analyst opens an alert's detail view) → **Why:** in practice an analyst only reviews explainability for 2-3 alerts, not the entire ingested batch.
 - **Problem:** large alert uploads (10k+ rows) degraded database inserts → **Solution:** `bulk_create` with `batch_size=500` at every ingestion point → **Why:** inserting row by row (or without batching) doesn't scale on SQLite or PostgreSQL for realistic SOC volumes.
-- **Problem:** 0% test coverage on a system that decides security alert priority → **Solution:** unit and integration test suite mapped 1:1 against the acceptance criteria defined by the QA team (30 user stories) → **Why:** you can't claim the prediction pipeline is reliable if it was never tested automatically.
+- **Problem:** 0% test coverage on a system that decides security alert priority → **Solution:** 110-test unit and integration suite mapped 1:1 against the acceptance criteria defined by the QA team (30 user stories) → **Why:** you can't claim the prediction pipeline is reliable if it was never tested automatically.
+
+📄 Full list of decisions, tradeoffs, and known gotchas: **[docs/technical.md](docs/technical.md)**
 
 ---
 
@@ -184,9 +190,11 @@ These users are created automatically by the migrations — useful for testing t
 
 ## 🧠 ML Model
 
-The model is trained from `soc_project/dataset_soc_alertas_train.csv` and saved to `soc_project/predictor/ml/soc_model.pkl`.
+Two-stage hierarchical classifier (RandomForest → LightGBM), trained from `soc_project/dataset_soc_alertas_train.csv` and saved to `soc_project/predictor/ml/soc_model.pkl`. On a held-out test set: **82.9% accuracy**, **98.9% recall on `malicioso`** (the metric that matters most for a triage tool — very few real attacks slip through).
 
-To retrain from scratch: delete `soc_model.pkl` and restart the server.
+To retrain from scratch: `python train_model.py` (or delete `soc_model.pkl` and restart the server — it auto-trains on first run).
+
+📄 Full architecture, hyperparameters, and evaluation: **[docs/model.md](docs/model.md)** · Training data breakdown: **[docs/dataset.md](docs/dataset.md)**
 
 ---
 
