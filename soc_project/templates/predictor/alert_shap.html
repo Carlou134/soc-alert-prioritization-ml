@@ -144,10 +144,29 @@
                     <p class="text-xs text-slate-500 mb-0.5">Kill chain stage</p>
                     <p class="text-sm text-slate-200">{{ alert.kill_chain_stage|default:"—" }}</p>
                 </div>
-                {% if alert.mitre_techniques %}
+                {% if mitre_techniques_resolved %}
                 <div class="col-span-2">
-                    <p class="text-xs text-slate-500 mb-0.5">Técnicas MITRE</p>
-                    <p class="text-sm text-slate-200 font-mono">{{ alert.mitre_techniques }}</p>
+                    <p class="text-xs text-slate-500 mb-1.5">Técnicas MITRE</p>
+                    <div class="flex flex-wrap gap-2" data-testid="mitre-techniques">
+                        {% for t in mitre_techniques_resolved %}
+                        {% if t.url %}
+                        <a href="{{ t.url }}" target="_blank" rel="noopener"
+                           title="{{ t.description|default:'' }}"
+                           data-testid="mitre-technique-{{ t.code }}"
+                           class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-700/60 border border-slate-600 text-xs hover:border-blue-500 hover:bg-slate-700 transition-colors">
+                            <span class="font-mono text-slate-400">{{ t.code }}</span>
+                            {% if t.name %}<span class="text-slate-200">{{ t.name }}</span>{% endif %}
+                        </a>
+                        {% else %}
+                        <span title="{{ t.description|default:'' }}"
+                              data-testid="mitre-technique-{{ t.code }}"
+                              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-700/60 border border-slate-600 text-xs">
+                            <span class="font-mono text-slate-400">{{ t.code }}</span>
+                            {% if t.name %}<span class="text-slate-200">{{ t.name }}</span>{% endif %}
+                        </span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
                 </div>
                 {% endif %}
             </div>

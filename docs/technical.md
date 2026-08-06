@@ -50,6 +50,12 @@ Views wrapped in `@role_required(...)` (e.g. `alert_escalate_view`, `incident_re
 | `whitenoise` | Serves static files directly from gunicorn on Azure App Service, no separate static host |
 | `reportlab`, `openpyxl`, `matplotlib` | PDF/Excel report export and embedded charts (`report_export_pdf_view`) |
 
+## MITRE ATT&CK technique metadata (`sync_mitre_attack`)
+
+`predictor/management/commands/sync_mitre_attack.py` is a **dev-time-only, offline** command — never called from the request path or from any always-on process. It reads the `mitre_tNNNN` columns from the already-trained `training_columns` (in `soc_model.pkl`), downloads MITRE's official STIX bundle (`github.com/mitre/cti`), and caches name/description/URL for just those technique IDs into `predictor/data/mitre_technique_metadata.json` — committed to git, read at runtime with zero network calls (`predictor/mitre_metadata.py::resolve_techniques()`, used by `alert_shap_view` to render technique chips instead of raw codes). It runs automatically as the last step of `train_model.py` (see [docs/model.md](model.md#retraining)) — never before training, since it depends on the *new* `training_columns` that training just produced.
+
+*Environment gotcha:* on machines behind a TLS-inspecting proxy/antivirus, Python's own `ssl` module can fail to verify GitHub's certificate (`SSLCertVerificationError`) even though `curl`/browsers work fine (they trust the OS certificate store; Python's `ssl`/`certifi` don't automatically). The command catches `urllib.error.URLError` and falls back to shelling out to `curl`, which sidesteps the issue entirely and works identically on the Linux Azure App Service target.
+
 ## Testing
 
 110 tests, `pytest-django`. Coverage is intentionally uneven — the test priorities were driven by mapping directly against the QA team's 30 user-story acceptance checklist (see [testing-backlog.md](testing-backlog.md)), not by chasing 100% line coverage everywhere.

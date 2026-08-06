@@ -56,6 +56,7 @@ from .utils import (
     predict_alert, predict_batch, extract_valid_fields, calculate_risk_score,
     calculate_shap_values, compute_shap_safe, get_active_model_version,
 )
+from .mitre_metadata import resolve_techniques
 from .pipeline import (
     REQUIRED_COLUMNS,
     OPTIONAL_COLUMNS,
@@ -1267,6 +1268,7 @@ def alert_shap_view(request, pk):
     return render(request, 'predictor/alert_shap.html', {
         'alert'              : alert,
         'prediction'         : prediction,
+        'mitre_techniques_resolved': resolve_techniques(alert.mitre_techniques),
         'shap_s1'            : _json.dumps(shap_data['s1']),
         'shap_s2'            : _json.dumps(shap_data['s2']),
         'status_choices'     : AlertWorkflow.INVESTIGATION_STATUS_CHOICES,

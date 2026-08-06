@@ -192,7 +192,7 @@ These users are created automatically by the migrations — useful for testing t
 
 Two-stage hierarchical classifier (RandomForest → LightGBM), trained from `soc_project/dataset_soc_alertas_train.csv` and saved to `soc_project/predictor/ml/soc_model.pkl`. On a held-out test set: **82.9% accuracy**, **98.9% recall on `malicioso`** (the metric that matters most for a triage tool — very few real attacks slip through).
 
-To retrain from scratch: `python train_model.py` (or delete `soc_model.pkl` and restart the server — it auto-trains on first run).
+To retrain from scratch: `python train_model.py` (or delete `soc_model.pkl` and restart the server — it auto-trains on first run). Retraining also auto-syncs a local cache of real MITRE ATT&CK technique names/descriptions (`python manage.py sync_mitre_attack`) used on the alert detail page — see [docs/model.md](docs/model.md#retraining).
 
 📄 Full architecture, hyperparameters, and evaluation: **[docs/model.md](docs/model.md)** · Training data breakdown: **[docs/dataset.md](docs/dataset.md)**
 

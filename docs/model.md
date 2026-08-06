@@ -97,3 +97,5 @@ python train_model.py
 ```
 
 Regenerates `predictor/ml/soc_model.pkl` and the figures in `reports/figures/`. `python manage.py migrate` also auto-triggers a training run if `soc_model.pkl` doesn't exist yet (first-time setup) — see the [README](../README.md).
+
+As the last step, `train_model.py` automatically runs `python manage.py sync_mitre_attack`, which re-syncs the local MITRE ATT&CK technique metadata cache (`predictor/data/mitre_technique_metadata.json`) against whatever `mitre_tNNNN` columns ended up in the new `training_columns` — this is what powers the technique name/description chips on the alert detail page (`alert_shap.html`). A network failure here only prints a warning; it never fails the training run, since the model was already saved by that point. Run it manually with `python manage.py sync_mitre_attack` if you ever need to force a re-sync without retraining.

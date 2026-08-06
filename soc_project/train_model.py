@@ -412,3 +412,14 @@ os.makedirs(os.path.dirname(model_path), exist_ok=True)
 joblib.dump(artifact, model_path)
 print(f"\nModelo guardado en {model_path}")
 print(f"Umbrales exportados: t1 (Malicioso)={best_t1}, t2 (A_Investigar)={best_t2}")
+
+# -- Sync de metadata MITRE ATT&CK para las técnicas del modelo recién entrenado --
+# No bloquea el entrenamiento si falla (red caída, etc.) — el modelo ya se guardó arriba.
+try:
+    import subprocess
+    import sys as _sys
+    manage_py = os.path.join(BASE_DIR, "manage.py")
+    subprocess.run([_sys.executable, manage_py, "sync_mitre_attack"], check=True, timeout=180)
+except Exception as e:
+    print(f"\n[WARN] No se pudo sincronizar metadata de MITRE ATT&CK: {e}")
+    print('El modelo se entrenó igual — corré "python manage.py sync_mitre_attack" a mano cuando quieras.')
