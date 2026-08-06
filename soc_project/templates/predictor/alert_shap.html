@@ -34,7 +34,7 @@
     </div>
 
     <!-- Alert summary card -->
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div>
             <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Clasificación</p>
             {% if prediction.predicted_class == 'malicioso' %}
@@ -78,7 +78,7 @@
         <!-- Red y tráfico -->
         <div>
             <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Red y tráfico</p>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
                 <div>
                     <p class="text-xs text-slate-500 mb-0.5">Protocolo</p>
                     <p class="text-sm text-slate-200 font-mono">{{ alert.protocol|default:"—" }}</p>
@@ -117,7 +117,7 @@
         <!-- Contexto de ataque -->
         <div>
             <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Contexto de ataque</p>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
                 <div>
                     <p class="text-xs text-slate-500 mb-0.5">Tipo de ataque</p>
                     <p class="text-sm text-slate-200">{{ alert.attack_type|default:"—" }}</p>
@@ -177,7 +177,7 @@
         <!-- Activo y entorno -->
         <div>
             <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Activo y entorno</p>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
                 <div>
                     <p class="text-xs text-slate-500 mb-0.5">Criticidad del activo</p>
                     <p class="text-sm text-slate-200">{{ alert.asset_criticality|default:"—" }}</p>
@@ -204,7 +204,7 @@
         <!-- Trazabilidad -->
         <div>
             <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Trazabilidad</p>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
                 <div>
                     <p class="text-xs text-slate-500 mb-0.5">Subida por</p>
                     <p class="text-sm text-slate-200">{{ alert.created_by.username }}</p>
@@ -308,7 +308,7 @@
                 {% if is_trainee and not assigned_to_me %}
                     Solo lectura
                 {% elif is_trainee and assigned_to_me %}
-                    Alerta asignada a vos — podés actualizar el estado
+                    Alerta asignada a ti — puedes actualizar el estado
                 {% else %}
                     Nivel 1 — marca el estado después de revisar la alerta
                 {% endif %}

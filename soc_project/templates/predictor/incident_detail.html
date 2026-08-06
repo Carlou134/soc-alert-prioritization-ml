@@ -31,7 +31,7 @@
     </div>
 
     <!-- KPIs del incidente -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Risk Score</p>
             <p class="text-2xl font-bold mt-1 font-mono
@@ -63,7 +63,7 @@
     <!-- Detalles técnicos -->
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
         <p class="text-sm font-semibold text-white mb-4">Datos técnicos de la alerta</p>
-        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-3 text-sm">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-3 text-sm">
             {% with fields=alert %}
             <div><p class="text-xs text-slate-500 uppercase tracking-wide">Severidad</p><p class="text-slate-200 mt-0.5">{{ alert.severity|default:"—" }}</p></div>
             <div><p class="text-xs text-slate-500 uppercase tracking-wide">Protocolo</p><p class="text-slate-200 mt-0.5">{{ alert.protocol|default:"—" }}</p></div>
@@ -75,7 +75,7 @@
             <div><p class="text-xs text-slate-500 uppercase tracking-wide">Fuente log</p><p class="text-slate-200 mt-0.5">{{ alert.log_source|default:"—" }}</p></div>
             <div><p class="text-xs text-slate-500 uppercase tracking-wide">Firma del ataque</p><p class="text-slate-200 mt-0.5">{{ alert.attack_signature|default:"—" }}</p></div>
             <div><p class="text-xs text-slate-500 uppercase tracking-wide">Indicador malware</p><p class="text-slate-200 mt-0.5">{{ alert.malware_indicator|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Correlation ID</p><p class="text-slate-200 mt-0.5 font-mono text-xs">{{ alert.correlation_id|default:"—" }}</p></div>
+            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Correlation ID</p><p class="text-slate-200 mt-0.5 font-mono text-xs break-all">{{ alert.correlation_id|default:"—" }}</p></div>
             <div><p class="text-xs text-slate-500 uppercase tracking-wide">Escalado por</p><p class="text-slate-200 mt-0.5">{{ incident.escalated_by.username|default:"—" }}</p></div>
             {% endwith %}
         </div>

@@ -47,7 +47,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mt-3">
             <div>
                 <label class="block text-xs text-slate-500 mb-1">Escalado desde</label>
                 <input type="date" name="date_from" value="{{ date_from }}" data-testid="incident-desk-filter-date-from"
@@ -67,7 +67,7 @@
                     <option value="resolved"{% if resolved_filter == 'resolved'%}selected{% endif %}>Solo resueltos</option>
                 </select>
             </div>
-            <div class="min-w-max">
+            <div>
                 <label class="block text-xs text-slate-500 mb-1">Ordenar por</label>
                 <select name="order" data-testid="incident-desk-filter-order"
                     class="w-full bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">

@@ -190,7 +190,7 @@
                 {% endfor %}
             </div>
             {% endfor %}
-            <p class="text-xs text-amber-300/60 mt-1">Los valores no numéricos se reemplazarán con 0 durante la limpieza. Podés corregir el mapeo o continuar igual.</p>
+            <p class="text-xs text-amber-300/60 mt-1">Los valores no numéricos se reemplazarán con 0 durante la limpieza. Puedes corregir el mapeo o continuar igual.</p>
         </div>
         {% endif %}
 
@@ -315,7 +315,7 @@
             {% endif %}
 
             <!-- Operaciones que se aplicarán -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 <div class="bg-slate-700/40 border border-slate-600 rounded-md p-3 text-center">
                     <p class="text-xs text-slate-300 font-medium">Eliminar duplicados</p>
                     <p class="text-emerald-400 text-xs mt-1 font-mono">✓ Activo</p>
@@ -418,7 +418,7 @@
     <div class="space-y-5">
 
         <!-- Estadísticas de limpieza -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
                 <p class="text-2xl font-bold font-mono text-white" data-testid="pipeline-stat-total-original">{{ stats.total_original }}</p>
                 <p class="text-xs text-slate-400 mt-1">Originales</p>

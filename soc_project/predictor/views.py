@@ -1133,7 +1133,7 @@ def alert_set_status_view(request, pk):
 
     profile = request.user.profile
     if profile.is_trainee and alert.workflow.assigned_to_id != request.user.pk:
-        return JsonResponse({'error': 'No tenés permisos para modificar esta alerta.'}, status=403)
+        return JsonResponse({'error': 'No tienes permisos para modificar esta alerta.'}, status=403)
 
     try:
         data = json.loads(request.body)
@@ -1345,7 +1345,7 @@ def alert_assign_view(request, pk):
     target_profile = getattr(target_user, 'profile', None)
 
     if target_profile is None or target_profile.role not in allowed_roles:
-        return JsonResponse({'error': 'No tenés permisos para asignar a ese analista.'}, status=403)
+        return JsonResponse({'error': 'No tienes permisos para asignar a ese analista.'}, status=403)
 
     workflow.assigned_to = target_user
     workflow.save(update_fields=['assigned_to'])
@@ -1368,7 +1368,7 @@ def alert_evaluate_view(request, pk):
 
     profile = request.user.profile
     if profile.role not in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1'):
-        return JsonResponse({'error': 'No tenés permisos para evaluar decisiones ML.'}, status=403)
+        return JsonResponse({'error': 'No tienes permisos para evaluar decisiones ML.'}, status=403)
 
     alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
 

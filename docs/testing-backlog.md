@@ -6,7 +6,7 @@ Este documento es la contraparte de nuestro lado del mapeo maestro de QA (`mapeo
 
 Cada HU tiene 2 escenarios de aceptación, pero el CP de QA solo cubre 1. En 29 de las 30 HU, ese CP cubre el escenario **negativo/de error** — el camino feliz queda sin caso de prueba formal. La única excepción es HU001 (al revés: su CP cubre el éxito, falta el duplicado).
 
-- **QA ejecuta** (Selenium/JMeter, columna izquierda de la tabla de abajo): ya está en su documento, no se repite acá.
+- **QA ejecuta** (Selenium/JMeter, columna izquierda de la tabla de abajo): ya está en su documento, no se repite aquí.
 - **Nosotros cubrimos** (unit + integración, `pytest`): el camino feliz de cada HU + el negativo de HU001. Todo con test real, no smoke visual — corre en CI, no depende de que alguien lo ejecute a mano.
 
 Entre ambos lados, los 60 criterios de aceptación quedan cubiertos sin duplicar esfuerzo.
