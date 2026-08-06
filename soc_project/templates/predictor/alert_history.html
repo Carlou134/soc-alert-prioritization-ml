@@ -14,7 +14,7 @@
     </div>
 
     <!-- Filtros -->
-    <form method="get" class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+    <form method="get" class="bg-slate-800 border border-slate-700 rounded-lg p-4" data-testid="alert-history-filter-form">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
 
             <div>
@@ -115,12 +115,12 @@
 
         </div>
 
-        <div class="flex items-center gap-3 mt-3">
-            <button type="submit"
+        <div class="flex flex-wrap items-center gap-3 mt-3">
+            <button type="submit" data-testid="alert-history-filter-submit"
                 class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium">
                 Filtrar
             </button>
-            <a href="{% url 'alert_history' %}"
+            <a href="{% url 'alert_history' %}" data-testid="alert-history-filter-clear"
                 class="text-slate-400 hover:text-white text-sm px-3 py-2 rounded-md hover:bg-slate-700">
                 Limpiar
             </a>
@@ -131,7 +131,7 @@
     {% if page_obj.object_list %}
     <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
+            <table class="w-full text-left text-sm" data-testid="alert-history-table">
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-900 text-xs font-medium text-slate-400 uppercase tracking-wide">
                         <th class="px-4 py-3">Fecha</th>
@@ -151,7 +151,7 @@
                     <tr class="hover:bg-slate-700/30 transition-colors
                         {% if alert.latest_prediction.predicted_class == 'malicioso' %}border-l-2 border-l-red-500
                         {% elif alert.latest_prediction.predicted_class == 'a_investigar' %}border-l-2 border-l-amber-500
-                        {% else %}border-l-2 border-l-emerald-500{% endif %}">
+                        {% else %}border-l-2 border-l-emerald-500{% endif %}" data-testid="alert-history-row-{{ alert.pk }}">
 
                         <td class="px-4 py-3 text-xs font-mono text-slate-400 whitespace-nowrap">
                             {{ alert.created_at|date:"Y-m-d H:i" }}
@@ -221,7 +221,7 @@
                         </td>
 
                         <td class="px-4 py-3">
-                            <a href="{% url 'alert_shap' alert.pk %}?readonly=1&next=alert_history{% if query_string %}&back_qs={{ query_string|urlencode }}{% endif %}"
+                            <a href="{% url 'alert_shap' alert.pk %}?readonly=1&next=alert_history{% if query_string %}&back_qs={{ query_string|urlencode }}{% endif %}" data-testid="alert-history-detail-link-{{ alert.pk }}"
                                class="text-xs text-blue-400 hover:text-blue-300 whitespace-nowrap">
                                 Ver detalle →
                             </a>
@@ -242,7 +242,7 @@
         </p>
         <div class="flex items-center gap-1">
             {% if page_obj.has_previous %}
-            <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}"
+            <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}" data-testid="pagination-prev"
                class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">← Anterior</a>
             {% endif %}
             {% for num in page_obj.paginator.page_range %}
@@ -254,7 +254,7 @@
                 {% endif %}
             {% endfor %}
             {% if page_obj.has_next %}
-            <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}"
+            <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}" data-testid="pagination-next"
                class="px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700">Siguiente →</a>
             {% endif %}
         </div>
@@ -262,7 +262,7 @@
     {% endif %}
 
     {% else %}
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-12 text-center">
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-12 text-center" data-testid="alert-history-empty-state">
         <svg class="w-10 h-10 text-slate-600 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>

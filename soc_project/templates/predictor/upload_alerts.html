@@ -14,15 +14,15 @@
 
     <!-- Formulario -->
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
-        <form id="upload-form" enctype="multipart/form-data" class="space-y-5">
+        <form id="upload-form" enctype="multipart/form-data" class="space-y-5" data-testid="upload-form">
             {% csrf_token %}
             <div>
                 <label class="block text-xs font-medium text-slate-400 mb-1.5">Archivo de alertas</label>
-                <input type="file" name="file" id="file-input" accept=".json,.csv"
+                <input type="file" name="file" id="file-input" data-testid="upload-file-input" accept=".json,.csv"
                     class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:bg-slate-600 file:border-0 file:text-slate-300 file:rounded file:px-3 file:py-1 file:mr-3 file:text-xs">
                 <p class="text-slate-500 text-xs mt-1.5">Formatos: .json, .csv — Máximo 10 MB</p>
             </div>
-            <button type="submit" id="submit-btn"
+            <button type="submit" id="submit-btn" data-testid="upload-submit"
                 class="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 Procesar archivo
             </button>
@@ -30,8 +30,8 @@
     </div>
 
     <!-- Error -->
-    <div id="error-box" class="hidden bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
-        <p class="text-sm text-red-400"><span class="font-medium">Error:</span> <span id="error-text"></span></p>
+    <div id="error-box" data-testid="upload-error-box" class="hidden bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+        <p class="text-sm text-red-400"><span class="font-medium">Error:</span> <span id="error-text" data-testid="upload-error-text"></span></p>
     </div>
 
     <!-- Loading (parseo/limpieza síncronos, rápido) -->
@@ -53,15 +53,15 @@
             <p class="text-xs text-slate-400 uppercase tracking-wide mb-4">Resumen</p>
             <div class="grid grid-cols-3 gap-3">
                 <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 text-center">
-                    <p id="stat-total" class="text-2xl font-bold font-mono text-white">—</p>
+                    <p id="stat-total" data-testid="upload-stat-total" class="text-2xl font-bold font-mono text-white">—</p>
                     <p class="text-xs text-slate-400 mt-1">Total</p>
                 </div>
                 <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 text-center">
-                    <p id="stat-saved" class="text-2xl font-bold font-mono text-emerald-500">—</p>
+                    <p id="stat-saved" data-testid="upload-stat-saved" class="text-2xl font-bold font-mono text-emerald-500">—</p>
                     <p class="text-xs text-emerald-400 mt-1">Guardadas</p>
                 </div>
                 <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-center">
-                    <p id="stat-failed" class="text-2xl font-bold font-mono text-red-500">—</p>
+                    <p id="stat-failed" data-testid="upload-stat-failed" class="text-2xl font-bold font-mono text-red-500">—</p>
                     <p class="text-xs text-red-400 mt-1">Fallidas</p>
                 </div>
             </div>
@@ -80,7 +80,7 @@
                         Corre en segundo plano — puedes navegar sin perder los datos.
                     </p>
                 </div>
-                <a id="view-alerts-link" href="{% url 'alert_list' %}"
+                <a id="view-alerts-link" data-testid="upload-view-alerts-link" href="{% url 'alert_list' %}"
                     class="hidden shrink-0 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md font-medium transition-colors">
                     Ver alertas
                 </a>

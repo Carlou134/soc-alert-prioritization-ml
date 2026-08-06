@@ -6,12 +6,12 @@
 <div class="space-y-6">
 
     <!-- Page header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-lg font-semibold text-white">Dashboard</h1>
             <p class="text-sm text-slate-400 mt-0.5">Estado de seguridad en tiempo real.</p>
         </div>
-        <a href="{% url 'alert_list' %}"
+        <a href="{% url 'alert_list' %}" data-testid="dashboard-view-all-alerts"
            class="text-xs text-blue-400 hover:text-blue-300 font-medium">
             Ver todas las alertas →
         </a>
@@ -21,22 +21,22 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Total alertas</p>
-            <p class="text-3xl font-bold text-white mt-2 font-mono">{{ total_alerts }}</p>
+            <p class="text-3xl font-bold text-white mt-2 font-mono" data-testid="kpi-total-alerts">{{ total_alerts }}</p>
             <p class="text-xs text-slate-500 mt-1">Ingestadas en el sistema</p>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Pendientes</p>
-            <p class="text-3xl font-bold text-slate-300 mt-2 font-mono">{{ total_pending }}</p>
+            <p class="text-3xl font-bold text-slate-300 mt-2 font-mono" data-testid="kpi-total-pending">{{ total_pending }}</p>
             <p class="text-xs text-slate-500 mt-1">Sin clasificar por ML</p>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
             <p class="text-xs text-slate-400 uppercase tracking-wide">A investigar</p>
-            <p class="text-3xl font-bold text-amber-500 mt-2 font-mono">{{ total_investigar }}</p>
+            <p class="text-3xl font-bold text-amber-500 mt-2 font-mono" data-testid="kpi-total-investigar">{{ total_investigar }}</p>
             <p class="text-xs text-slate-500 mt-1">Requieren análisis</p>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 border-l-4 border-l-red-500">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Maliciosos</p>
-            <p class="text-3xl font-bold text-red-500 mt-2 font-mono">{{ total_malicioso }}</p>
+            <p class="text-3xl font-bold text-red-500 mt-2 font-mono" data-testid="kpi-total-malicioso">{{ total_malicioso }}</p>
             <p class="text-xs text-slate-500 mt-1">Amenazas confirmadas</p>
         </div>
     </div>
@@ -145,11 +145,11 @@
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 flex flex-col">
             <p class="text-sm font-semibold text-white mb-4">Dejar nota para el próximo turno</p>
             {% if request.user.profile.role != 'trainee' %}
-            <form method="POST" action="{% url 'turno_nota_save' %}" class="flex flex-col flex-1 gap-3">
+            <form method="POST" action="{% url 'turno_nota_save' %}" class="flex flex-col flex-1 gap-3" data-testid="turno-nota-form">
                 {% csrf_token %}
-                <textarea name="contenido" rows="5" placeholder="Ej: Turno Noche — Dejo 3 alertas escaladas a incidentes por posible Ransomware. Revisar correlation ID 4821."
+                <textarea name="contenido" rows="5" placeholder="Ej: Turno Noche — Dejo 3 alertas escaladas a incidentes por posible Ransomware. Revisar correlation ID 4821." data-testid="turno-nota-textarea"
                     class="flex-1 w-full bg-slate-900/60 border border-slate-700 text-slate-200 placeholder-slate-600 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
-                <button type="submit"
+                <button type="submit" data-testid="turno-nota-submit"
                     class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-md transition-colors">
                     Registrar nota
                 </button>
@@ -170,12 +170,12 @@
     <div class="bg-slate-800 border border-slate-700 rounded-lg">
         <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
             <p class="text-sm font-semibold text-white">Últimas alertas</p>
-            <a href="{% url 'alert_list' %}" class="text-xs text-blue-400 hover:text-blue-300 font-medium">
+            <a href="{% url 'alert_list' %}" data-testid="dashboard-view-all-alerts-2" class="text-xs text-blue-400 hover:text-blue-300 font-medium">
                 Ver todas →
             </a>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
+            <table class="w-full text-left text-sm" data-testid="dashboard-recent-alerts-table">
                 <thead>
                     <tr class="border-b border-slate-700">
                         <th class="px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Fecha</th>
@@ -189,7 +189,7 @@
                 </thead>
                 <tbody class="divide-y divide-slate-700/50">
                     {% for alert in recent_alerts %}
-                    <tr class="hover:bg-slate-700/30 transition-colors {% if alert.latest_prediction.predicted_class == 'malicioso' %}border-l-2 border-l-red-500{% endif %}">
+                    <tr class="hover:bg-slate-700/30 transition-colors {% if alert.latest_prediction.predicted_class == 'malicioso' %}border-l-2 border-l-red-500{% endif %}" data-testid="dashboard-alert-row-{{ alert.pk }}">
                         <td class="px-5 py-3 text-xs font-mono text-slate-400 whitespace-nowrap">{{ alert.created_at|date:"Y-m-d H:i" }}</td>
 
                         <!-- Severidad -->
@@ -246,7 +246,7 @@
                         <!-- Acción SHAP -->
                         <td class="px-5 py-3">
                             {% if alert.latest_prediction.predicted_class %}
-                            <a href="{% url 'alert_shap' alert.pk %}?next=dashboard"
+                            <a href="{% url 'alert_shap' alert.pk %}?next=dashboard" data-testid="dashboard-shap-link-{{ alert.pk }}"
                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-colors">
                                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5" />

@@ -11,6 +11,8 @@ import json
 import numpy as np
 import pandas as pd
 
+from .utils import MAP_MITRE_TACTIC
+
 # Campos mínimos para que una predicción sea válida
 REQUIRED_COLUMNS = [
     'event_category',
@@ -253,6 +255,15 @@ def clean_records(records: list) -> tuple:
     for col in CATEGORICAL_COLUMNS:
         if col in df.columns:
             df[col] = df[col].astype(str).str.lower().str.strip()
+
+    # 4b. mitre_tactic — mapear al vocabulario real de tácticas MITRE (mismo diccionario
+    # que usa el predictor individual en utils.py). Sin este paso, un valor no reconocido
+    # pero no-nulo (ej. "0" de un export con columnas corridas) pasaba tal cual a la BD
+    # en vez de caer a 'unknown' como el resto de valores no mapeados.
+    if 'mitre_tactic' in df.columns:
+        df['mitre_tactic'] = df['mitre_tactic'].apply(
+            lambda v: MAP_MITRE_TACTIC.get(str(v).strip().lower().replace(' ', ''), 'unknown')
+        )
 
     # 5. Convertir columnas numéricas
     for col in NUMERIC_COLUMNS:
