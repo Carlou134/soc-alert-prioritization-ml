@@ -2,6 +2,28 @@ import pytest
 from django.contrib.auth.models import User
 
 
+@pytest.fixture(autouse=True)
+def _use_simple_static_storage(settings):
+    """whitenoise.storage.CompressedManifestStaticFilesStorage exige el
+    manifiesto de `collectstatic` — no corre en el entorno de test. Cualquier
+    template con {% static %} rompería con ValueError sin este override."""
+    settings.STORAGES = {
+        **settings.STORAGES,
+        'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+    }
+
+
+@pytest.fixture
+def q_cluster_sync(monkeypatch):
+    """Fuerza que async_task() de django-q2 corra sincrónico en el proceso
+    del test. django_q.conf.Conf.SYNC se calcula una sola vez, al importar
+    el módulo (lee settings.Q_CLUSTER en ese momento) — sobreescribir
+    settings.Q_CLUSTER en runtime (vía el fixture `settings`) no tiene ningún
+    efecto porque Conf ya quedó cacheada; hay que parchear la clase."""
+    from django_q.conf import Conf
+    monkeypatch.setattr(Conf, 'SYNC', True)
+
+
 @pytest.fixture
 def make_user(db):
     """Crea un User con su UserProfile (via señal) en el rol pedido."""
