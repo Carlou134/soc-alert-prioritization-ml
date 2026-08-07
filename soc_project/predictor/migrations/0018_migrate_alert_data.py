@@ -14,7 +14,7 @@ def split_alert_data(apps, schema_editor):
         return
 
     # ModelVersion "legacy" — todas las predicciones ya existentes (y las nuevas,
-    # hasta que exista un pipeline de reentrenamiento real) quedan asociadas acá.
+    # hasta que exista un pipeline de reentrenamiento real) quedan asociadas aquí.
     legacy_version, _ = ModelVersion.objects.get_or_create(
         version_label='legacy-pre-migration',
         defaults={

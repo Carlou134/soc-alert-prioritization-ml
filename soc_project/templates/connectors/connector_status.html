@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block title %}Estado de conectores — SOC Predictor{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+
+    <!-- Header -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h1 class="text-xl font-semibold text-white">Estado de conectores</h1>
+            <p class="text-sm text-slate-400 mt-0.5">Vista de solo lectura — la configuración y las credenciales las administra un admin.</p>
+        </div>
+        <span data-testid="connector-status-count" class="text-xs text-slate-500 bg-slate-800 border border-slate-700 rounded-full px-3 py-1">
+            {{ connectors|length }} conector{{ connectors|length|pluralize:"es" }}
+        </span>
+    </div>
+
+    {% if not connectors %}
+    <div class="bg-slate-800/50 border border-dashed border-slate-700 rounded-xl p-10 text-center" data-testid="connector-status-empty-state">
+        <p class="text-slate-400 text-sm">Todavía no hay ningún conector configurado.</p>
+        <p class="text-slate-500 text-xs mt-1">Un administrador puede agregar uno desde "Conectores SIEM".</p>
+    </div>
+    {% else %}
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" data-testid="connector-status-grid">
+        {% for c in connectors %}
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 flex flex-col gap-4" data-testid="connector-status-card-{{ c.pk }}">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-white truncate" data-testid="connector-status-name-{{ c.pk }}">{{ c.name }}</p>
+                    <p class="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+                        <span class="text-[10px] font-semibold tracking-wide {% if c.category == 'XDR' %}text-fuchsia-400{% else %}text-sky-400{% endif %}">{{ c.category }}</span>
+                        <span class="truncate">{{ c.get_source_type_display }}</span>
+                    </p>
+                </div>
+                {% if c.status == 'connected' %}
+                <span data-testid="connector-status-badge-{{ c.pk }}" class="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Conectado
+                </span>
+                {% elif c.status == 'error' %}
+                <span data-testid="connector-status-badge-{{ c.pk }}" class="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> Error
+                </span>
+                {% else %}
+                <span data-testid="connector-status-badge-{{ c.pk }}" class="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-slate-700 text-slate-400 border border-slate-600">
+                    <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> No probado
+                </span>
+                {% endif %}
+            </div>
+
+            <div class="text-xs text-slate-500 space-y-1">
+                <p>Polling cada {{ c.poll_interval_minutes }} min · {% if c.is_active %}<span class="text-slate-400">Activo</span>{% else %}<span class="text-slate-600">Inactivo</span>{% endif %}</p>
+                {% if c.last_tested_at %}
+                <p data-testid="connector-status-last-tested-{{ c.pk }}">Última prueba: {{ c.last_tested_at|date:"d/m/Y H:i" }}</p>
+                {% endif %}
+                {% if c.last_synced_at %}
+                <p data-testid="connector-status-last-synced-{{ c.pk }}">Última sincronización: {{ c.last_synced_at|date:"d/m/Y H:i" }}</p>
+                {% else %}
+                <p class="text-slate-600">Sin sincronizaciones todavía</p>
+                {% endif %}
+            </div>
+
+            {% if c.last_test_message %}
+            <p data-testid="connector-status-message-{{ c.pk }}" class="text-xs rounded-md px-3 py-2 {% if c.status == 'connected' %}bg-emerald-500/10 text-emerald-400{% else %}bg-red-500/10 text-red-400{% endif %}">
+                {{ c.last_test_message }}
+            </p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

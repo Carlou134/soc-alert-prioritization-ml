@@ -422,4 +422,4 @@ try:
     subprocess.run([_sys.executable, manage_py, "sync_mitre_attack"], check=True, timeout=180)
 except Exception as e:
     print(f"\n[WARN] No se pudo sincronizar metadata de MITRE ATT&CK: {e}")
-    print('El modelo se entrenó igual — corré "python manage.py sync_mitre_attack" a mano cuando quieras.')
+    print('El modelo se entrenó igual — ejecuta "python manage.py sync_mitre_attack" a mano cuando quieras.')

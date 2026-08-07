@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from accounts.decorators import admin_required
+from accounts.decorators import admin_required, analyst_required
 from accounts.models import (
     ACTION_CONNECTOR_CREATED,
     ACTION_CONNECTOR_DELETED,
@@ -27,6 +27,7 @@ from .forms import (
     required_extra_fields,
 )
 from .models import SIEMConnector
+from . import splunk_service
 
 # Prefills por tipo de SIEM cuando se llega desde la galería (?type=splunk, etc).
 SIEM_TYPE_DEFAULTS = {
@@ -95,6 +96,19 @@ def connector_list_view(request):
         'connectors': connectors,
         'source_choices': SIEMConnector.SOURCE_CHOICES,
     })
+
+
+@login_required
+@analyst_required
+def connector_status_view(request):
+    """
+    Vista de solo lectura para analistas (N1/N2/N3) — mismo estado que ve el
+    admin (conectado/error/no probado, últimas fechas de prueba y sync), pero
+    sin credenciales, sin config de conexión y sin botones de gestión. Crear/
+    editar/eliminar/probar sigue siendo exclusivo de admin_required.
+    """
+    connectors = SIEMConnector.objects.all()
+    return render(request, 'connectors/connector_status.html', {'connectors': connectors})
 
 
 @login_required
@@ -180,12 +194,9 @@ def connector_delete_view(request, pk):
 @require_POST
 def connector_test_view(request, pk):
     """
-    Prueba de conexión SIMULADA — no se hace ninguna llamada de red real a
-    ningún SIEM. Solo valida que el conector tenga host configurado y las
-    credenciales que su tipo (y, en Splunk, su auth_type) requiere — ver
-    required_credential_fields() en forms.py.
-    La latencia "de red" se simula en el frontend (JS), no aquí — así no se
-    bloquea un worker de Django con un sleep().
+    Splunk: prueba de conexión REAL contra la REST API de management
+    (ver splunk_service.py). El resto de los tipos siguen simulados — no
+    hay una instancia real contra la cual probarlos todavía.
     """
     connector = get_object_or_404(SIEMConnector, pk=pk)
 
@@ -204,6 +215,8 @@ def connector_test_view(request, pk):
         success, message = False, f'Faltan credenciales configuradas: {", ".join(missing_creds)}.'
     elif missing_extra:
         success, message = False, f'Falta configurar: {", ".join(missing_extra)}.'
+    elif connector.source_type == 'splunk':
+        success, message = splunk_service.test_connection(connector)
     else:
         success, message = True, f'Conexión simulada exitosa a {connector.get_source_type_display()}.'
 

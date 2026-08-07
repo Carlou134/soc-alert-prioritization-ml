@@ -379,7 +379,7 @@ def _bulk_create_alerts(pairs, user):
     """Crea Alert + AlertWorkflow pareado (siempre) + PredictionLog (si hubo predicción).
 
     `pairs` es una lista de (alert, prediction_kwargs) sin guardar todavía.
-    bulk_create no dispara save()/señales, así que el pareo se arma a mano acá
+    bulk_create no dispara save()/señales, así que el pareo se arma a mano aquí
     en vez de depender de un hook automático. Devuelve los Alert ya guardados,
     en el mismo orden que `pairs`.
 

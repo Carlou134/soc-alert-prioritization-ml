@@ -8,7 +8,7 @@ def process_alert_batch(dataset_id, records, user_id):
     """Tarea async (django-q2): predice y guarda un lote de alertas ya limpias.
 
     Compartida por upload_alerts_view y pipeline_normalize_view (Track 5) —
-    lo lento (predict_batch + bulk_create) se movió acá para que el navegador
+    lo lento (predict_batch + bulk_create) se movió aquí para que el navegador
     ya no tenga que quedarse en la página mientras procesa. Cualquier
     excepción no prevista deja el Dataset en 'failed' con error_message, así
     el polling del frontend nunca queda esperando un estado que no llega.

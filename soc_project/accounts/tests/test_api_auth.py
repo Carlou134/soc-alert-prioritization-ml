@@ -10,7 +10,7 @@ def client():
 
 
 # ── Register (HU001) ─────────────────────────────────────────────────────────
-# QA (su CP) cubre Esc.1 Registro exitoso — acá cubrimos Esc.2, el gap que
+# QA (su CP) cubre Esc.1 Registro exitoso — aquí cubrimos Esc.2, el gap que
 # el propio mapeo de QA señaló sin caso de prueba formal.
 
 @pytest.mark.django_db
@@ -59,7 +59,7 @@ def test_register_rejects_missing_fields(client):
 
 
 # ── Login (HU002) ────────────────────────────────────────────────────────────
-# QA cubre Esc.2 Credenciales inválidas — acá cubrimos Esc.1, el gap señalado.
+# QA cubre Esc.2 Credenciales inválidas — aquí cubrimos Esc.1, el gap señalado.
 
 @pytest.mark.django_db
 def test_login_succeeds_with_valid_credentials(client, make_user):
@@ -91,7 +91,7 @@ def test_login_rejects_missing_credentials(client):
 
 
 # ── Logout (HU005) ───────────────────────────────────────────────────────────
-# QA cubre Esc.2 Sesión expirada — acá cubrimos Esc.1 Cierre de sesión exitoso.
+# QA cubre Esc.2 Sesión expirada — aquí cubrimos Esc.1 Cierre de sesión exitoso.
 
 @pytest.mark.django_db
 def test_logout_blacklists_refresh_token(make_user):
