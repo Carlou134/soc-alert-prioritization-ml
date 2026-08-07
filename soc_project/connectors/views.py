@@ -78,6 +78,26 @@ SIEM_TYPE_DEFAULTS = {
 }
 
 
+def _deactivate_other_active_splunk_connectors(saved_connector):
+    """
+    Un solo conector Splunk activo a la vez. Dos conectores Splunk activos
+    en simultáneo llevarían cada uno su propio last_synced_at, y el
+    dispatcher (sync_due_connectors) le pediría a Splunk las mismas alertas
+    dos veces — Alert duplicados en la BD, sin ningún control de duplicados
+    contra Splunk (solo existe para archivos subidos a mano). Devuelve la
+    cantidad de conectores que se desactivaron, para poder avisarle al admin.
+    """
+    if saved_connector.source_type != 'splunk' or not saved_connector.is_active:
+        return 0
+    others = SIEMConnector.objects.filter(
+        source_type='splunk', is_active=True,
+    ).exclude(pk=saved_connector.pk)
+    count = others.count()
+    if count:
+        others.update(is_active=False)
+    return count
+
+
 def _form_context():
     return {
         'credential_fields_json': json.dumps(CREDENTIAL_FIELDS_BY_TYPE),
@@ -126,6 +146,7 @@ def connector_create_view(request):
             connector.credentials = form.build_credentials()
             connector.extra_config = form.build_extra_config()
             connector.save()
+            deactivated = _deactivate_other_active_splunk_connectors(connector)
 
             log_action(
                 request.user,
@@ -133,6 +154,8 @@ def connector_create_view(request):
                 f'Conector "{connector.name}" ({connector.get_source_type_display()}) creado por {request.user.username}.',
             )
             messages.success(request, f'Conector "{connector.name}" creado. Todavía no fue probado.')
+            if deactivated:
+                messages.info(request, f'Se desactivó automáticamente {deactivated} conector(es) Splunk que ya estaban activos — solo puede haber uno a la vez para evitar ingesta duplicada.')
             return redirect('connector_list')
 
     return render(request, 'connectors/connector_form.html', {
@@ -160,6 +183,7 @@ def connector_edit_view(request, pk):
             connector.status = 'not_tested'
             connector.last_test_message = ''
             connector.save()
+            deactivated = _deactivate_other_active_splunk_connectors(connector)
 
             log_action(
                 request.user,
@@ -167,6 +191,8 @@ def connector_edit_view(request, pk):
                 f'Conector "{connector.name}" editado por {request.user.username}.',
             )
             messages.success(request, f'Conector "{connector.name}" actualizado.')
+            if deactivated:
+                messages.info(request, f'Se desactivó automáticamente {deactivated} conector(es) Splunk que ya estaban activos — solo puede haber uno a la vez para evitar ingesta duplicada.')
             return redirect('connector_list')
 
     return render(request, 'connectors/connector_form.html', {
