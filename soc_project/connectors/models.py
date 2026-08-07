@@ -35,13 +35,28 @@ EXTRA_CONFIG_FIELD_LABELS = {
 
 class SIEMConnector(models.Model):
     SOURCE_CHOICES = [
+        # SIEM — centraliza logs crudos
         ('splunk', 'Splunk Enterprise / Cloud'),
         ('sentinel', 'Microsoft Sentinel'),
         ('qradar', 'IBM QRadar'),
         ('elastic', 'Elastic Security'),
         ('wazuh', 'Wazuh'),
         ('cortex_xsiam', 'Cortex XSIAM (Palo Alto)'),
+        # XDR — entrega incidentes ya correlacionados/enriquecidos (MITRE ATT&CK)
+        ('crowdstrike', 'CrowdStrike Falcon Insight XDR'),
+        ('defender_xdr', 'Microsoft Defender XDR'),
+        ('cortex_xdr', 'Cortex XDR (Palo Alto)'),
+        ('trendmicro', 'Trend Micro Vision One'),
     ]
+    # Pura función de source_type, no un campo propio — la categoría de un
+    # conector no es algo que el admin deba poder desincronizar de su tipo
+    # (no tendría sentido marcar "CrowdStrike" como categoría SIEM). Se
+    # deriva aquí en vez de guardarse en una columna aparte.
+    SOURCE_CATEGORY = {
+        'splunk': 'SIEM', 'sentinel': 'SIEM', 'qradar': 'SIEM',
+        'elastic': 'SIEM', 'wazuh': 'SIEM', 'cortex_xsiam': 'SIEM',
+        'crowdstrike': 'XDR', 'defender_xdr': 'XDR', 'cortex_xdr': 'XDR', 'trendmicro': 'XDR',
+    }
     STATUS_CHOICES = [
         ('not_tested', 'No probado'),
         ('connected', 'Conectado'),
@@ -79,7 +94,7 @@ class SIEMConnector(models.Model):
     # en Cortex XSIAM). Se separa de `credentials` porque no son secretos —
     # ver EXTRA_CONFIG_FIELD_LABELS. Igual que `credentials`, cada source_type
     # usa solo el subconjunto que le corresponde (ver EXTRA_CONFIG_FIELDS_BY_TYPE
-    # en forms.py). Campos usados por un solo tipo van acá en vez de ser
+    # en forms.py). Campos usados por un solo tipo van aquí en vez de ser
     # columnas propias — evita agregar 4+ columnas casi siempre NULL a la tabla.
     extra_config = models.JSONField(default=dict, blank=True)
 
@@ -92,7 +107,7 @@ class SIEMConnector(models.Model):
 
     # Checkpointing de ingesta incremental — lo va a setear el worker real
     # (no implementado todavía) después de cada sync exitoso, para pedirle
-    # al SIEM solo lo nuevo desde acá y no reprocesar alertas ya traídas.
+    # al SIEM solo lo nuevo desde aquí y no reprocesar alertas ya traídas.
     # No es un campo del form: es de solo lectura para el analista.
     last_synced_at = models.DateTimeField(null=True, blank=True)
 
@@ -106,11 +121,15 @@ class SIEMConnector(models.Model):
 
     class Meta:
         ordering = ['-created_at']
-        verbose_name = 'Conector SIEM'
-        verbose_name_plural = 'Conectores SIEM'
+        verbose_name = 'Conector SOC'
+        verbose_name_plural = 'Conectores SOC'
 
     def __str__(self):
         return f'{self.name} ({self.get_source_type_display()})'
+
+    @property
+    def category(self):
+        return self.SOURCE_CATEGORY.get(self.source_type, 'SIEM')
 
     @property
     def connection_url(self):

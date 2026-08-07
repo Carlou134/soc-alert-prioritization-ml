@@ -27,6 +27,11 @@ CREDENTIAL_FIELDS_BY_TYPE = {
     'elastic':      None,  # depende de auth_type: api_key | user_password
     'wazuh':        None,  # depende de auth_type: api_key | user_password
     'cortex_xsiam': ['api_key_id', 'api_key'],
+    # XDRs — mismas formas de auth que ya existían en algún SIEM, reutilizadas tal cual.
+    'crowdstrike':  ['client_id', 'client_secret'],           # OAuth2 client credentials
+    'defender_xdr': ['tenant_id', 'client_id', 'client_secret'],  # idéntico a Sentinel (mismo Azure AD)
+    'cortex_xdr':   ['api_key_id', 'api_key'],                # idéntico a Cortex XSIAM
+    'trendmicro':   ['api_token'],                            # token estático de larga duración
 }
 
 AUTH_TYPE_CREDENTIAL_FIELDS = {
@@ -36,7 +41,7 @@ AUTH_TYPE_CREDENTIAL_FIELDS = {
 }
 
 # Qué opciones de auth_type tiene sentido ofrecer por tipo — Splunk no hace
-# Basic+API Key como Elastic, cada uno tiene su propio par. Tipos ausentes acá
+# Basic+API Key como Elastic, cada uno tiene su propio par. Tipos ausentes aquí
 # (sentinel/qradar/cortex_xsiam) no usan auth_type — su auth es fija.
 AUTH_TYPE_CHOICES_BY_TYPE = {
     'splunk':  ['user_password', 'bearer_token'],
@@ -50,14 +55,16 @@ EXTRA_CONFIG_FIELDS_BY_TYPE = {
     'elastic':      ['index_pattern'],
     'wazuh':        ['index_pattern'],
     'cortex_xsiam': ['min_severity'],
+    'defender_xdr': ['min_severity'],
 }
 
 # Qué campo de la config (custom_query) tiene cada tipo, y cómo se llama en su propio lenguaje —
 # usado solo por el JS del template para reetiquetar el mismo <textarea>/<input>.
 QUERY_LANGUAGE_LABEL_BY_TYPE = {
-    'splunk':   'Consulta SPL',
-    'sentinel': 'Filtro KQL',
-    'qradar':   'Filtro AQL',
+    'splunk':      'Consulta SPL',
+    'sentinel':    'Filtro KQL',
+    'qradar':      'Filtro AQL',
+    'crowdstrike': 'Filtro FQL',
 }
 
 # Qué campos del bloque "Configuración avanzada" se muestran para cada tipo —
@@ -72,6 +79,10 @@ ADV_FIELDS_BY_TYPE = {
     'elastic':      ['auth_type', 'index_pattern'],
     'wazuh':        ['auth_type', 'index_pattern'],
     'cortex_xsiam': ['min_severity'],
+    'crowdstrike':  ['custom_query'],
+    'defender_xdr': ['min_severity'],
+    # cortex_xdr y trendmicro no tienen campos avanzados propios en el mapeo —
+    # solo host + credenciales, igual que Cortex XSIAM sin el filtro de severidad.
 }
 
 _CREDENTIAL_FIELD_NAMES = (
@@ -180,7 +191,7 @@ class SIEMConnectorForm(forms.ModelForm):
         return {k: v for k, v in existing.items() if k in relevant}
 
     def build_extra_config(self):
-        """Igual que build_credentials(), pero para config no-secreta — acá
+        """Igual que build_credentials(), pero para config no-secreta — aquí
         además el form SÍ prefillea el valor existente al editar (ver
         connector_edit_view), así que en la práctica el campo nunca llega
         vacío salvo que el usuario lo borre a propósito."""

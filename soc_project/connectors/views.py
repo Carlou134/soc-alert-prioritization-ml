@@ -61,6 +61,19 @@ SIEM_TYPE_DEFAULTS = {
     'cortex_xsiam': {
         'min_severity': 'MEDIUM',
     },
+    # XDRs
+    'crowdstrike': {
+        'host': 'api.crowdstrike.com',
+        'custom_query': "status:'new'+severity_name:['High','Critical']",
+    },
+    'defender_xdr': {
+        'host': 'graph.microsoft.com',
+        'min_severity': 'HIGH',
+    },
+    'cortex_xdr': {},
+    'trendmicro': {
+        'host': 'api.trendmicro.com',
+    },
 }
 
 
@@ -171,7 +184,7 @@ def connector_test_view(request, pk):
     ningún SIEM. Solo valida que el conector tenga host configurado y las
     credenciales que su tipo (y, en Splunk, su auth_type) requiere — ver
     required_credential_fields() en forms.py.
-    La latencia "de red" se simula en el frontend (JS), no acá — así no se
+    La latencia "de red" se simula en el frontend (JS), no aquí — así no se
     bloquea un worker de Django con un sleep().
     """
     connector = get_object_or_404(SIEMConnector, pk=pk)

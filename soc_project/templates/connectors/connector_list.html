@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Conectores SIEM — SOC Predictor{% endblock %}
+{% block title %}Conectores SOC — SOC Predictor{% endblock %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto space-y-8">
@@ -8,8 +8,8 @@
     <!-- Header -->
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h1 class="text-xl font-semibold text-white">Conectores SIEM</h1>
-            <p class="text-sm text-slate-400 mt-0.5">Conectá tus herramientas de seguridad para ingestar alertas automáticamente.</p>
+            <h1 class="text-xl font-semibold text-white">Conectores SOC</h1>
+            <p class="text-sm text-slate-400 mt-0.5">Conectá tus SIEMs y plataformas XDR para ingestar alertas automáticamente.</p>
         </div>
         <span data-testid="connector-count" class="text-xs text-slate-500 bg-slate-800 border border-slate-700 rounded-full px-3 py-1">
             {{ connectors|length }} conector{{ connectors|length|pluralize:"es" }} configurado{{ connectors|length|pluralize:"s" }}
@@ -29,7 +29,8 @@
 
     <!-- Galería: conectar un SIEM nuevo -->
     <div>
-        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Conectar un nuevo SIEM</p>
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">SIEM</p>
+        <p class="text-xs text-slate-600 mb-3">Centraliza logs crudos — la consulta que trae las alertas es configurable.</p>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" data-testid="connector-siem-gallery">
 
             <a href="{% url 'connector_create' %}?type=splunk" data-testid="connector-add-splunk"
@@ -83,6 +84,47 @@
         </div>
     </div>
 
+    <!-- Galería: conectar un XDR nuevo -->
+    <div>
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">XDR</p>
+        <p class="text-xs text-slate-600 mb-3">Entrega incidentes ya correlacionados y enriquecidos con MITRE ATT&amp;CK.</p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="connector-xdr-gallery">
+
+            <a href="{% url 'connector_create' %}?type=crowdstrike" data-testid="connector-add-crowdstrike"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-red-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center group-hover:bg-red-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">CrowdStrike Falcon</span>
+            </a>
+
+            <a href="{% url 'connector_create' %}?type=defender_xdr" data-testid="connector-add-defender_xdr"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-blue-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">Microsoft Defender XDR</span>
+            </a>
+
+            <a href="{% url 'connector_create' %}?type=cortex_xdr" data-testid="connector-add-cortex_xdr"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-rose-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center justify-center group-hover:bg-rose-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">Cortex XDR</span>
+            </a>
+
+            <a href="{% url 'connector_create' %}?type=trendmicro" data-testid="connector-add-trendmicro"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-fuchsia-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/30 flex items-center justify-center group-hover:bg-fuchsia-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-fuchsia-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">Trend Micro Vision One</span>
+            </a>
+
+        </div>
+    </div>
+
     <!-- Conectores configurados -->
     <div>
         <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Conectores configurados</p>
@@ -99,7 +141,10 @@
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
                         <p class="text-sm font-semibold text-white truncate" data-testid="connector-name-{{ c.pk }}">{{ c.name }}</p>
-                        <p class="text-xs text-slate-400 mt-0.5">{{ c.get_source_type_display }}</p>
+                        <p class="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+                            <span class="text-[10px] font-semibold tracking-wide {% if c.category == 'XDR' %}text-fuchsia-400{% else %}text-sky-400{% endif %}">{{ c.category }}</span>
+                            <span class="truncate">{{ c.get_source_type_display }}</span>
+                        </p>
                     </div>
                     {% if c.status == 'connected' %}
                     <span data-testid="connector-status-{{ c.pk }}" class="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
