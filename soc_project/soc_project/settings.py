@@ -27,6 +27,7 @@ INSTALLED_APPS = [
 
     'accounts',
     'predictor',
+    'connectors',
     'tailwind',
     'theme',
 ]
