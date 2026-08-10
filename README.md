@@ -153,9 +153,9 @@ Open your browser at:
 http://127.0.0.1:8000/
 ```
 
-### 8. Run the background worker (required for alert uploads)
+### 8. Run the background worker (required for alert uploads and SIEM sync)
 
-Alert uploads (both the simple upload form and the normalization pipeline) are processed asynchronously via [django-q2](https://django-q2.readthedocs.io/), so predictions are saved even if you navigate away mid-upload. This needs its own process — open a **second terminal** (with the same virtualenv activated) and run:
+Alert uploads (both the simple upload form and the normalization pipeline) are processed asynchronously via [django-q2](https://django-q2.readthedocs.io/), so predictions are saved even if you navigate away mid-upload. The same worker also runs the Splunk connector's periodic sync (see "SIEM Integration" below). This needs its own process — open a **second terminal** (with the same virtualenv activated) and run:
 
 ```bash
 cd soc_project
@@ -195,6 +195,41 @@ Two-stage hierarchical classifier (RandomForest → LightGBM), trained from `soc
 To retrain from scratch: `python train_model.py` (or delete `soc_model.pkl` and restart the server — it auto-trains on first run). Retraining also auto-syncs a local cache of real MITRE ATT&CK technique names/descriptions (`python manage.py sync_mitre_attack`) used on the alert detail page — see [docs/model.md](docs/model.md#retraining).
 
 📄 Full architecture, hyperparameters, and evaluation: **[docs/model.md](docs/model.md)** · Training data breakdown: **[docs/dataset.md](docs/dataset.md)**
+
+---
+
+## 🔌 SIEM Integration (Splunk)
+
+Admins can connect the app to a SIEM/XDR platform from **Conectores SIEM** in the sidebar (`/connectors/`). Splunk is the only type with a **real** connection today (REST API-based) — the other 9 supported types (Sentinel, QRadar, Elastic, Wazuh, Cortex XSIAM, CrowdStrike, Defender XDR, Cortex XDR, Trend Micro) are configurable but simulated, pending a real instance to validate against.
+
+### Connector parameters (Splunk)
+
+| Field | Value | Notes |
+|---|---|---|
+| Host / IP | e.g. `localhost` | No scheme (`https://` added automatically) |
+| Port | `8089` | Splunk's **management REST API** port — not `8000` (Web UI) or `8088` (HEC, see below) |
+| Auth type | Usuario y contraseña / Token (Bearer) | Basic Auth or `Authorization: Bearer <token>` |
+| Consulta SPL | `search index=soc_alerts` | Prefilled; the incremental time window (`earliest_time`/`latest_time`) is added automatically, not part of this string |
+| Verify SSL | off (recommended for local dev) | Splunk's default cert is self-signed |
+| Frecuencia de polling | 5 min (default) | How often the background sync checks for new alerts |
+
+### Splunk-side setup (one-time)
+
+1. **Create the index**: Splunk Web → *Settings → Indexes → New Index* → name it exactly `soc_alerts`. Indexes aren't auto-created.
+2. **Create an HEC token** (for the external worker to push events in): *Settings → Data Inputs → HTTP Event Collector → New Token*. This uses a **different port (`8088`)** and a separate token from the connector's own credentials above.
+3. Events must be sent with **`"sourcetype": "_json"`** — otherwise Splunk may not extract the JSON fields, and the app's own fallback (parsing `_raw` directly) is what actually makes ingestion work regardless, but `_json` keeps it aligned with Splunk's own field-extraction UI too.
+
+### Field contract (what the external worker's JSON events must contain)
+
+Matches `predictor/pipeline.py` — the **same** cleaning/validation pipeline used by manual CSV/JSON uploads, reused as-is for Splunk ingestion.
+
+| Required | Optional | Display only |
+|---|---|---|
+| `event_category`, `protocol`, `traffic_type`, `mitre_tactic`, `kill_chain_stage`, `severity`, `ids_ips_alert`, `asset_criticality`, `log_source`, `firewall_action`, `failed_login_attempts`, `request_rate_per_min` | `correlation_id`, `mitre_techniques`, `has_threat_family`, `evidence_role`, `os_family`, `anomaly_score` | `attack_type`, `attack_signature`, `malware_indicator`, `label` |
+
+### Running it
+
+The background sync (`connectors.tasks.sync_due_connectors`) is a `django-q2` scheduled task that runs every minute — it needs **the same `qcluster` process from step 8 above**, nothing extra to start. Admins can force an immediate sync (bypassing the schedule and resetting the checkpoint) with the ↻ button on the connector's card in `/connectors/`.
 
 ---
 
