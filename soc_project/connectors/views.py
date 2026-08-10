@@ -11,6 +11,7 @@ from accounts.decorators import admin_required, analyst_required
 from accounts.models import (
     ACTION_CONNECTOR_CREATED,
     ACTION_CONNECTOR_DELETED,
+    ACTION_CONNECTOR_RESYNCED,
     ACTION_CONNECTOR_TESTED,
     ACTION_CONNECTOR_UPDATED,
     log_action,
@@ -28,6 +29,7 @@ from .forms import (
 )
 from .models import SIEMConnector
 from . import splunk_service
+from . import tasks as connector_tasks
 
 # Prefills por tipo de SIEM cuando se llega desde la galería (?type=splunk, etc).
 SIEM_TYPE_DEFAULTS = {
@@ -263,3 +265,71 @@ def connector_test_view(request, pk):
         'message': message,
         'tested_at': connector.last_tested_at.strftime('%d/%m/%Y %H:%M'),
     })
+
+
+def _run_sync_now(request, pk, *, reset_checkpoint, action, action_label):
+    connector = get_object_or_404(SIEMConnector, pk=pk)
+
+    if connector.source_type != 'splunk':
+        return JsonResponse({'error': 'La sincronización manual solo está disponible para Splunk por ahora.'}, status=400)
+
+    if reset_checkpoint:
+        connector.last_synced_at = None
+        connector.save(update_fields=['last_synced_at'])
+
+    connector_tasks.sync_splunk_connector(connector.pk)
+    connector.refresh_from_db()
+
+    log_action(
+        request.user,
+        action,
+        f'{action_label} del conector "{connector.name}" por {request.user.username} — resultado: {connector.last_test_message or connector.get_status_display()}',
+    )
+
+    return JsonResponse({
+        'status': connector.status,
+        'status_label': connector.get_status_display(),
+        'message': connector.last_test_message,
+        'last_synced_at': connector.last_synced_at.strftime('%d/%m/%Y %H:%M') if connector.last_synced_at else None,
+    })
+
+
+@login_required
+@admin_required
+@require_POST
+def connector_sync_now_view(request, pk):
+    """
+    Botón principal "Sincronizar ahora" — corre sync_splunk_connector() en
+    el momento (síncrono, no encolado), SIN tocar el checkpoint. Es el
+    equivalente a "no quiero esperar al Schedule de 1 minuto", sin efectos
+    secundarios: usa el mismo last_synced_at que ya tenía, así que nunca
+    vuelve a traer algo que ya se guardó antes.
+    """
+    return _run_sync_now(
+        request, pk, reset_checkpoint=False,
+        action=ACTION_CONNECTOR_RESYNCED, action_label='Sincronización manual',
+    )
+
+
+@login_required
+@admin_required
+@require_POST
+def connector_force_resync_view(request, pk):
+    """
+    Botón secundario "Resetear checkpoint completo" — resetea el checkpoint
+    (last_synced_at=None) y vuelve a traer TODO desde que se creó el
+    conector, incluido lo que ya se guardó antes. A propósito destructivo:
+    reservado para cuando el checkpoint quedó roto/adelantado de más (ver
+    el bug corregido en connectors/tasks.py) — en uso normal, usar
+    "Sincronizar ahora" en su lugar.
+
+    Bug real encontrado en uso (2026-08-10): un admin lo usó como si fuera
+    "traeme lo nuevo" en vez de "reseteá todo" — el segundo click duplicó
+    las alertas ya guardadas del primer click, porque clean_records no
+    dedupea contra lo que ya está en la BD. Por eso ahora hay dos botones
+    separados en vez de uno solo que hacía las dos cosas.
+    """
+    return _run_sync_now(
+        request, pk, reset_checkpoint=True,
+        action=ACTION_CONNECTOR_RESYNCED, action_label='Reset completo de checkpoint',
+    )

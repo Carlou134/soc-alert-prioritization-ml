@@ -186,24 +186,39 @@
                 </p>
                 {% endif %}
 
-                <div class="flex items-center gap-2 mt-auto pt-3 border-t border-slate-700/50">
-                    <button type="button" data-testid="connector-test-btn-{{ c.pk }}" data-connector-id="{{ c.pk }}"
-                            class="connector-test-btn flex-1 inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-md px-3 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                        <svg class="test-btn-icon w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12a7.5 7.5 0 0015 0m-15 0a7.5 7.5 0 1115 0m-15 0H3m16.5 0H21m-1.5 0H12m-8.457 3.077l1.41-.513m14.095-5.13l1.41-.513M5.106 17.785l1.15-.964m11.49-9.642l1.149-.964M7.501 19.795l.75-1.3m7.5-12.99l.75-1.3m-6.063 16.658l.26-1.477m2.605-14.772l.26-1.477m0 17.726l-.26-1.477M10.698 4.614l-.26-1.477M16.5 19.794l-.75-1.299M7.5 4.205L12 12" /></svg>
-                        <span class="test-btn-label">Probar conexión</span>
-                    </button>
-                    <a href="{% url 'connector_edit' c.pk %}" data-testid="connector-edit-btn-{{ c.pk }}"
-                       class="inline-flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-md px-3 py-2 transition-colors">
-                        Editar
-                    </a>
-                    <form method="post" action="{% url 'connector_delete' c.pk %}" data-testid="connector-delete-form-{{ c.pk }}"
-                          onsubmit="return confirm('¿Eliminar el conector &quot;{{ c.name|escapejs }}&quot;?');">
-                        {% csrf_token %}
-                        <button type="submit" data-testid="connector-delete-btn-{{ c.pk }}"
-                                class="inline-flex items-center justify-center bg-slate-700 hover:bg-red-500/20 hover:text-red-400 text-slate-300 text-xs font-medium rounded-md px-3 py-2 transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                <div class="mt-auto pt-3 border-t border-slate-700/50 space-y-2">
+                    <div class="flex items-center gap-2">
+                        <button type="button" data-testid="connector-test-btn-{{ c.pk }}" data-connector-id="{{ c.pk }}"
+                                class="connector-test-btn flex-1 inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-md px-3 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="test-btn-icon w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12a7.5 7.5 0 0015 0m-15 0a7.5 7.5 0 1115 0m-15 0H3m16.5 0H21m-1.5 0H12m-8.457 3.077l1.41-.513m14.095-5.13l1.41-.513M5.106 17.785l1.15-.964m11.49-9.642l1.149-.964M7.501 19.795l.75-1.3m7.5-12.99l.75-1.3m-6.063 16.658l.26-1.477m2.605-14.772l.26-1.477m0 17.726l-.26-1.477M10.698 4.614l-.26-1.477M16.5 19.794l-.75-1.299M7.5 4.205L12 12" /></svg>
+                            <span class="test-btn-label">Probar conexión</span>
                         </button>
-                    </form>
+                        {% if c.source_type == 'splunk' %}
+                        <button type="button" data-testid="connector-sync-now-btn-{{ c.pk }}" data-connector-id="{{ c.pk }}"
+                                title="Sincroniza ahora sin esperar al timer — usa el checkpoint actual, no trae de nuevo lo ya guardado"
+                                class="connector-sync-now-btn inline-flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-md px-3 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="sync-now-btn-icon w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                        </button>
+                        {% endif %}
+                        <a href="{% url 'connector_edit' c.pk %}" data-testid="connector-edit-btn-{{ c.pk }}"
+                           class="inline-flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-md px-3 py-2 transition-colors">
+                            Editar
+                        </a>
+                        <form method="post" action="{% url 'connector_delete' c.pk %}" data-testid="connector-delete-form-{{ c.pk }}"
+                              class="connector-delete-form" data-connector-name="{{ c.name|escapejs }}">
+                            {% csrf_token %}
+                            <button type="submit" data-testid="connector-delete-btn-{{ c.pk }}"
+                                    class="inline-flex items-center justify-center bg-slate-700 hover:bg-red-500/20 hover:text-red-400 text-slate-300 text-xs font-medium rounded-md px-3 py-2 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                            </button>
+                        </form>
+                    </div>
+                    {% if c.source_type == 'splunk' %}
+                    <button type="button" data-testid="connector-force-resync-btn-{{ c.pk }}" data-connector-id="{{ c.pk }}"
+                            class="connector-force-resync-btn text-[11px] text-amber-500/80 hover:text-amber-400 underline decoration-dotted transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        Resetear checkpoint completo (puede duplicar alertas ya guardadas)
+                    </button>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -255,6 +270,95 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
         });
     });
+
+    function runConnectorSync(btn, id, url, iconSelector) {
+        const icon = btn.querySelector(iconSelector);
+        btn.disabled = true;
+        if (icon) icon.classList.add('animate-spin');
+
+        fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrftoken } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                return Swal.fire({
+                    title: data.status === 'connected' ? 'Sincronización completada' : 'Hubo un error',
+                    text: data.message || '',
+                    icon: data.status === 'connected' ? 'success' : 'error',
+                    confirmButtonColor: '#3b82f6',
+                    background: '#1e293b',
+                    color: '#e2e8f0',
+                });
+            })
+            .then(function () { window.location.reload(); })
+            .catch(function () {
+                btn.disabled = false;
+                if (icon) icon.classList.remove('animate-spin');
+                Swal.fire({
+                    title: 'Error de red',
+                    text: 'No se pudo completar la sincronización.',
+                    icon: 'error',
+                    confirmButtonColor: '#3b82f6',
+                    background: '#1e293b',
+                    color: '#e2e8f0',
+                });
+            });
+    }
+
+    // "Sincronizar ahora" — no toca el checkpoint, nunca duplica lo ya
+    // guardado, así que no hace falta un confirm() destructivo aquí.
+    document.querySelectorAll('.connector-sync-now-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const id = btn.dataset.connectorId;
+            runConnectorSync(btn, id, '/connectors/' + id + '/sync-now/', '.sync-now-btn-icon');
+        });
+    });
+
+    // "Resetear checkpoint completo" — SÍ puede duplicar alertas ya
+    // guardadas (vuelve a mirar desde que se creó el conector), por eso la
+    // advertencia es explícita sobre eso, no genérica.
+    document.querySelectorAll('.connector-force-resync-btn').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            const result = await Swal.fire({
+                title: '¿Resetear el checkpoint completo?',
+                html: 'Vuelve a traer TODO desde que se creó el conector — incluidas las alertas que ya se guardaron antes.<br><span style="font-size:0.8rem;color:#f87171;">Puede duplicarlas: no hay control de duplicados contra lo ya guardado.</span><br><span style="font-size:0.8rem;color:#94a3b8;">Usalo solo si el checkpoint quedó "atascado" — para el uso normal, usá "Sincronizar ahora".</span>',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: '#334155',
+                confirmButtonText: 'Sí, resetear y traer todo',
+                cancelButtonText: 'Cancelar',
+                background: '#1e293b',
+                color: '#e2e8f0',
+            });
+            if (!result.isConfirmed) return;
+
+            const id = btn.dataset.connectorId;
+            runConnectorSync(btn, id, '/connectors/' + id + '/resync/', null);
+        });
+    });
+
+    document.querySelectorAll('.connector-delete-form').forEach(function (form) {
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const name = form.dataset.connectorName;
+
+            const result = await Swal.fire({
+                title: '¿Eliminar conector?',
+                html: `Se va a eliminar <strong>"${name}"</strong> permanentemente.<br><span style="font-size:0.8rem;color:#94a3b8;">Esta acción no se puede deshacer.</span>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: '#334155',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
+                background: '#1e293b',
+                color: '#e2e8f0',
+            });
+            if (!result.isConfirmed) return;
+
+            form.submit();
+        });
+    });
 });
 </script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 {% endblock %}

@@ -103,7 +103,11 @@ class SIEMConnector(models.Model):
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='not_tested')
     last_tested_at = models.DateTimeField(null=True, blank=True)
-    last_test_message = models.CharField(max_length=255, blank=True)
+    # TextField, no CharField(255): los mensajes de diagnóstico de
+    # sincronización (columnas faltantes, claves del evento, etc.) pueden
+    # superar 255 caracteres fácil — en SQLite no truncaría, pero en
+    # Postgres (producción) un CharField sí hace cumplir el límite.
+    last_test_message = models.TextField(blank=True)
 
     # Checkpointing de ingesta incremental — lo va a setear el worker real
     # (no implementado todavía) después de cada sync exitoso, para pedirle
@@ -151,4 +155,24 @@ class SIEMConnector(models.Model):
         return [
             {'key': k, 'label': EXTRA_CONFIG_FIELD_LABELS.get(k, k), 'value': v}
             for k, v in (self.extra_config or {}).items() if v
+        ]
+
+
+class IngestedSplunkEvent(models.Model):
+    """
+    Ledger de deduplicación real: guarda el `_cd` (identificador interno de
+    Splunk, único por evento dentro de un índice — "bucket_id:offset") de
+    cada evento ya procesado por un conector. Sin esto, un mismo evento
+    puede volver a traerse (ej. al usar "Resetear checkpoint completo", que
+    vuelve a mirar una ventana de tiempo ya cubierta antes) y se guardaría
+    dos veces como Alert, porque clean_records() no compara contra lo que
+    ya existe en la base de datos — solo dedupea dentro del mismo lote.
+    """
+    connector = models.ForeignKey(SIEMConnector, on_delete=models.CASCADE, related_name='ingested_events')
+    event_id = models.CharField(max_length=64)
+    ingested_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['connector', 'event_id'], name='unique_ingested_event_per_connector'),
         ]

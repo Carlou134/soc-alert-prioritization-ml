@@ -242,6 +242,16 @@ def clean_records(records: list) -> tuple:
     # 1. Normalizar nombres de columnas
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_', regex=False)
 
+    # 1b. Aplanar valores no-hasheables (listas/dicts) a texto plano — pandas
+    # no puede deduplicar/factorizar una celda que sea una lista. Aparece con
+    # datos de Splunk: un campo multivalor en el resultado JSON viene como
+    # array aunque nuestro campo lo espere como string simple (incluso en
+    # metadatos internos de Splunk que ni usamos, tipo _time/tag::eventtype —
+    # el crash pasa en el drop_duplicates() de abajo, antes de filtrar
+    # columnas conocidas). Listas se unen con ';' — mismo separador que ya
+    # usa mitre_techniques en el resto del pipeline.
+    df = df.map(lambda v: ';'.join(map(str, v)) if isinstance(v, (list, tuple)) else (str(v) if isinstance(v, dict) else v))
+
     # 2. Eliminar duplicados
     initial_count = len(df)
     df = df.drop_duplicates()
