@@ -229,7 +229,7 @@ Matches `predictor/pipeline.py` — the **same** cleaning/validation pipeline us
 
 ### Running it
 
-The background sync (`connectors.tasks.sync_due_connectors`) is a `django-q2` scheduled task that runs every minute — it needs **the same `qcluster` process from step 8 above**, nothing extra to start. Admins can force an immediate sync (bypassing the schedule and resetting the checkpoint) with the ↻ button on the connector's card in `/connectors/`.
+The background sync (`connectors.tasks.sync_due_connectors`) is a `django-q2` scheduled task that runs every minute — it needs **the same `qcluster` process from step 8 above**, nothing extra to start. Creating/testing a connector does **not** pull any data by itself — the first real sync happens once `poll_interval_minutes` has elapsed, or immediately via **"Sincronizar ahora"** on the connector's card in `/connectors/`. That first sync looks **24h back** from the moment the connector was created (not just from that instant forward), so connecting to an existing Splunk instance brings in what's already there instead of only future events. A separate, explicitly-labeled **"Resetear checkpoint completo"** link re-applies that same 24h-back window from scratch — reserved for recovering a stuck checkpoint, since it can re-fetch (and duplicate) alerts already saved.
 
 ---
 
