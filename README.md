@@ -209,7 +209,7 @@ Admins can connect the app to a SIEM/XDR platform from **Conectores SIEM** in th
 | Host / IP | e.g. `localhost` | No scheme (`https://` added automatically) |
 | Port | `8089` | Splunk's **management REST API** port — not `8000` (Web UI) or `8088` (HEC, see below) |
 | Auth type | Usuario y contraseña / Token (Bearer) | Basic Auth or `Authorization: Bearer <token>` |
-| Consulta SPL | `search index=soc_alerts` | Prefilled; the incremental time window (`earliest_time`/`latest_time`) is added automatically, not part of this string |
+| Consulta SPL | `search index=soc_alerts` | Prefilled; the incremental time window (`index_earliest`/`index_latest`, filtered by Splunk's `_indextime`) is added automatically, not part of this string |
 | Verify SSL | off (recommended for local dev) | Splunk's default cert is self-signed |
 | Frecuencia de polling | 5 min (default) | How often the background sync checks for new alerts |
 

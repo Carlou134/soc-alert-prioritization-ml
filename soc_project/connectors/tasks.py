@@ -6,14 +6,14 @@ Flujo: sync_due_connectors() corre cada 1 minuto (Schedule registrado en
 apps.py.ready()) y decide, por cada conector Splunk activo, si ya toca
 sincronizar según su propio poll_interval_minutes. Si toca,
 sync_splunk_connector() hace un oneshot search real contra la REST API
-(earliest_time = último checkpoint), limpia los resultados con el MISMO
+(index_earliest = último checkpoint), limpia los resultados con el MISMO
 pipeline que ya usan las cargas manuales (clean_records) y encola
 process_alert_batch — el mismo camino que upload_alerts_view /
 pipeline_normalize_view (Track 5). No se duplica ninguna lógica de
 limpieza/predicción/guardado, solo se agrega el origen de los datos.
 """
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 
 import httpx
 from django.utils import timezone
@@ -66,10 +66,16 @@ def sync_splunk_connector(connector_id):
 
     payload = {
         'search': connector.custom_query or 'search index=soc_alerts',
-        # Epoch timestamp — inequívoco sin importar timezone/locale de la instancia Splunk,
-        # a diferencia de modificadores relativos ("-1h") o ISO8601.
-        'earliest_time': str(int(earliest.timestamp())),
-        'latest_time': 'now',
+        # index_earliest/index_latest filtran por _indextime (cuándo Splunk
+        # escribió el evento en disco), NO por earliest_time/latest_time
+        # (que filtran por _time, la marca del evento). _indextime es
+        # monótono creciente por diseño — un evento que el worker entrega
+        # tarde (red, buffering) nunca puede "quedar antes" del checkpoint
+        # como sí podía pasar con _time. Recomendación oficial de Splunk
+        # para polling incremental sin pérdida de eventos. Epoch timestamp
+        # por ser inequívoco sin importar timezone/locale de la instancia.
+        'index_earliest': str(int(earliest.timestamp())),
+        'index_latest': 'now',
         'exec_mode': 'oneshot',
         'output_mode': 'json',
     }
@@ -122,7 +128,11 @@ def sync_splunk_connector(connector_id):
         # Splunk sí tenía datos para esta ventana — no es un caso de "todavía
         # no indexado" como el de arriba, ya se procesaron antes. Es seguro
         # avanzar el checkpoint para no repetir esta misma consulta cada vez.
-        _mark_synced(connector, f'{len(raw_results)} evento(s) recibidos, ya estaban guardados de una sincronización anterior — sin alertas nuevas.')
+        _mark_synced(
+            connector,
+            f'{len(raw_results)} evento(s) recibidos, ya estaban guardados de una sincronización anterior — sin alertas nuevas.',
+            _max_indextime(raw_results),
+        )
         return
 
     # Un oneshot search plano ("search index=soc_alerts") no siempre aplana
@@ -158,7 +168,7 @@ def sync_splunk_connector(connector_id):
     )
     async_task('predictor.tasks.process_alert_batch', dataset.pk, clean, connector.created_by_id)
 
-    _mark_synced(connector, f'{len(clean)} alerta(s) nueva(s) encoladas para procesar.')
+    _mark_synced(connector, f'{len(clean)} alerta(s) nueva(s) encoladas para procesar.', _max_indextime(raw_results))
 
 
 def _extract_event_fields(result):
@@ -176,6 +186,19 @@ def _extract_event_fields(result):
         except (ValueError, TypeError):
             pass
     return result
+
+
+def _max_indextime(raw_results):
+    """El _indextime más reciente entre los resultados devueltos por Splunk,
+    para usar como próximo checkpoint (index_earliest de la siguiente
+    corrida) — no la hora del reloj local, que es lo que causaba la
+    necesidad de un margen de solape "por las dudas". Si ningún resultado
+    trae _indextime (no debería pasar contra un Splunk real), se usa la
+    hora actual como resguardo."""
+    values = [float(r['_indextime']) for r in raw_results if r.get('_indextime')]
+    if not values:
+        return timezone.now()
+    return datetime.fromtimestamp(max(values), tz=dt_timezone.utc)
 
 
 def _diagnose_empty_clean(events, stats):
@@ -207,15 +230,15 @@ def _mark_connected(connector, message):
     connector.save(update_fields=['status', 'last_test_message'])
 
 
-def _mark_synced(connector, message):
-    """Hubo resultados y se guardaron — aquí sí se avanza el checkpoint, con
-    un margen de solape de 60s hacia atrás por las dudas (lag de indexación
-    de Splunk o pequeño desfase de reloj entre el worker y el servidor).
-    El margen puede reprocesar el mismo evento dos veces en un caso límite,
-    pero eso es preferible a perderlo — clean_records no dedupea contra lo
-    ya guardado, así que un solape muy grande sí crearía Alert duplicados.
-    60s es un margen chico a propósito."""
-    connector.last_synced_at = timezone.now() - timedelta(seconds=60)
+def _mark_synced(connector, message, checkpoint):
+    """Hubo resultados y se confirmó que Splunk los tenía — se avanza el
+    checkpoint hasta el `checkpoint` recibido (el _indextime más reciente
+    visto, ver _max_indextime). Ya no hace falta un margen de solape hacia
+    atrás "por las dudas": index_earliest/index_latest filtran por
+    _indextime (monótono, no por _time), y el ledger de deduplicación
+    (IngestedSplunkEvent) absorbe sin riesgo cualquier evento que vuelva a
+    caer justo en el límite de la siguiente consulta."""
+    connector.last_synced_at = checkpoint
     connector.status = 'connected'
     connector.last_test_message = message
     connector.save(update_fields=['last_synced_at', 'status', 'last_test_message'])
