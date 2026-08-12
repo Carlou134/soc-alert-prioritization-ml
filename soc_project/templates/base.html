@@ -26,16 +26,26 @@
                 </div>
                 <p class="text-white font-semibold text-sm truncate">SOC Predictor</p>
             </div>
-            <button type="button" id="sidebar-toggle" data-testid="sidebar-toggle"
-                class="p-2 text-slate-300 hover:text-white shrink-0"
-                aria-label="Abrir menú" aria-expanded="false" aria-controls="sidebar">
-                <svg id="sidebar-toggle-icon-open" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                </svg>
-                <svg id="sidebar-toggle-icon-close" class="w-6 h-6 hidden" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
+            <div class="flex items-center gap-1 shrink-0">
+                <a href="{% url 'alert_list' %}?investigation_status=new"
+                    data-testid="notif-bell-mobile" title="Alertas nuevas en tu cola"
+                    class="relative flex items-center justify-center w-9 h-9 rounded-md text-slate-300 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                    </svg>
+                    <span class="notif-bell-badge hidden absolute top-0.5 right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none">0</span>
+                </a>
+                <button type="button" id="sidebar-toggle" data-testid="sidebar-toggle"
+                    class="p-2 text-slate-300 hover:text-white shrink-0"
+                    aria-label="Abrir menú" aria-expanded="false" aria-controls="sidebar">
+                    <svg id="sidebar-toggle-icon-open" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                    </svg>
+                    <svg id="sidebar-toggle-icon-close" class="w-6 h-6 hidden" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <!-- Backdrop (mobile only, shown while sidebar is open) -->
@@ -49,16 +59,26 @@
 
             <!-- Logo -->
             <div class="px-5 py-4 border-b border-slate-800">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center shrink-0">
-                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                            </svg>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-white font-semibold text-sm leading-tight">SOC Predictor</p>
+                            <p class="text-slate-500 text-xs">ML Threat Analysis</p>
+                        </div>
+                    </div>
+                    <a href="{% url 'alert_list' %}?investigation_status=new"
+                        data-testid="notif-bell-desktop" title="Alertas nuevas en tu cola"
+                        class="relative flex items-center justify-center w-8 h-8 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
                         </svg>
-                    </div>
-                    <div class="min-w-0">
-                        <p class="text-white font-semibold text-sm leading-tight">SOC Predictor</p>
-                        <p class="text-slate-500 text-xs">ML Threat Analysis</p>
-                    </div>
+                        <span class="notif-bell-badge hidden absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none">0</span>
+                    </a>
                 </div>
             </div>
 
@@ -216,6 +236,32 @@
         window.matchMedia('(min-width: 768px)').addEventListener('change', function (e) {
             if (e.matches) closeSidebar();
         });
+    })();
+
+    // Campanita de notificaciones (Track 7) — polling corto, no WebSockets.
+    (function () {
+        var badges = document.querySelectorAll('.notif-bell-badge');
+        if (!badges.length) return;
+
+        function refresh() {
+            fetch('{% url "notifications_unread_count" %}', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (resp) { return resp.ok ? resp.json() : null; })
+                .then(function (data) {
+                    if (!data) return;
+                    badges.forEach(function (badge) {
+                        if (data.count > 0) {
+                            badge.textContent = data.count > 99 ? '99+' : data.count;
+                            badge.classList.remove('hidden');
+                        } else {
+                            badge.classList.add('hidden');
+                        }
+                    });
+                })
+                .catch(function () { /* red caída — se reintenta solo en el próximo tick */ });
+        }
+
+        refresh();
+        setInterval(refresh, 3000);
     })();
     </script>
     {% else %}

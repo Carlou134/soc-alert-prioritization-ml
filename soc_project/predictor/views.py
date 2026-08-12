@@ -486,6 +486,33 @@ def dataset_status_view(request, pk):
     })
 
 
+@login_required
+def notifications_unread_count_view(request):
+    """JSON liviano para el badge de la campanita en el navbar (Track 7) —
+    cantidad de alertas nuevas en la cola que le corresponde revisar al rol
+    del usuario logueado. A propósito NO filtra por assigned_to: si dependiera
+    de que alguien asigne la alerta a mano primero, nunca se dispararía sola
+    al subir/sincronizar un lote nuevo — que es justamente el caso de uso
+    ("avisame apenas entra algo nuevo"). Mismo filtro automático por rol que
+    ya usa alert_list_view (N1/practicante solo ven benigno, N2 solo lo que
+    no es benigno, N3/admin ven todo) para que el número del badge coincida
+    con lo que el usuario realmente va a ver al hacer click. Solo auth de
+    sesión — no es un endpoint del API externa (/api/...), así que no lleva
+    JWT. Polling corto desde JS (2-3s), mismo patrón ya usado y probado en
+    dataset_status_view (Track 5) — no WebSockets, no Redis, sin cambios de
+    infraestructura."""
+    role = request.user.profile.role
+    qs = AlertWorkflow.objects.filter(
+        investigation_status='new', alert__incident__isnull=True,
+    )
+    if role in ('analyst_n1', 'trainee'):
+        qs = qs.filter(alert__predictionlog__predicted_class='benigno')
+    elif role == 'analyst_n2':
+        qs = qs.exclude(alert__predictionlog__isnull=True).exclude(alert__predictionlog__predicted_class='benigno')
+    count = qs.distinct().count()
+    return JsonResponse({'count': count})
+
+
 def _friendly_serializer_errors(errors: dict) -> dict:
     """Convierte errores de serializer en mensajes amigables para el usuario."""
     friendly = {}
