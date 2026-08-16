@@ -69,8 +69,38 @@ DB_HOST= ../venv/Scripts/python.exe -m pytest --cov=predictor --cov=accounts --c
 
 Corren con `django-q2` en modo síncrono (`Q_CLUSTER sync=True` parcheado via fixture `q_cluster_sync`) para no depender de un `qcluster` real corriendo aparte durante CI.
 
+## Indicaciones para QA — alcance de JMeter/BlazeMeter vs. Selenium
+
+División de alcance por herramienta, para que QA arme su propio plan de carga sin adivinar qué cubrir:
+
+- **JMeter/BlazeMeter — SOLO `POST /login/` (autenticación por sesión) + los GET de abajo.** Nunca `POST`/`PUT`/`DELETE` de escritura (registro, subida de dataset, conexión Splunk, CRUD de alertas) — esas operaciones no son idempotentes, correrlas en loop bajo carga solo generaría datos basura o corrompería datos reales contra el mismo entorno de la demo.
+- **Selenium — todo lo que escribe/muta**: registro, subida de dataset, conexión Splunk, CRUD de alertas, formularios en general. Se corre una cantidad fija y controlada de veces por suite, validando corrección funcional, no throughput.
+
+**Techo de usuarios virtuales concurrentes: 20** para el flujo general (login + navegación). Representa el headcount total de analistas SOC de todos los niveles + admin (N1+N2+N3+admin) — no una cifra de manual de curso. Un SOC real opera por turnos: pocos analistas conectados simultáneamente en la práctica. 20 ya es un margen generoso de estrés sobre el uso real esperado.
+
+**Excepción — Detalle SHAP: máximo 3 usuarios concurrentes, no 20.** Abrir el detalle de una alerta puntual no es algo que 20 analistas hagan a la vez ni en cada vuelta de su sesión — en la práctica es "uno asigna la alerta, otro la revisa", como mucho un par de personas en simultáneo. Cargar este endpoint específico con los 20 usuarios del resto del flujo sobreestima muchísimo el uso real y no aporta una medición útil. El resto de los endpoints de la tabla (dashboard, alertas, historial, incidentes, reportes, exports, auditoría, conectores) sí usan el techo general de 20.
+
+**Endpoints GET para JMeter/BlazeMeter** (confirmados contra `predictor/urls.py`/`views.py`, no asumidos):
+
+| Página | Endpoint | Prioridad | Concurrencia |
+|---|---|---|---|
+| Dashboard | `/dashboard/` | Liviana | hasta 20 |
+| Alertas + filtros | `/alerts/?severity=...&predicted_class=...` | Liviana | hasta 20 |
+| Historial + filtros | `/alerts/history/?...` | Liviana | hasta 20 |
+| Mesa de incidentes | `/incidents/` | Liviana | hasta 20 |
+| **Detalle SHAP** | `/alerts/<id>/shap/` | **Alta — síncrono, CPU-intensivo** | **máx. 3** |
+| Reportes + filtros | `/reports/?...` | Liviana | hasta 20 |
+| **Export PDF** | `/reports/export/pdf/`, `/reports/export/incidents/pdf/` | **Alta — síncrono, matplotlib** | hasta 20 |
+| Export Excel | `/reports/export/excel/` | Liviana | hasta 20 |
+| Auditoría | `/audit/` | Liviana | hasta 20 |
+| Estado de conectores | `/connectors/status/` | Liviana | hasta 20 |
+
+Si el tiempo de QA es limitado, priorizar: login + dashboard/alertas (flujo normal) + **detalle SHAP (con su tope de 3, no 20) y export PDF** (los únicos dos puntos con trabajo síncrono pesado real detrás). El resto es variación del mismo patrón "GET con filtros", cobertura secundaria.
+
+Deuda de performance ya atendida de nuestro lado antes de que QA empiece: `bulk_create` con `batch_size=500`, modelo/SHAP precargados en `apps.py.ready()`, uploads movidos a background (Track 5) — así que lo que quede lento en SHAP/PDF bajo carga es trabajo síncrono real, no una ineficiencia ya conocida y sin atender.
+
 ## Fuera de alcance (documentado, no oculto)
 
-- Carga (JMeter) — de QA. Deuda de performance conocida y ya atendida antes de que empiecen: `bulk_create` con `batch_size=500`, modelo/SHAP precargados en `apps.py.ready()`, uploads movidos a background (Track 5). El cálculo de SHAP por alerta y la generación de gráficos con matplotlib en PDF siguen siendo síncronos — riesgo real bajo concurrencia, sin medir todavía.
+- Carga (JMeter) — de QA, armar y correr el `.jmx` es su entregable, no algo que el equipo de desarrollo les resuelva de antemano (ver indicaciones arriba).
 - E2E formal con casos documentados — de QA (Selenium), su entregable de curso.
 - `predictor/claude_service.py` (explicación de SHAP en texto, chat de incidente) — 0% cobertura, no estaba en el alcance de ninguna HU de este mapeo.
