@@ -489,28 +489,44 @@ def dataset_status_view(request, pk):
 @login_required
 def notifications_unread_count_view(request):
     """JSON liviano para el badge de la campanita en el navbar (Track 7) —
-    cantidad de alertas nuevas en la cola que le corresponde revisar al rol
-    del usuario logueado. A propósito NO filtra por assigned_to: si dependiera
-    de que alguien asigne la alerta a mano primero, nunca se dispararía sola
-    al subir/sincronizar un lote nuevo — que es justamente el caso de uso
-    ("avisame apenas entra algo nuevo"). Mismo filtro automático por rol que
-    ya usa alert_list_view (N1/practicante solo ven benigno, N2 solo lo que
-    no es benigno, N3/admin ven todo) para que el número del badge coincida
-    con lo que el usuario realmente va a ver al hacer click. Solo auth de
-    sesión — no es un endpoint del API externa (/api/...), así que no lleva
-    JWT. Polling corto desde JS (2-3s), mismo patrón ya usado y probado en
-    dataset_status_view (Track 5) — no WebSockets, no Redis, sin cambios de
-    infraestructura."""
+    suma dos señales distintas, a pedido explícito del usuario (mostrar 99
+    de una subida masiva de alertas resultaba alarmante/inútil comparado con
+    un simple aviso de "llegó un lote nuevo"):
+
+    1. Lotes (Dataset) con alertas nuevas SIN asignar todavía — 1 por lote,
+       sin importar cuántas alertas tenga adentro (99 alertas en un mismo
+       upload = 1, no 99). Es la señal genérica de "entró algo, andá a
+       mirar la cola" — no depende de que nadie reclame nada a mano, por
+       eso se dispara solo al subir/sincronizar (ver el fix anterior: si
+       dependiera de assigned_to nunca se disparaba con un lote recién
+       llegado, porque assigned_to queda nulo hasta la asignación manual).
+    2. Alertas asignadas puntualmente a MÍ y todavía en 'Nueva' — ahí sí
+       cuenta 1 a 1 (1, 2, 3...), porque una vez asignada es responsabilidad
+       personal del analista, no un lote genérico.
+
+    Ambas señales usan el mismo filtro automático por rol que ya usa
+    alert_list_view (N1/practicante solo ven benigno, N2 solo lo que no es
+    benigno, N3/admin ven todo), y excluyen alertas ya escaladas a incidente
+    (salieron de la cola normal). Solo auth de sesión — no es un endpoint
+    del API externa (/api/...), así que no lleva JWT. Polling corto desde
+    JS (2-3s), mismo patrón ya usado y probado en dataset_status_view
+    (Track 5) — no WebSockets, no Redis, sin cambios de infraestructura."""
     role = request.user.profile.role
-    qs = AlertWorkflow.objects.filter(
+    base_qs = AlertWorkflow.objects.filter(
         investigation_status='new', alert__incident__isnull=True,
     )
     if role in ('analyst_n1', 'trainee'):
-        qs = qs.filter(alert__predictionlog__predicted_class='benigno')
+        base_qs = base_qs.filter(alert__predictionlog__predicted_class='benigno')
     elif role == 'analyst_n2':
-        qs = qs.exclude(alert__predictionlog__isnull=True).exclude(alert__predictionlog__predicted_class='benigno')
-    count = qs.distinct().count()
-    return JsonResponse({'count': count})
+        base_qs = base_qs.exclude(alert__predictionlog__isnull=True).exclude(alert__predictionlog__predicted_class='benigno')
+
+    pending_datasets = (
+        base_qs.filter(assigned_to__isnull=True)
+        .values('alert__dataset_id').distinct().count()
+    )
+    assigned_to_me = base_qs.filter(assigned_to=request.user).distinct().count()
+
+    return JsonResponse({'count': pending_datasets + assigned_to_me})
 
 
 def _friendly_serializer_errors(errors: dict) -> dict:

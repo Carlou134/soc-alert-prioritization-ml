@@ -194,7 +194,8 @@ Two-stage hierarchical classifier (RandomForest → LightGBM), trained from `soc
 
 To retrain from scratch: `python train_model.py` (or delete `soc_model.pkl` and restart the server — it auto-trains on first run). Retraining also auto-syncs a local cache of real MITRE ATT&CK technique names/descriptions (`python manage.py sync_mitre_attack`) used on the alert detail page — see [docs/model.md](docs/model.md#retraining).
 
-📄 Full architecture, hyperparameters, and evaluation: **[docs/model.md](docs/model.md)** · Training data breakdown: **[docs/dataset.md](docs/dataset.md)**
+- 📄 Full architecture, hyperparameters, and evaluation: **[docs/model.md](docs/model.md)** 
+- Training data breakdown: **[docs/dataset.md](docs/dataset.md)**
 
 ---
 
