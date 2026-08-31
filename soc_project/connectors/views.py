@@ -223,8 +223,9 @@ def connector_delete_view(request, pk):
 def connector_test_view(request, pk):
     """
     Splunk: prueba de conexión REAL contra la REST API de management
-    (ver splunk_service.py). El resto de los tipos siguen simulados — no
-    hay una instancia real contra la cual probarlos todavía.
+    (ver splunk_service.py). El resto de los tipos todavía no tienen
+    integración real — se informa como error para no simular un éxito
+    que el analista podría confundir con una conexión real.
     """
     connector = get_object_or_404(SIEMConnector, pk=pk)
 
@@ -246,7 +247,10 @@ def connector_test_view(request, pk):
     elif connector.source_type == 'splunk':
         success, message = splunk_service.test_connection(connector)
     else:
-        success, message = True, f'Conexión simulada exitosa a {connector.get_source_type_display()}.'
+        success, message = False, (
+            f'{connector.get_source_type_display()} todavía no tiene una integración real '
+            'implementada — la sincronización automática solo funciona con Splunk por ahora.'
+        )
 
     connector.status = 'connected' if success else 'error'
     connector.last_tested_at = timezone.now()
