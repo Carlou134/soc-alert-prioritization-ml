@@ -1,0 +1,97 @@
+{
+  "T1071": {
+    "description": "Adversaries may communicate using OSI application layer protocols to avoid detection/network filtering by blending in with existing traffic.",
+    "name": "Application Layer Protocol",
+    "tactics": [
+      "command and control"
+    ],
+    "url": "https://attack.mitre.org/techniques/T1071"
+  },
+  "T1078": {
+    "description": "Adversaries may obtain and abuse credentials of existing accounts as a means of gaining Initial Access, Persistence, Privilege Escalation, or Defense Evasion.",
+    "name": "Valid Accounts",
+    "tactics": [
+      "stealth",
+      "persistence",
+      "privilege escalation",
+      "initial access"
+    ],
+    "url": "https://attack.mitre.org/techniques/T1078"
+  },
+  "T1078.004": {
+    "description": "Valid accounts in cloud environments may allow adversaries to perform actions to achieve Initial Access, Persistence, Privilege Escalation, or Defense Evasion.",
+    "name": "Cloud Accounts",
+    "tactics": [
+      "stealth",
+      "persistence",
+      "privilege escalation",
+      "initial access"
+    ],
+    "url": "https://attack.mitre.org/techniques/T1078/004"
+  },
+  "T1087": {
+    "description": "Adversaries may attempt to get a listing of valid accounts, usernames, or email addresses on a system or within a compromised environment.",
+    "name": "Account Discovery",
+    "tactics": [
+      "discovery"
+    ],
+    "url": "https://attack.mitre.org/techniques/T1087"
+  },
+  "T1110": {
+    "description": "Adversaries may use brute force techniques to gain access to accounts when passwords are unknown or when password hashes are obtained.",
+    "name": "Brute Force",
+    "tactics": [
+      "credential access"
+    ],
+    "url": "https://attack.mitre.org/techniques/T1110"
+  },
+  "T1110.001": {
+    "description": "Adversaries with no prior knowledge of legitimate credentials within the system or environment may guess passwords to attempt access to accounts.",
+    "name": "Password Guessing",
+    "tactics": [
+      "credential access"
+    ],
+    "url": "https://attack.mitre.org/techniques/T1110/001"
+  },
+  "T1110.003": {
+    "description": "Adversaries may use a single or small list of commonly used passwords against many different accounts to attempt to acquire valid account credentials.",
+    "name": "Password Spraying",
+    "tactics": [
+      "credential access"
+    ],
+    "url": "https://attack.mitre.org/techniques/T1110/003"
+  },
+  "T1133": {
+    "description": "Adversaries may leverage external-facing remote services to initially access and/or persist within a network.",
+    "name": "External Remote Services",
+    "tactics": [
+      "persistence",
+      "initial access"
+    ],
+    "url": "https://attack.mitre.org/techniques/T1133"
+  },
+  "T1566": {
+    "description": "Adversaries may send phishing messages to gain access to victim systems.",
+    "name": "Phishing",
+    "tactics": [
+      "initial access"
+    ],
+    "url": "https://attack.mitre.org/techniques/T1566"
+  },
+  "T1566.001": {
+    "description": "Adversaries may send spearphishing emails with a malicious attachment in an attempt to gain access to victim systems.",
+    "name": "Spearphishing Attachment",
+    "tactics": [
+      "initial access"
+    ],
+    "url": "https://attack.mitre.org/techniques/T1566/001"
+  },
+  "T1566.002": {
+    "description": "Adversaries may send spearphishing emails with a malicious link in an attempt to gain access to victim systems.",
+    "name": "Spearphishing Link",
+    "tactics": [
+      "initial access"
+    ],
+    "url": "https://attack.mitre.org/techniques/T1566/002"
+  }
+}

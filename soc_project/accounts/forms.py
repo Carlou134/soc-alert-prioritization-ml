@@ -19,21 +19,21 @@ SELECT_CLASS = (
 class RegisterForm(UserCreationForm):
     email = forms.EmailField(
         required=True,
-        widget=forms.EmailInput(attrs={'class': INPUT_CLASS}),
+        widget=forms.EmailInput(attrs={'class': INPUT_CLASS, 'data-testid': 'register-email'}),
     )
 
     class Meta:
         model = User
         fields = ['username', 'email', 'password1', 'password2']
         widgets = {
-            'username': forms.TextInput(attrs={'class': INPUT_CLASS}),
+            'username': forms.TextInput(attrs={'class': INPUT_CLASS, 'data-testid': 'register-username'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['username'].widget.attrs.update({'class': INPUT_CLASS})
-        self.fields['password1'].widget.attrs.update({'class': INPUT_CLASS})
-        self.fields['password2'].widget.attrs.update({'class': INPUT_CLASS})
+        self.fields['password1'].widget.attrs.update({'class': INPUT_CLASS, 'data-testid': 'register-password1'})
+        self.fields['password2'].widget.attrs.update({'class': INPUT_CLASS, 'data-testid': 'register-password2'})
 
     def clean_email(self):
         email = self.cleaned_data['email'].strip().lower()
@@ -45,19 +45,19 @@ class RegisterForm(UserCreationForm):
 class AdminCreateUserForm(UserCreationForm):
     email = forms.EmailField(
         required=True,
-        widget=forms.EmailInput(attrs={'class': INPUT_CLASS}),
+        widget=forms.EmailInput(attrs={'class': INPUT_CLASS, 'data-testid': 'user-create-email'}),
     )
     role = forms.ChoiceField(
         choices=UserProfile.ROLE_CHOICES,
         label='Rol',
-        widget=forms.Select(attrs={'class': SELECT_CLASS}),
+        widget=forms.Select(attrs={'class': SELECT_CLASS, 'data-testid': 'user-create-role'}),
     )
     is_active = forms.BooleanField(
         required=False,
         initial=True,
         label='Cuenta activa',
         widget=forms.CheckboxInput(
-            attrs={'class': 'w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded'}
+            attrs={'class': 'w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded', 'data-testid': 'user-create-is-active'}
         ),
     )
 
@@ -65,14 +65,14 @@ class AdminCreateUserForm(UserCreationForm):
         model = User
         fields = ['username', 'email', 'password1', 'password2']
         widgets = {
-            'username': forms.TextInput(attrs={'class': INPUT_CLASS}),
+            'username': forms.TextInput(attrs={'class': INPUT_CLASS, 'data-testid': 'user-create-username'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['username'].widget.attrs.update({'class': INPUT_CLASS})
-        self.fields['password1'].widget.attrs.update({'class': INPUT_CLASS})
-        self.fields['password2'].widget.attrs.update({'class': INPUT_CLASS})
+        self.fields['password1'].widget.attrs.update({'class': INPUT_CLASS, 'data-testid': 'user-create-password1'})
+        self.fields['password2'].widget.attrs.update({'class': INPUT_CLASS, 'data-testid': 'user-create-password2'})
 
     def clean_email(self):
         email = self.cleaned_data['email'].strip().lower()
@@ -85,12 +85,12 @@ class UserRoleForm(forms.Form):
     role = forms.ChoiceField(
         choices=UserProfile.ROLE_CHOICES,
         label='Rol',
-        widget=forms.Select(attrs={'class': SELECT_CLASS}),
+        widget=forms.Select(attrs={'class': SELECT_CLASS, 'data-testid': 'user-edit-role'}),
     )
     is_active = forms.BooleanField(
         required=False,
         label='Usuario activo',
         widget=forms.CheckboxInput(
-            attrs={'class': 'w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded'}
+            attrs={'class': 'w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded', 'data-testid': 'user-edit-is-active'}
         ),
     )

@@ -11,7 +11,7 @@
     </div>
 
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
-        <form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="predict-form">
             {% csrf_token %}
             {% for field in form %}
             <div>
@@ -24,7 +24,7 @@
             {% endfor %}
 
             <div class="md:col-span-2 pt-2">
-                <button type="submit"
+                <button type="submit" data-testid="predict-submit"
                     class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium">
                     Ejecutar predicción
                 </button>
@@ -33,17 +33,17 @@
     </div>
 
     {% if result %}
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 {% if result == 'malicioso' %}border-l-4 border-l-red-500{% elif result == 'a_investigar' %}border-l-4 border-l-amber-500{% else %}border-l-4 border-l-emerald-500{% endif %}">
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 {% if result == 'malicioso' %}border-l-4 border-l-red-500{% elif result == 'a_investigar' %}border-l-4 border-l-amber-500{% else %}border-l-4 border-l-emerald-500{% endif %}" data-testid="predict-result">
         <p class="text-xs text-slate-400 uppercase tracking-wide mb-3">Resultado de predicción</p>
 
         <div class="flex items-center gap-3 mb-5">
             <span class="text-sm text-slate-300">Clase predicha:</span>
             {% if result == 'benigno' %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">{{ result }}</span>
+                <span class="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" data-testid="predict-result-class">{{ result }}</span>
             {% elif result == 'a_investigar' %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">{{ result }}</span>
+                <span class="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20" data-testid="predict-result-class">{{ result }}</span>
             {% else %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-red-500/10 text-red-500 border border-red-500/20">{{ result }}</span>
+                <span class="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-red-500/10 text-red-500 border border-red-500/20" data-testid="predict-result-class">{{ result }}</span>
             {% endif %}
         </div>
 

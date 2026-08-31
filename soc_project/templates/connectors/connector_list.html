@@ -1,0 +1,364 @@
+{% extends 'base.html' %}
+
+{% block title %}Conectores SOC — SOC Predictor{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-8">
+
+    <!-- Header -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h1 class="text-xl font-semibold text-white">Conectores SOC</h1>
+            <p class="text-sm text-slate-400 mt-0.5">Conectá tus SIEMs y plataformas XDR para ingestar alertas automáticamente.</p>
+        </div>
+        <span data-testid="connector-count" class="text-xs text-slate-500 bg-slate-800 border border-slate-700 rounded-full px-3 py-1">
+            {{ connectors|length }} conector{{ connectors|length|pluralize:"es" }} configurado{{ connectors|length|pluralize:"s" }}
+        </span>
+    </div>
+
+    <!-- Messages -->
+    {% if messages %}
+        {% for message in messages %}
+        <div class="px-4 py-3 rounded-md text-sm
+            {% if message.tags == 'error' %}bg-red-500/10 border border-red-500/30 text-red-400
+            {% else %}bg-green-500/10 border border-green-500/30 text-green-400{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Galería: conectar un SIEM nuevo -->
+    <div>
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">SIEM</p>
+        <p class="text-xs text-slate-600 mb-3">Centraliza logs crudos — la consulta que trae las alertas es configurable.</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" data-testid="connector-siem-gallery">
+
+            <a href="{% url 'connector_create' %}?type=splunk" data-testid="connector-add-splunk"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-emerald-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.348 14.652a3.75 3.75 0 010-5.304m5.304 0a3.75 3.75 0 010 5.304m-7.425 2.121a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.807-3.808-9.98 0-13.788m13.788 0c3.808 3.807 3.808 9.98 0 13.788M12 12h.008v.008H12V12z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">Splunk</span>
+            </a>
+
+            <a href="{% url 'connector_create' %}?type=sentinel" data-testid="connector-add-sentinel"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-sky-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center group-hover:bg-sky-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">Microsoft Sentinel</span>
+            </a>
+
+            <a href="{% url 'connector_create' %}?type=qradar" data-testid="connector-add-qradar"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-indigo-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25M21 7.5v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">IBM QRadar</span>
+            </a>
+
+            <a href="{% url 'connector_create' %}?type=elastic" data-testid="connector-add-elastic"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-yellow-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center group-hover:bg-yellow-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">Elastic Security</span>
+            </a>
+
+            <a href="{% url 'connector_create' %}?type=wazuh" data-testid="connector-add-wazuh"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-cyan-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">Wazuh</span>
+            </a>
+
+            <a href="{% url 'connector_create' %}?type=cortex_xsiam" data-testid="connector-add-cortex_xsiam"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-orange-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">Cortex XSIAM</span>
+            </a>
+
+        </div>
+    </div>
+
+    <!-- Galería: conectar un XDR nuevo -->
+    <div>
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">XDR</p>
+        <p class="text-xs text-slate-600 mb-3">Entrega incidentes ya correlacionados y enriquecidos con MITRE ATT&amp;CK.</p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="connector-xdr-gallery">
+
+            <a href="{% url 'connector_create' %}?type=crowdstrike" data-testid="connector-add-crowdstrike"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-red-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center group-hover:bg-red-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">CrowdStrike Falcon</span>
+            </a>
+
+            <a href="{% url 'connector_create' %}?type=defender_xdr" data-testid="connector-add-defender_xdr"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-blue-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">Microsoft Defender XDR</span>
+            </a>
+
+            <a href="{% url 'connector_create' %}?type=cortex_xdr" data-testid="connector-add-cortex_xdr"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-rose-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center justify-center group-hover:bg-rose-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">Cortex XDR</span>
+            </a>
+
+            <a href="{% url 'connector_create' %}?type=trendmicro" data-testid="connector-add-trendmicro"
+               class="group flex flex-col items-center gap-2 bg-slate-800 border border-slate-700 hover:border-fuchsia-500/50 rounded-xl p-4 text-center transition-colors">
+                <div class="w-11 h-11 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/30 flex items-center justify-center group-hover:bg-fuchsia-500/20 transition-colors">
+                    <svg class="w-5 h-5 text-fuchsia-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" /></svg>
+                </div>
+                <span class="text-xs font-medium text-slate-200">Trend Micro Vision One</span>
+            </a>
+
+        </div>
+    </div>
+
+    <!-- Conectores configurados -->
+    <div>
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Conectores configurados</p>
+
+        {% if not connectors %}
+        <div class="bg-slate-800/50 border border-dashed border-slate-700 rounded-xl p-10 text-center" data-testid="connector-empty-state">
+            <p class="text-slate-400 text-sm">Todavía no configuraste ningún conector.</p>
+            <p class="text-slate-500 text-xs mt-1">Elegí un SIEM de la galería de arriba para empezar.</p>
+        </div>
+        {% else %}
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" data-testid="connector-grid">
+            {% for c in connectors %}
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 flex flex-col gap-4" data-testid="connector-card-{{ c.pk }}">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-white truncate" data-testid="connector-name-{{ c.pk }}">{{ c.name }}</p>
+                        <p class="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+                            <span class="text-[10px] font-semibold tracking-wide {% if c.category == 'XDR' %}text-fuchsia-400{% else %}text-sky-400{% endif %}">{{ c.category }}</span>
+                            <span class="truncate">{{ c.get_source_type_display }}</span>
+                        </p>
+                    </div>
+                    {% if c.status == 'connected' %}
+                    <span data-testid="connector-status-{{ c.pk }}" class="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Conectado
+                    </span>
+                    {% elif c.status == 'error' %}
+                    <span data-testid="connector-status-{{ c.pk }}" class="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> Error
+                    </span>
+                    {% else %}
+                    <span data-testid="connector-status-{{ c.pk }}" class="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-slate-700 text-slate-400 border border-slate-600">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> No probado
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div class="text-xs text-slate-500 space-y-1">
+                    <p class="truncate" title="{{ c.connection_url }}">{{ c.connection_url }}</p>
+                    <p>Polling cada {{ c.poll_interval_minutes }} min · {% if c.is_active %}<span class="text-slate-400">Activo</span>{% else %}<span class="text-slate-600">Inactivo</span>{% endif %}</p>
+                    {% if c.last_tested_at %}
+                    <p data-testid="connector-last-tested-{{ c.pk }}">Última prueba: {{ c.last_tested_at|date:"d/m/Y H:i" }}</p>
+                    {% endif %}
+                    {% if c.last_synced_at %}
+                    <p data-testid="connector-last-synced-{{ c.pk }}">Última sincronización: {{ c.last_synced_at|date:"d/m/Y H:i" }}</p>
+                    {% endif %}
+                </div>
+
+                {% if c.configured_extra_fields %}
+                <div class="flex flex-wrap gap-1.5" data-testid="connector-extra-config-{{ c.pk }}">
+                    {% for f in c.configured_extra_fields %}
+                    <span class="text-xs bg-slate-900/60 border border-slate-700 text-slate-400 rounded-full px-2.5 py-0.5" title="{{ f.value }}">{{ f.label }}: {{ f.value|truncatechars:20 }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if c.last_test_message %}
+                <p data-testid="connector-test-message-{{ c.pk }}" class="text-xs rounded-md px-3 py-2 {% if c.status == 'connected' %}bg-emerald-500/10 text-emerald-400{% else %}bg-red-500/10 text-red-400{% endif %}">
+                    {{ c.last_test_message }}
+                </p>
+                {% endif %}
+
+                <div class="mt-auto pt-3 border-t border-slate-700/50 space-y-2">
+                    <div class="flex items-center gap-2">
+                        <button type="button" data-testid="connector-test-btn-{{ c.pk }}" data-connector-id="{{ c.pk }}"
+                                class="connector-test-btn flex-1 inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-md px-3 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="test-btn-icon w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12a7.5 7.5 0 0015 0m-15 0a7.5 7.5 0 1115 0m-15 0H3m16.5 0H21m-1.5 0H12m-8.457 3.077l1.41-.513m14.095-5.13l1.41-.513M5.106 17.785l1.15-.964m11.49-9.642l1.149-.964M7.501 19.795l.75-1.3m7.5-12.99l.75-1.3m-6.063 16.658l.26-1.477m2.605-14.772l.26-1.477m0 17.726l-.26-1.477M10.698 4.614l-.26-1.477M16.5 19.794l-.75-1.299M7.5 4.205L12 12" /></svg>
+                            <span class="test-btn-label">Probar conexión</span>
+                        </button>
+                        {% if c.source_type == 'splunk' %}
+                        <button type="button" data-testid="connector-sync-now-btn-{{ c.pk }}" data-connector-id="{{ c.pk }}"
+                                title="Sincroniza ahora sin esperar al timer — usa el checkpoint actual, no trae de nuevo lo ya guardado"
+                                class="connector-sync-now-btn inline-flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-md px-3 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="sync-now-btn-icon w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                        </button>
+                        {% endif %}
+                        <a href="{% url 'connector_edit' c.pk %}" data-testid="connector-edit-btn-{{ c.pk }}"
+                           class="inline-flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-md px-3 py-2 transition-colors">
+                            Editar
+                        </a>
+                        <form method="post" action="{% url 'connector_delete' c.pk %}" data-testid="connector-delete-form-{{ c.pk }}"
+                              class="connector-delete-form" data-connector-name="{{ c.name|escapejs }}">
+                            {% csrf_token %}
+                            <button type="submit" data-testid="connector-delete-btn-{{ c.pk }}"
+                                    class="inline-flex items-center justify-center bg-slate-700 hover:bg-red-500/20 hover:text-red-400 text-slate-300 text-xs font-medium rounded-md px-3 py-2 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                            </button>
+                        </form>
+                    </div>
+                    {% if c.source_type == 'splunk' %}
+                    <button type="button" data-testid="connector-force-resync-btn-{{ c.pk }}" data-connector-id="{{ c.pk }}"
+                            class="connector-force-resync-btn text-[11px] text-amber-500/80 hover:text-amber-400 underline decoration-dotted transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        Resetear checkpoint completo (puede duplicar alertas ya guardadas)
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function getCookie(name) {
+        const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return match ? match.pop() : '';
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    document.querySelectorAll('.connector-test-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const id = btn.dataset.connectorId;
+            const label = btn.querySelector('.test-btn-label');
+            const icon = btn.querySelector('.test-btn-icon');
+            const card = document.querySelector('[data-testid="connector-card-' + id + '"]');
+
+            btn.disabled = true;
+            label.textContent = 'Conectando…';
+            icon.classList.add('animate-spin');
+
+            fetch('/connectors/' + id + '/test/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrftoken },
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    // Delay artificial de UX — la respuesta del server ya llegó,
+                    // pero mostrarla instantáneo se siente falso para una
+                    // "prueba de conexión". No bloquea a Django, solo a la UI.
+                    setTimeout(function () {
+                        btn.disabled = false;
+                        label.textContent = 'Probar conexión';
+                        icon.classList.remove('animate-spin');
+                        window.location.reload();
+                    }, 900);
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                    label.textContent = 'Probar conexión';
+                    icon.classList.remove('animate-spin');
+                });
+        });
+    });
+
+    function runConnectorSync(btn, id, url, iconSelector) {
+        const icon = btn.querySelector(iconSelector);
+        btn.disabled = true;
+        if (icon) icon.classList.add('animate-spin');
+
+        fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrftoken } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                return Swal.fire({
+                    title: data.status === 'connected' ? 'Sincronización completada' : 'Hubo un error',
+                    text: data.message || '',
+                    icon: data.status === 'connected' ? 'success' : 'error',
+                    confirmButtonColor: '#3b82f6',
+                    background: '#1e293b',
+                    color: '#e2e8f0',
+                });
+            })
+            .then(function () { window.location.reload(); })
+            .catch(function () {
+                btn.disabled = false;
+                if (icon) icon.classList.remove('animate-spin');
+                Swal.fire({
+                    title: 'Error de red',
+                    text: 'No se pudo completar la sincronización.',
+                    icon: 'error',
+                    confirmButtonColor: '#3b82f6',
+                    background: '#1e293b',
+                    color: '#e2e8f0',
+                });
+            });
+    }
+
+    // "Sincronizar ahora" — no toca el checkpoint, nunca duplica lo ya
+    // guardado, así que no hace falta un confirm() destructivo aquí.
+    document.querySelectorAll('.connector-sync-now-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const id = btn.dataset.connectorId;
+            runConnectorSync(btn, id, '/connectors/' + id + '/sync-now/', '.sync-now-btn-icon');
+        });
+    });
+
+    // "Resetear checkpoint completo" — SÍ puede duplicar alertas ya
+    // guardadas (vuelve a mirar desde que se creó el conector), por eso la
+    // advertencia es explícita sobre eso, no genérica.
+    document.querySelectorAll('.connector-force-resync-btn').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            const result = await Swal.fire({
+                title: '¿Resetear el checkpoint completo?',
+                html: 'Vuelve a traer TODO desde que se creó el conector — incluidas las alertas que ya se guardaron antes.<br><span style="font-size:0.8rem;color:#f87171;">Puede duplicarlas: no hay control de duplicados contra lo ya guardado.</span><br><span style="font-size:0.8rem;color:#94a3b8;">Usalo solo si el checkpoint quedó "atascado" — para el uso normal, usá "Sincronizar ahora".</span>',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: '#334155',
+                confirmButtonText: 'Sí, resetear y traer todo',
+                cancelButtonText: 'Cancelar',
+                background: '#1e293b',
+                color: '#e2e8f0',
+            });
+            if (!result.isConfirmed) return;
+
+            const id = btn.dataset.connectorId;
+            runConnectorSync(btn, id, '/connectors/' + id + '/resync/', null);
+        });
+    });
+
+    document.querySelectorAll('.connector-delete-form').forEach(function (form) {
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const name = form.dataset.connectorName;
+
+            const result = await Swal.fire({
+                title: '¿Eliminar conector?',
+                html: `Se va a eliminar <strong>"${name}"</strong> permanentemente.<br><span style="font-size:0.8rem;color:#94a3b8;">Esta acción no se puede deshacer.</span>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: '#334155',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
+                background: '#1e293b',
+                color: '#e2e8f0',
+            });
+            if (!result.isConfirmed) return;
+
+            form.submit();
+        });
+    });
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+{% endblock %}

@@ -21,18 +21,18 @@
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
             <h2 class="text-sm font-semibold text-white mb-5">Registro</h2>
 
-            <form method="post" class="space-y-4">
+            <form method="post" class="space-y-4" data-testid="register-form">
                 {% csrf_token %}
                 {% for field in form %}
                 <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1.5">{{ field.label }}</label>
                     {{ field }}
                     {% if field.errors %}
-                    <p class="text-red-400 text-xs mt-1">{{ field.errors|striptags }}</p>
+                    <p class="text-red-400 text-xs mt-1" data-testid="register-{{ field.name }}-error">{{ field.errors|striptags }}</p>
                     {% endif %}
                 </div>
                 {% endfor %}
-                <button type="submit"
+                <button type="submit" data-testid="register-submit"
                     class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 rounded-md text-sm">
                     Crear cuenta
                 </button>
@@ -41,7 +41,7 @@
 
         <p class="text-center text-xs text-slate-500 mt-4">
             ¿Ya tienes cuenta?
-            <a href="{% url 'login' %}" class="text-blue-400 hover:text-blue-300 font-medium">Inicia sesión</a>
+            <a href="{% url 'login' %}" data-testid="register-login-link" class="text-blue-400 hover:text-blue-300 font-medium">Inicia sesión</a>
         </p>
 
     </div>

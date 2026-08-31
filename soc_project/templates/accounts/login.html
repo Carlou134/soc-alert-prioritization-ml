@@ -22,24 +22,24 @@
             <h2 class="text-sm font-semibold text-white mb-5">Iniciar sesión</h2>
 
             {% if error %}
-            <div class="mb-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-md px-4 py-3 text-sm">
+            <div data-testid="login-error" class="mb-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-md px-4 py-3 text-sm">
                 {{ error }}
             </div>
             {% endif %}
 
-            <form method="post" class="space-y-4">
+            <form method="post" class="space-y-4" data-testid="login-form">
                 {% csrf_token %}
                 <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1.5">Usuario</label>
-                    <input type="text" name="username" autocomplete="username"
+                    <input type="text" name="username" autocomplete="username" data-testid="login-username"
                         class="w-full bg-slate-700 border border-slate-600 text-slate-100 placeholder:text-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1.5">Contraseña</label>
-                    <input type="password" name="password" autocomplete="current-password"
+                    <input type="password" name="password" autocomplete="current-password" data-testid="login-password"
                         class="w-full bg-slate-700 border border-slate-600 text-slate-100 placeholder:text-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 </div>
-                <button type="submit"
+                <button type="submit" data-testid="login-submit"
                     class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 rounded-md text-sm">
                     Entrar
                 </button>
@@ -48,7 +48,7 @@
 
         <p class="text-center text-xs text-slate-500 mt-4">
             ¿No tienes cuenta?
-            <a href="{% url 'register' %}" class="text-blue-400 hover:text-blue-300 font-medium">Regístrate</a>
+            <a href="{% url 'register' %}" data-testid="login-register-link" class="text-blue-400 hover:text-blue-300 font-medium">Regístrate</a>
         </p>
 
     </div>

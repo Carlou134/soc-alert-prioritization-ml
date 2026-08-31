@@ -1,0 +1,339 @@
+import json
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from accounts.decorators import admin_required, analyst_required
+from accounts.models import (
+    ACTION_CONNECTOR_CREATED,
+    ACTION_CONNECTOR_DELETED,
+    ACTION_CONNECTOR_RESYNCED,
+    ACTION_CONNECTOR_TESTED,
+    ACTION_CONNECTOR_UPDATED,
+    log_action,
+)
+
+from .forms import (
+    ADV_FIELDS_BY_TYPE,
+    AUTH_TYPE_CHOICES_BY_TYPE,
+    AUTH_TYPE_CREDENTIAL_FIELDS,
+    CREDENTIAL_FIELDS_BY_TYPE,
+    QUERY_LANGUAGE_LABEL_BY_TYPE,
+    SIEMConnectorForm,
+    required_credential_fields,
+    required_extra_fields,
+)
+from .models import SIEMConnector
+from . import splunk_service
+from . import tasks as connector_tasks
+
+# Prefills por tipo de SIEM cuando se llega desde la galería (?type=splunk, etc).
+SIEM_TYPE_DEFAULTS = {
+    'splunk': {
+        'port': 8089,
+        'auth_type': 'user_password',
+        'custom_query': 'search index=soc_alerts',
+        'batch_size': 50,
+        'verify_ssl': False,  # típico en instancias locales con certificado autofirmado
+    },
+    'sentinel': {
+        'host': 'management.azure.com',  # base real de la Azure Resource Manager API
+        'custom_query': "SecurityIncident | where Status == 'New'",
+    },
+    'qradar': {
+        'port': 443,
+        'verify_ssl': False,  # instalaciones on-prem suelen usar certificado autofirmado
+        'custom_query': "SELECT * FROM offenses WHERE status='OPEN'",
+    },
+    'elastic': {
+        'port': 9200,
+        'auth_type': 'api_key',
+        'verify_ssl': False,
+        'index_pattern': '.alerts-security.alerts-*',
+    },
+    'wazuh': {
+        'port': 55000,
+        'auth_type': 'user_password',
+        'verify_ssl': False,
+        'index_pattern': 'wazuh-alerts-*',
+    },
+    'cortex_xsiam': {
+        'min_severity': 'MEDIUM',
+    },
+    # XDRs
+    'crowdstrike': {
+        'host': 'api.crowdstrike.com',
+        'custom_query': "status:'new'+severity_name:['High','Critical']",
+    },
+    'defender_xdr': {
+        'host': 'graph.microsoft.com',
+        'min_severity': 'HIGH',
+    },
+    'cortex_xdr': {},
+    'trendmicro': {
+        'host': 'api.trendmicro.com',
+    },
+}
+
+
+def _deactivate_other_active_splunk_connectors(saved_connector):
+    """
+    Un solo conector Splunk activo a la vez. Dos conectores Splunk activos
+    en simultáneo llevarían cada uno su propio last_synced_at, y el
+    dispatcher (sync_due_connectors) le pediría a Splunk las mismas alertas
+    dos veces — Alert duplicados en la BD, sin ningún control de duplicados
+    contra Splunk (solo existe para archivos subidos a mano). Devuelve la
+    cantidad de conectores que se desactivaron, para poder avisarle al admin.
+    """
+    if saved_connector.source_type != 'splunk' or not saved_connector.is_active:
+        return 0
+    others = SIEMConnector.objects.filter(
+        source_type='splunk', is_active=True,
+    ).exclude(pk=saved_connector.pk)
+    count = others.count()
+    if count:
+        others.update(is_active=False)
+    return count
+
+
+def _form_context():
+    return {
+        'credential_fields_json': json.dumps(CREDENTIAL_FIELDS_BY_TYPE),
+        'auth_type_credential_fields_json': json.dumps(AUTH_TYPE_CREDENTIAL_FIELDS),
+        'auth_type_choices_by_type_json': json.dumps(AUTH_TYPE_CHOICES_BY_TYPE),
+        'adv_fields_by_type_json': json.dumps(ADV_FIELDS_BY_TYPE),
+        'query_language_label_by_type_json': json.dumps(QUERY_LANGUAGE_LABEL_BY_TYPE),
+    }
+
+
+@login_required
+@admin_required
+def connector_list_view(request):
+    connectors = SIEMConnector.objects.select_related('created_by').all()
+    return render(request, 'connectors/connector_list.html', {
+        'connectors': connectors,
+        'source_choices': SIEMConnector.SOURCE_CHOICES,
+    })
+
+
+@login_required
+@analyst_required
+def connector_status_view(request):
+    """
+    Vista de solo lectura para analistas (N1/N2/N3) — mismo estado que ve el
+    admin (conectado/error/no probado, últimas fechas de prueba y sync), pero
+    sin credenciales, sin config de conexión y sin botones de gestión. Crear/
+    editar/eliminar/probar sigue siendo exclusivo de admin_required.
+    """
+    connectors = SIEMConnector.objects.all()
+    return render(request, 'connectors/connector_status.html', {'connectors': connectors})
+
+
+@login_required
+@admin_required
+def connector_create_view(request):
+    initial_type = request.GET.get('type', '')
+    initial = {'source_type': initial_type, **SIEM_TYPE_DEFAULTS.get(initial_type, {})} if initial_type else None
+    form = SIEMConnectorForm(initial=initial)
+
+    if request.method == 'POST':
+        form = SIEMConnectorForm(request.POST)
+        if form.is_valid():
+            connector = form.save(commit=False)
+            connector.created_by = request.user
+            connector.credentials = form.build_credentials()
+            connector.extra_config = form.build_extra_config()
+            connector.save()
+            deactivated = _deactivate_other_active_splunk_connectors(connector)
+
+            log_action(
+                request.user,
+                ACTION_CONNECTOR_CREATED,
+                f'Conector "{connector.name}" ({connector.get_source_type_display()}) creado por {request.user.username}.',
+            )
+            messages.success(request, f'Conector "{connector.name}" creado. Todavía no fue probado.')
+            if deactivated:
+                messages.info(request, f'Se desactivó automáticamente {deactivated} conector(es) Splunk que ya estaban activos — solo puede haber uno a la vez para evitar ingesta duplicada.')
+            return redirect('connector_list')
+
+    return render(request, 'connectors/connector_form.html', {
+        'form': form,
+        'is_edit': False,
+        **_form_context(),
+    })
+
+
+@login_required
+@admin_required
+def connector_edit_view(request, pk):
+    connector = get_object_or_404(SIEMConnector, pk=pk)
+    # extra_config no es secreto — a diferencia de credentials, sí se
+    # prefillea en el form (el usuario ve y puede editar el valor real).
+    form = SIEMConnectorForm(instance=connector, initial=connector.extra_config)
+
+    if request.method == 'POST':
+        form = SIEMConnectorForm(request.POST, instance=connector)
+        if form.is_valid():
+            connector = form.save(commit=False)
+            connector.credentials = form.build_credentials()
+            connector.extra_config = form.build_extra_config()
+            # Cambiar config invalida la última prueba de conexión.
+            connector.status = 'not_tested'
+            connector.last_test_message = ''
+            connector.save()
+            deactivated = _deactivate_other_active_splunk_connectors(connector)
+
+            log_action(
+                request.user,
+                ACTION_CONNECTOR_UPDATED,
+                f'Conector "{connector.name}" editado por {request.user.username}.',
+            )
+            messages.success(request, f'Conector "{connector.name}" actualizado.')
+            if deactivated:
+                messages.info(request, f'Se desactivó automáticamente {deactivated} conector(es) Splunk que ya estaban activos — solo puede haber uno a la vez para evitar ingesta duplicada.')
+            return redirect('connector_list')
+
+    return render(request, 'connectors/connector_form.html', {
+        'form': form,
+        'is_edit': True,
+        'connector': connector,
+        **_form_context(),
+    })
+
+
+@login_required
+@admin_required
+@require_POST
+def connector_delete_view(request, pk):
+    connector = get_object_or_404(SIEMConnector, pk=pk)
+    name = connector.name
+    connector.delete()
+    log_action(request.user, ACTION_CONNECTOR_DELETED, f'Conector "{name}" eliminado por {request.user.username}.')
+    messages.success(request, f'Conector "{name}" eliminado.')
+    return redirect('connector_list')
+
+
+@login_required
+@admin_required
+@require_POST
+def connector_test_view(request, pk):
+    """
+    Splunk: prueba de conexión REAL contra la REST API de management
+    (ver splunk_service.py). El resto de los tipos todavía no tienen
+    integración real — se informa como error para no simular un éxito
+    que el analista podría confundir con una conexión real.
+    """
+    connector = get_object_or_404(SIEMConnector, pk=pk)
+
+    missing_creds = [
+        f for f in required_credential_fields(connector.source_type, connector.auth_type)
+        if not connector.credentials.get(f)
+    ]
+    missing_extra = [
+        f for f in required_extra_fields(connector.source_type)
+        if not connector.extra_config.get(f)
+    ]
+
+    if not connector.host:
+        success, message = False, 'Falta configurar el host del SIEM.'
+    elif missing_creds:
+        success, message = False, f'Faltan credenciales configuradas: {", ".join(missing_creds)}.'
+    elif missing_extra:
+        success, message = False, f'Falta configurar: {", ".join(missing_extra)}.'
+    elif connector.source_type == 'splunk':
+        success, message = splunk_service.test_connection(connector)
+    else:
+        success, message = False, (
+            f'{connector.get_source_type_display()} todavía no tiene una integración real '
+            'implementada — la sincronización automática solo funciona con Splunk por ahora.'
+        )
+
+    connector.status = 'connected' if success else 'error'
+    connector.last_tested_at = timezone.now()
+    connector.last_test_message = message
+    connector.save(update_fields=['status', 'last_tested_at', 'last_test_message'])
+
+    log_action(
+        request.user,
+        ACTION_CONNECTOR_TESTED,
+        f'Prueba de conexión ({"éxito" if success else "error"}) al conector "{connector.name}" — {message}',
+    )
+
+    return JsonResponse({
+        'status': connector.status,
+        'status_label': connector.get_status_display(),
+        'message': message,
+        'tested_at': connector.last_tested_at.strftime('%d/%m/%Y %H:%M'),
+    })
+
+
+def _run_sync_now(request, pk, *, reset_checkpoint, action, action_label):
+    connector = get_object_or_404(SIEMConnector, pk=pk)
+
+    if connector.source_type != 'splunk':
+        return JsonResponse({'error': 'La sincronización manual solo está disponible para Splunk por ahora.'}, status=400)
+
+    if reset_checkpoint:
+        connector.last_synced_at = None
+        connector.save(update_fields=['last_synced_at'])
+
+    connector_tasks.sync_splunk_connector(connector.pk)
+    connector.refresh_from_db()
+
+    log_action(
+        request.user,
+        action,
+        f'{action_label} del conector "{connector.name}" por {request.user.username} — resultado: {connector.last_test_message or connector.get_status_display()}',
+    )
+
+    return JsonResponse({
+        'status': connector.status,
+        'status_label': connector.get_status_display(),
+        'message': connector.last_test_message,
+        'last_synced_at': connector.last_synced_at.strftime('%d/%m/%Y %H:%M') if connector.last_synced_at else None,
+    })
+
+
+@login_required
+@admin_required
+@require_POST
+def connector_sync_now_view(request, pk):
+    """
+    Botón principal "Sincronizar ahora" — corre sync_splunk_connector() en
+    el momento (síncrono, no encolado), SIN tocar el checkpoint. Es el
+    equivalente a "no quiero esperar al Schedule de 1 minuto", sin efectos
+    secundarios: usa el mismo last_synced_at que ya tenía, así que nunca
+    vuelve a traer algo que ya se guardó antes.
+    """
+    return _run_sync_now(
+        request, pk, reset_checkpoint=False,
+        action=ACTION_CONNECTOR_RESYNCED, action_label='Sincronización manual',
+    )
+
+
+@login_required
+@admin_required
+@require_POST
+def connector_force_resync_view(request, pk):
+    """
+    Botón secundario "Resetear checkpoint completo" — resetea el checkpoint
+    (last_synced_at=None) y vuelve a traer TODO desde que se creó el
+    conector, incluido lo que ya se guardó antes. A propósito destructivo:
+    reservado para cuando el checkpoint quedó roto/adelantado de más (ver
+    el bug corregido en connectors/tasks.py) — en uso normal, usar
+    "Sincronizar ahora" en su lugar.
+
+    Bug real encontrado en uso (2026-08-10): un admin lo usó como si fuera
+    "traeme lo nuevo" en vez de "reseteá todo" — el segundo click duplicó
+    las alertas ya guardadas del primer click, porque clean_records no
+    dedupea contra lo que ya está en la BD. Por eso ahora hay dos botones
+    separados en vez de uno solo que hacía las dos cosas.
+    """
+    return _run_sync_now(
+        request, pk, reset_checkpoint=True,
+        action=ACTION_CONNECTOR_RESYNCED, action_label='Reset completo de checkpoint',
+    )

@@ -177,12 +177,18 @@ class PredictionForm(forms.Form):
         help_text='Códigos ATT&CK separados por ";" — mejoran el score de Stage 2.'
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            field.widget.attrs['data-testid'] = f'predict-{name.replace("_", "-")}'
+
 
 class JSONPredictionForm(forms.Form):
     payload = forms.CharField(
         label='Pega tu JSON',
         widget=forms.Textarea(attrs={
             'class': TEXTAREA_CLASS,
+            'data-testid': 'predict-json-payload',
             'placeholder': (
                 '{\n'
                 '  "event_category": "intrusion_attempt",\n'

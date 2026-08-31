@@ -11,6 +11,8 @@ import json
 import numpy as np
 import pandas as pd
 
+from .utils import MAP_MITRE_TACTIC
+
 # Campos mínimos para que una predicción sea válida
 REQUIRED_COLUMNS = [
     'event_category',
@@ -240,6 +242,16 @@ def clean_records(records: list) -> tuple:
     # 1. Normalizar nombres de columnas
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_', regex=False)
 
+    # 1b. Aplanar valores no-hasheables (listas/dicts) a texto plano — pandas
+    # no puede deduplicar/factorizar una celda que sea una lista. Aparece con
+    # datos de Splunk: un campo multivalor en el resultado JSON viene como
+    # array aunque nuestro campo lo espere como string simple (incluso en
+    # metadatos internos de Splunk que ni usamos, tipo _time/tag::eventtype —
+    # el crash pasa en el drop_duplicates() de abajo, antes de filtrar
+    # columnas conocidas). Listas se unen con ';' — mismo separador que ya
+    # usa mitre_techniques en el resto del pipeline.
+    df = df.map(lambda v: ';'.join(map(str, v)) if isinstance(v, (list, tuple)) else (str(v) if isinstance(v, dict) else v))
+
     # 2. Eliminar duplicados
     initial_count = len(df)
     df = df.drop_duplicates()
@@ -253,6 +265,15 @@ def clean_records(records: list) -> tuple:
     for col in CATEGORICAL_COLUMNS:
         if col in df.columns:
             df[col] = df[col].astype(str).str.lower().str.strip()
+
+    # 4b. mitre_tactic — mapear al vocabulario real de tácticas MITRE (mismo diccionario
+    # que usa el predictor individual en utils.py). Sin este paso, un valor no reconocido
+    # pero no-nulo (ej. "0" de un export con columnas corridas) pasaba tal cual a la BD
+    # en vez de caer a 'unknown' como el resto de valores no mapeados.
+    if 'mitre_tactic' in df.columns:
+        df['mitre_tactic'] = df['mitre_tactic'].apply(
+            lambda v: MAP_MITRE_TACTIC.get(str(v).strip().lower().replace(' ', ''), 'unknown')
+        )
 
     # 5. Convertir columnas numéricas
     for col in NUMERIC_COLUMNS:

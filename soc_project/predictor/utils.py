@@ -670,3 +670,39 @@ def calculate_risk_score(probabilities: dict) -> float:
         sum(probabilities.get(cls, 0.0) * w for cls, w in _RISK_WEIGHTS.items()),
         4,
     )
+
+
+# ---------------------------------------------------------------------------
+# ModelVersion — versionado del modelo (Track 1)
+# ---------------------------------------------------------------------------
+
+def get_active_model_version():
+    """Versión del modelo a asociar con las nuevas PredictionLog.
+
+    Hasta que exista un pipeline de reentrenamiento real, todas las
+    predicciones nuevas quedan asociadas a la misma versión activa
+    (normalmente la 'legacy' que crea la migración 0018_migrate_alert_data
+    al migrar datos existentes).
+
+    Auto-reparable a propósito: si la base arrancó vacía (instalación fresca,
+    o alguien corrió las migraciones sin datos previos), 0018 no tiene nada
+    que migrar y no crea la versión 'legacy' — sin este fallback, la primera
+    predicción nueva explota con DoesNotExist. Acá se crea una versión
+    placeholder al vuelo la primera vez que hace falta.
+    """
+    from django.utils import timezone
+    from .models import ModelVersion
+
+    version = ModelVersion.objects.filter(is_active=True).first()
+    if version is not None:
+        return version
+
+    version, _ = ModelVersion.objects.get_or_create(
+        version_label='initial',
+        defaults={
+            'trained_at': timezone.now(),
+            'artifact_path': str(MODEL_PATH),
+            'is_active': True,
+        },
+    )
+    return version

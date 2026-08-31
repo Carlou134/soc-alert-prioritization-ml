@@ -14,15 +14,15 @@
 
     <!-- Formulario -->
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
-        <form id="upload-form" enctype="multipart/form-data" class="space-y-5">
+        <form id="upload-form" enctype="multipart/form-data" class="space-y-5" data-testid="upload-form">
             {% csrf_token %}
             <div>
                 <label class="block text-xs font-medium text-slate-400 mb-1.5">Archivo de alertas</label>
-                <input type="file" name="file" id="file-input" accept=".json,.csv"
+                <input type="file" name="file" id="file-input" data-testid="upload-file-input" accept=".json,.csv"
                     class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:bg-slate-600 file:border-0 file:text-slate-300 file:rounded file:px-3 file:py-1 file:mr-3 file:text-xs">
                 <p class="text-slate-500 text-xs mt-1.5">Formatos: .json, .csv — Máximo 10 MB</p>
             </div>
-            <button type="submit" id="submit-btn"
+            <button type="submit" id="submit-btn" data-testid="upload-submit"
                 class="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 Procesar archivo
             </button>
@@ -30,72 +30,61 @@
     </div>
 
     <!-- Error -->
-    <div id="error-box" class="hidden bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
-        <p class="text-sm text-red-400"><span class="font-medium">Error:</span> <span id="error-text"></span></p>
+    <div id="error-box" data-testid="upload-error-box" class="hidden bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+        <p class="text-sm text-red-400"><span class="font-medium">Error:</span> <span id="error-text" data-testid="upload-error-text"></span></p>
     </div>
 
-    <!-- Loading -->
+    <!-- Loading (parseo/limpieza síncronos, rápido) -->
     <div id="loading-box" class="hidden bg-slate-800 border border-slate-700 rounded-lg px-5 py-4">
         <div class="flex items-center gap-3">
             <svg class="animate-spin h-4 w-4 text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
-            <p id="loading-text" class="text-sm text-slate-300">Analizando archivo...</p>
+            <p class="text-sm text-slate-300">Analizando archivo...</p>
         </div>
     </div>
 
-    <!-- Resultados (aparecen después del phase 1) -->
+    <!-- Resultados -->
     <div id="results-section" class="hidden space-y-5">
 
         <!-- Resumen -->
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
             <p class="text-xs text-slate-400 uppercase tracking-wide mb-4">Resumen</p>
-            <div class="grid grid-cols-3 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 text-center">
-                    <p id="stat-total" class="text-2xl font-bold font-mono text-white">—</p>
+                    <p id="stat-total" data-testid="upload-stat-total" class="text-2xl font-bold font-mono text-white">—</p>
                     <p class="text-xs text-slate-400 mt-1">Total</p>
                 </div>
                 <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 text-center">
-                    <p id="stat-saved" class="text-2xl font-bold font-mono text-emerald-500">—</p>
+                    <p id="stat-saved" data-testid="upload-stat-saved" class="text-2xl font-bold font-mono text-emerald-500">—</p>
                     <p class="text-xs text-emerald-400 mt-1">Guardadas</p>
                 </div>
-                <div id="processing-badge" class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 text-center">
-                    <div class="flex items-center justify-center gap-1.5 mb-1">
-                        <svg id="proc-spinner" class="animate-spin h-3.5 w-3.5 text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                        </svg>
-                        <p id="stat-remaining" class="text-sm font-mono text-blue-400"></p>
-                    </div>
-                    <p id="proc-label" class="text-xs text-blue-400">Procesando...</p>
+                <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-center">
+                    <p id="stat-failed" data-testid="upload-stat-failed" class="text-2xl font-bold font-mono text-red-500">—</p>
+                    <p class="text-xs text-red-400 mt-1">Fallidas</p>
                 </div>
             </div>
+            <p id="stat-cleanup" class="text-xs text-slate-500 mt-3"></p>
         </div>
 
-        <!-- Preview table -->
-        <div>
-            <p class="text-sm font-semibold text-white mb-3">
-                Preview — primeras <span id="preview-count-label">10</span> alertas
-            </p>
-            <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-                <table class="w-full text-left">
-                    <thead>
-                        <tr class="border-b border-slate-700">
-                            <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">#</th>
-                            <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Clase predicha</th>
-                            <th class="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Risk score</th>
-                        </tr>
-                    </thead>
-                    <tbody id="preview-tbody"></tbody>
-                </table>
+        <!-- Progreso de guardado en segundo plano (Track 5) -->
+        <div id="save-status" class="bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-3 flex items-start gap-3">
+            <svg id="save-icon" class="w-4 h-4 text-blue-400 mt-0.5 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
+            </svg>
+            <div class="flex-1 flex items-center justify-between gap-3">
+                <div>
+                    <p id="save-title" class="text-sm font-semibold text-blue-400">Guardando alertas en el sistema…</p>
+                    <p id="save-detail" class="text-xs text-slate-400 mt-0.5">
+                        Corre en segundo plano — puedes navegar sin perder los datos.
+                    </p>
+                </div>
+                <a id="view-alerts-link" data-testid="upload-view-alerts-link" href="{% url 'alert_list' %}"
+                    class="hidden shrink-0 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md font-medium transition-colors">
+                    Ver alertas
+                </a>
             </div>
-        </div>
-
-        <!-- Banner completado (aparece después del phase 2) -->
-        <div id="done-banner" class="hidden bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-5 py-4 items-center justify-between">
-            <p class="text-sm text-emerald-400 font-medium">Todas las alertas fueron procesadas y guardadas.</p>
-            <a href="{% url 'alert_list' %}" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md font-medium transition-colors">Ver alertas</a>
         </div>
 
     </div>
@@ -104,23 +93,22 @@
 
 <script>
 (function () {
-    const form        = document.getElementById('upload-form');
-    const submitBtn   = document.getElementById('submit-btn');
-    const errorBox    = document.getElementById('error-box');
-    const errorText   = document.getElementById('error-text');
-    const loadingBox  = document.getElementById('loading-box');
-    const loadingTxt  = document.getElementById('loading-text');
-    const results     = document.getElementById('results-section');
-    const tbody       = document.getElementById('preview-tbody');
-    const statTotal   = document.getElementById('stat-total');
-    const statSaved   = document.getElementById('stat-saved');
-    const statRemain  = document.getElementById('stat-remaining');
-    const procBadge   = document.getElementById('processing-badge');
-    const procLabel   = document.getElementById('proc-label');
-    const procSpinner = document.getElementById('proc-spinner');
-    const doneBanner  = document.getElementById('done-banner');
-    const previewLbl  = document.getElementById('preview-count-label');
-    const csrfToken   = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const form            = document.getElementById('upload-form');
+    const submitBtn       = document.getElementById('submit-btn');
+    const errorBox        = document.getElementById('error-box');
+    const errorText       = document.getElementById('error-text');
+    const loadingBox      = document.getElementById('loading-box');
+    const results         = document.getElementById('results-section');
+    const statTotal       = document.getElementById('stat-total');
+    const statSaved       = document.getElementById('stat-saved');
+    const statFailed      = document.getElementById('stat-failed');
+    const statCleanup     = document.getElementById('stat-cleanup');
+    const saveStatusBox   = document.getElementById('save-status');
+    const saveIcon        = document.getElementById('save-icon');
+    const saveTitle       = document.getElementById('save-title');
+    const saveDetail      = document.getElementById('save-detail');
+    const viewAlertsLink  = document.getElementById('view-alerts-link');
+    const csrfToken       = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
     function showError(msg) {
         loadingBox.classList.add('hidden');
@@ -130,14 +118,49 @@
         submitBtn.textContent = 'Procesar archivo';
     }
 
-    function badgeFor(cls) {
-        const map = {
-            'malicioso':    'bg-red-500/10 text-red-500 border-red-500/20',
-            'a_investigar': 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-            'benigno':      'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-        };
-        const s = map[cls] || 'bg-slate-700 text-slate-300 border-slate-600';
-        return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${s}">${cls}</span>`;
+    function pollStatus(datasetId) {
+        const statusUrl = `/datasets/${datasetId}/status/`;
+
+        function poll() {
+            fetch(statusUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(r => r.json())
+                .then(data => {
+                    statSaved.textContent  = data.saved_count;
+                    statFailed.textContent = data.failed_count;
+
+                    if (data.status === 'processed') {
+                        saveStatusBox.classList.remove('bg-blue-500/10', 'border-blue-500/20');
+                        saveStatusBox.classList.add('bg-emerald-500/10', 'border-emerald-500/20');
+                        saveIcon.classList.remove('animate-spin', 'text-blue-400');
+                        saveIcon.classList.add('text-emerald-400');
+                        saveIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>';
+                        saveTitle.classList.remove('text-blue-400');
+                        saveTitle.classList.add('text-emerald-400');
+                        saveTitle.textContent = data.saved_count + ' alerta' + (data.saved_count === 1 ? '' : 's') + ' guardada' + (data.saved_count === 1 ? '' : 's') + ' en el sistema';
+                        saveDetail.textContent = data.failed_count
+                            ? data.failed_count + ' registro(s) no pudieron guardarse.'
+                            : 'Clasificadas con ML y risk score asignado.';
+                        viewAlertsLink.classList.remove('hidden');
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Procesar archivo';
+                    } else if (data.status === 'failed') {
+                        saveStatusBox.classList.remove('bg-blue-500/10', 'border-blue-500/20');
+                        saveStatusBox.classList.add('bg-red-500/10', 'border-red-500/20');
+                        saveIcon.classList.remove('animate-spin', 'text-blue-400');
+                        saveIcon.classList.add('text-red-400');
+                        saveTitle.classList.remove('text-blue-400');
+                        saveTitle.classList.add('text-red-400');
+                        saveTitle.textContent = 'No se pudo completar el guardado';
+                        saveDetail.textContent = data.error_message || 'Ocurrió un error inesperado.';
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Procesar archivo';
+                    } else {
+                        setTimeout(poll, 2000);
+                    }
+                })
+                .catch(() => setTimeout(poll, 3000));
+        }
+        poll();
     }
 
     form.addEventListener('submit', async function (e) {
@@ -145,14 +168,10 @@
 
         errorBox.classList.add('hidden');
         results.classList.add('hidden');
-        doneBanner.classList.remove('flex');
-        doneBanner.classList.add('hidden');
         loadingBox.classList.remove('hidden');
-        loadingTxt.textContent = 'Analizando archivo...';
         submitBtn.disabled = true;
         submitBtn.textContent = 'Procesando...';
 
-        // ── Phase 1 ──────────────────────────────────────────────────────
         const fd = new FormData(form);
 
         let data;
@@ -170,68 +189,17 @@
 
         if (data.error) { showError(data.error); return; }
 
-        // Mostrar preview
         loadingBox.classList.add('hidden');
         results.classList.remove('hidden');
-        previewLbl.textContent  = data.preview_count;
-        statTotal.textContent   = data.total;
-        statSaved.textContent   = data.preview_count;
-        statRemain.textContent  = data.remaining > 0 ? `${data.remaining}` : '';
 
-        tbody.innerHTML = '';
-        data.preview.forEach(function (row) {
-            const tr = document.createElement('tr');
-            tr.className = 'border-b border-slate-800 hover:bg-slate-800/50' +
-                (row.predicted_class === 'malicioso' ? ' border-l-4 border-l-red-500' : '');
-            tr.innerHTML =
-                `<td class="px-4 py-3 text-xs font-mono text-slate-400">#${row.record}</td>` +
-                `<td class="px-4 py-3">${badgeFor(row.predicted_class)}</td>` +
-                `<td class="px-4 py-3 text-xs font-mono text-slate-300">${row.risk_score}</td>`;
-            tbody.appendChild(tr);
-        });
+        statTotal.textContent  = data.total;
+        statSaved.textContent  = 0;
+        statFailed.textContent = 0;
+        statCleanup.textContent =
+            `${data.stats.duplicates_removed} duplicado(s) eliminado(s), ` +
+            `${data.stats.invalid_rows_removed} fila(s) inválida(s) eliminada(s) antes de guardar.`;
 
-        if (data.remaining === 0) {
-            procBadge.classList.add('hidden');
-            doneBanner.classList.remove('hidden');
-            doneBanner.classList.add('flex');
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Procesar archivo';
-            return;
-        }
-
-        // ── Phase 2: el usuario puede quedarse o navegar ──────────────────
-        loadingTxt.textContent = `Procesando ${data.remaining} alertas restantes...`;
-        loadingBox.classList.remove('hidden');
-
-        const fd2 = new FormData();
-        fd2.set('csrfmiddlewaretoken', csrfToken);
-        fd2.set('phase', 'complete');
-
-        let data2;
-        try {
-            const res2 = await fetch(window.location.href, {
-                method: 'POST',
-                headers: { 'X-CSRFToken': csrfToken },
-                body: fd2,
-            });
-            data2 = await res2.json();
-        } catch (_) {
-            showError('Error al procesar el lote restante.');
-            return;
-        }
-
-        loadingBox.classList.add('hidden');
-        procSpinner.classList.add('hidden');
-        procLabel.textContent  = 'Completado';
-        procLabel.className    = 'text-xs text-emerald-400';
-        statRemain.textContent = data2.saved || 0;
-        statRemain.className   = 'text-sm font-mono text-emerald-400';
-        statSaved.textContent  = data.preview_count + (data2.saved || 0);
-
-        doneBanner.classList.remove('hidden');
-        doneBanner.classList.add('flex');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Procesar archivo';
+        pollStatus(data.dataset_id);
     });
 })();
 </script>

@@ -6,7 +6,7 @@
 <div class="space-y-6">
 
     <!-- Header -->
-    <div class="flex items-start justify-between gap-4">
+    <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
             <div class="flex items-center gap-3">
                 <svg class="w-5 h-5 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -23,12 +23,12 @@
     </div>
 
     <!-- Filtros -->
-    <form method="get" class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+    <form method="get" class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4" data-testid="incident-desk-filter-form">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <input type="text" name="q" value="{{ search }}" placeholder="Buscar evento, ataque, protocolo…"
+            <input type="text" name="q" value="{{ search }}" placeholder="Buscar evento, ataque, protocolo…" data-testid="incident-desk-filter-search"
                 class="col-span-1 md:col-span-2 bg-slate-700 border border-slate-600 text-slate-200 placeholder-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
 
-            <select name="predicted_class"
+            <select name="predicted_class" data-testid="incident-desk-filter-class"
                 class="bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
                 <option value="">Todas las clases</option>
                 <option value="malicioso"   {% if class_filter == 'malicioso'   %}selected{% endif %}>Malicioso</option>
@@ -36,40 +36,40 @@
             </select>
 
             <div class="flex gap-2">
-                <button type="submit"
+                <button type="submit" data-testid="incident-desk-filter-submit"
                     class="flex-1 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                     Filtrar
                 </button>
-                <a href="{% url 'incident_desk' %}"
+                <a href="{% url 'incident_desk' %}" data-testid="incident-desk-filter-clear"
                     class="flex items-center justify-center px-3 py-2 rounded-md text-sm text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
                     Limpiar
                 </a>
             </div>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mt-3">
             <div>
                 <label class="block text-xs text-slate-500 mb-1">Escalado desde</label>
-                <input type="date" name="date_from" value="{{ date_from }}"
+                <input type="date" name="date_from" value="{{ date_from }}" data-testid="incident-desk-filter-date-from"
                     class="w-full bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
             </div>
             <div>
                 <label class="block text-xs text-slate-500 mb-1">Escalado hasta</label>
-                <input type="date" name="date_to" value="{{ date_to }}"
+                <input type="date" name="date_to" value="{{ date_to }}" data-testid="incident-desk-filter-date-to"
                     class="w-full bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
             </div>
             <div>
                 <label class="block text-xs text-slate-500 mb-1">Estado</label>
-                <select name="resolved_filter"
+                <select name="resolved_filter" data-testid="incident-desk-filter-resolved"
                     class="w-full bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
                     <option value=""        {% if resolved_filter == ''        %}selected{% endif %}>Todos</option>
                     <option value="active"  {% if resolved_filter == 'active'  %}selected{% endif %}>Solo activos</option>
                     <option value="resolved"{% if resolved_filter == 'resolved'%}selected{% endif %}>Solo resueltos</option>
                 </select>
             </div>
-            <div class="min-w-max">
+            <div>
                 <label class="block text-xs text-slate-500 mb-1">Ordenar por</label>
-                <select name="order"
+                <select name="order" data-testid="incident-desk-filter-order"
                     class="w-full bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
                     <option value="date_desc" {% if order == 'date_desc' %}selected{% endif %}>Más reciente primero</option>
                     <option value="date_asc"  {% if order == 'date_asc'  %}selected{% endif %}>Más antiguo primero</option>
@@ -82,8 +82,8 @@
 
     <!-- Tabla de incidentes -->
     {% if page_obj.object_list %}
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-        <table class="w-full text-sm">
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden overflow-x-auto">
+        <table class="w-full text-sm min-w-180" data-testid="incident-desk-table">
             <thead>
                 <tr class="border-b border-slate-700/50">
                     <th class="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">#</th>
@@ -99,10 +99,10 @@
             </thead>
             <tbody class="divide-y divide-slate-700/30">
                 {% for alert in page_obj %}
-                <tr class="hover:bg-slate-700/20 transition-colors">
+                <tr class="hover:bg-slate-700/20 transition-colors" data-testid="incident-row-{{ alert.pk }}">
                     <td class="px-4 py-3 text-slate-500 font-mono text-xs">{{ alert.pk }}</td>
                     <td class="px-4 py-3">
-                        {% if alert.is_resolved %}
+                        {% if alert.incident.is_resolved %}
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>Resuelto
                             </span>
@@ -113,16 +113,16 @@
                         {% endif %}
                     </td>
                     <td class="px-4 py-3">
-                        {% if alert.predicted_class == 'malicioso' %}
+                        {% if alert.latest_prediction.predicted_class == 'malicioso' %}
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/25">Malicioso</span>
-                        {% elif alert.predicted_class == 'a_investigar' %}
+                        {% elif alert.latest_prediction.predicted_class == 'a_investigar' %}
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/25">A investigar</span>
                         {% else %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-600/50 text-slate-400">{{ alert.predicted_class|default:"—" }}</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-600/50 text-slate-400">{{ alert.latest_prediction.predicted_class|default:"—" }}</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-3 font-mono text-xs {% if alert.risk_score >= 0.7 %}text-red-400{% elif alert.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
-                        {% if alert.risk_score is not None %}{{ alert.risk_score|floatformat:4 }}{% else %}—{% endif %}
+                    <td class="px-4 py-3 font-mono text-xs {% if alert.latest_prediction.risk_score >= 0.7 %}text-red-400{% elif alert.latest_prediction.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
+                        {% if alert.latest_prediction.risk_score is not None %}{{ alert.latest_prediction.risk_score|floatformat:4 }}{% else %}—{% endif %}
                     </td>
                     <td class="px-4 py-3">
                         <p class="text-slate-200 font-medium">{{ alert.event_category|default:"—" }}</p>
@@ -131,12 +131,12 @@
                         {% endif %}
                     </td>
                     <td class="px-4 py-3 text-slate-300 text-xs">{{ alert.mitre_tactic|default:"—" }}</td>
-                    <td class="px-4 py-3 text-slate-300 text-xs">{{ alert.escalated_by.username|default:"—" }}</td>
+                    <td class="px-4 py-3 text-slate-300 text-xs">{{ alert.incident.escalated_by.username|default:"—" }}</td>
                     <td class="px-4 py-3 text-slate-400 font-mono text-xs">
-                        {% if alert.escalated_at %}{{ alert.escalated_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+                        {% if alert.incident.escalated_at %}{{ alert.incident.escalated_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
                     </td>
                     <td class="px-4 py-3 text-right">
-                        <a href="{% url 'incident_detail' alert.pk %}{% if query_string %}?back_qs={{ query_string|urlencode }}{% endif %}"
+                        <a href="{% url 'incident_detail' alert.pk %}{% if query_string %}?back_qs={{ query_string|urlencode }}{% endif %}" data-testid="incident-detail-link-{{ alert.pk }}"
                             class="text-xs text-slate-400 hover:text-white transition-colors">
                             Ver detalle →
                         </a>
@@ -155,13 +155,13 @@
         </p>
         <div class="flex items-center gap-1">
             {% if page_obj.has_previous %}
-            <a href="?{{ query_string }}&page={{ page_obj.previous_page_number }}"
+            <a href="?{{ query_string }}&page={{ page_obj.previous_page_number }}" data-testid="pagination-prev"
                 class="px-3 py-1.5 rounded-md text-sm text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
                 ← Anterior
             </a>
             {% endif %}
             {% if page_obj.has_next %}
-            <a href="?{{ query_string }}&page={{ page_obj.next_page_number }}"
+            <a href="?{{ query_string }}&page={{ page_obj.next_page_number }}" data-testid="pagination-next"
                 class="px-3 py-1.5 rounded-md text-sm text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
                 Siguiente →
             </a>
@@ -171,7 +171,7 @@
     {% endif %}
 
     {% else %}
-    <div class="bg-slate-800/30 border border-slate-700/30 rounded-xl p-12 text-center">
+    <div class="bg-slate-800/30 border border-slate-700/30 rounded-xl p-12 text-center" data-testid="incident-desk-empty-state">
         <svg class="w-10 h-10 text-slate-600 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
         </svg>

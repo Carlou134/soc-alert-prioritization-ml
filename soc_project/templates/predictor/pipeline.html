@@ -122,11 +122,11 @@
             </p>
         </div>
 
-        <form method="post" action="{% url 'pipeline_upload' %}" enctype="multipart/form-data" class="space-y-5">
+        <form method="post" action="{% url 'pipeline_upload' %}" enctype="multipart/form-data" class="space-y-5" data-testid="pipeline-upload-form">
             {% csrf_token %}
             <div>
                 <label class="block text-xs font-medium text-slate-400 mb-1.5">Archivo de datos</label>
-                <input type="file" name="file" accept=".json,.csv" required
+                <input type="file" name="file" accept=".json,.csv" required data-testid="pipeline-upload-file-input"
                     class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
                            file:bg-slate-600 file:border-0 file:text-slate-300 file:rounded file:px-3 file:py-1 file:mr-3 file:text-xs cursor-pointer">
                 <p class="text-slate-500 text-xs mt-1.5">Formatos: .csv, .json — Máximo 10 MB</p>
@@ -141,7 +141,7 @@
                 </div>
             </div>
 
-            <button type="submit"
+            <button type="submit" data-testid="pipeline-upload-submit"
                 class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/>
@@ -190,7 +190,7 @@
                 {% endfor %}
             </div>
             {% endfor %}
-            <p class="text-xs text-amber-300/60 mt-1">Los valores no numéricos se reemplazarán con 0 durante la limpieza. Podés corregir el mapeo o continuar igual.</p>
+            <p class="text-xs text-amber-300/60 mt-1">Los valores no numéricos se reemplazarán con 0 durante la limpieza. Puedes corregir el mapeo o continuar igual.</p>
         </div>
         {% endif %}
 
@@ -204,7 +204,7 @@
             </div>
         </div>
 
-        <form method="post" class="space-y-4">
+        <form method="post" class="space-y-4" data-testid="pipeline-map-form">
             {% csrf_token %}
             {% if type_warnings %}<input type="hidden" name="force_continue" value="1">{% endif %}
 
@@ -216,7 +216,8 @@
                     <span class="w-2 h-2 rounded-full {{ section.dot_class }} shrink-0"></span>
                     <p class="text-xs font-semibold {{ section.title_class }} uppercase tracking-wide">{{ section.title }}</p>
                 </div>
-                <table class="w-full text-left text-sm">
+                <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm min-w-150">
                     <thead>
                         <tr class="bg-slate-900 border-b border-slate-700">
                             <th class="px-4 py-2.5 text-xs font-medium text-slate-400 w-44">Campo</th>
@@ -244,7 +245,7 @@
                                 </span>
                             </td>
                             <td class="px-4 py-3 align-top">
-                                <select name="map_{{ row.name }}"
+                                <select name="map_{{ row.name }}" data-testid="pipeline-map-select-{{ row.name }}"
                                     class="bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 w-full">
                                     <option value="__skip__">— Ignorar —</option>
                                     {% for dcol in detected_cols %}
@@ -256,6 +257,7 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                </div>
             </div>
             {% endif %}
             {% endfor %}
@@ -271,11 +273,11 @@
             {% endif %}
 
             <div class="flex gap-3">
-                <button type="submit"
+                <button type="submit" data-testid="pipeline-map-submit"
                     class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                     {% if type_warnings %}Continuar de todas formas{% else %}Aplicar mapeo y continuar{% endif %}
                 </button>
-                <a href="{% url 'pipeline' %}"
+                <a href="{% url 'pipeline' %}" data-testid="pipeline-map-cancel"
                     class="inline-flex items-center bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-md text-sm font-medium transition-colors">
                     Cancelar
                 </a>
@@ -313,7 +315,7 @@
             {% endif %}
 
             <!-- Operaciones que se aplicarán -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 <div class="bg-slate-700/40 border border-slate-600 rounded-md p-3 text-center">
                     <p class="text-xs text-slate-300 font-medium">Eliminar duplicados</p>
                     <p class="text-emerald-400 text-xs mt-1 font-mono">✓ Activo</p>
@@ -378,9 +380,9 @@
 
         <!-- Acciones -->
         <div class="flex gap-3">
-            <form method="post" action="{% url 'pipeline_normalize' %}" id="form-normalize">
+            <form method="post" action="{% url 'pipeline_normalize' %}" id="form-normalize" data-testid="pipeline-normalize-form">
                 {% csrf_token %}
-                <button type="submit" id="btn-normalize"
+                <button type="submit" id="btn-normalize" data-testid="pipeline-normalize-submit"
                     class="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-md text-sm font-medium transition-colors">
                     <svg id="btn-icon" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/>
@@ -400,7 +402,7 @@
                 icon.classList.add('animate-spin');
             });
             </script>
-            <a href="{% url 'pipeline' %}"
+            <a href="{% url 'pipeline' %}" data-testid="pipeline-normalize-cancel"
                 class="inline-flex items-center bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 Cancelar
             </a>
@@ -416,25 +418,25 @@
     <div class="space-y-5">
 
         <!-- Estadísticas de limpieza -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
-                <p class="text-2xl font-bold font-mono text-white">{{ stats.total_original }}</p>
+                <p class="text-2xl font-bold font-mono text-white" data-testid="pipeline-stat-total-original">{{ stats.total_original }}</p>
                 <p class="text-xs text-slate-400 mt-1">Originales</p>
             </div>
             <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 text-center">
-                <p class="text-2xl font-bold font-mono text-amber-400">{{ stats.duplicates_removed }}</p>
+                <p class="text-2xl font-bold font-mono text-amber-400" data-testid="pipeline-stat-duplicates">{{ stats.duplicates_removed }}</p>
                 <p class="text-xs text-amber-400/70 mt-1">Duplicados eliminados</p>
             </div>
             <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 text-center">
-                <p class="text-2xl font-bold font-mono text-blue-400">{{ stats.nulls_filled }}</p>
+                <p class="text-2xl font-bold font-mono text-blue-400" data-testid="pipeline-stat-nulls-filled">{{ stats.nulls_filled }}</p>
                 <p class="text-xs text-blue-400/70 mt-1">Nulos rellenados</p>
             </div>
             <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-center">
-                <p class="text-2xl font-bold font-mono text-red-400">{{ stats.invalid_rows_removed }}</p>
+                <p class="text-2xl font-bold font-mono text-red-400" data-testid="pipeline-stat-invalid">{{ stats.invalid_rows_removed }}</p>
                 <p class="text-xs text-red-400/70 mt-1">Filas inválidas</p>
             </div>
             <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 text-center">
-                <p class="text-2xl font-bold font-mono text-emerald-400">{{ stats.total_clean }}</p>
+                <p class="text-2xl font-bold font-mono text-emerald-400" data-testid="pipeline-stat-clean">{{ stats.total_clean }}</p>
                 <p class="text-xs text-emerald-400/70 mt-1">Registros limpios</p>
             </div>
         </div>
@@ -450,24 +452,61 @@
         </div>
         {% endif %}
 
-        <!-- Confirmación automática de guardado -->
-        {% if saved_count %}
-        <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-3 flex items-start gap-3">
-            <svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+        <!-- Progreso de guardado en segundo plano (Track 5) -->
+        {% if dataset_id %}
+        <div id="pipeline-save-status" class="bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-3 flex items-start gap-3">
+            <svg id="pipeline-save-icon" class="w-4 h-4 text-blue-400 mt-0.5 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
             </svg>
             <div>
-                <p class="text-sm font-semibold text-emerald-400">
-                    {{ saved_count }} alerta{{ saved_count|pluralize:"s" }} guardada{{ saved_count|pluralize:"s" }} en el sistema
-                </p>
-                <p class="text-xs text-emerald-300/70 mt-0.5">
-                    Clasificadas con ML y risk score asignado.
-                    {% if failed_count %}
-                    <span class="text-amber-400">{{ failed_count }} registro{{ failed_count|pluralize:"s" }} no pudo{{ failed_count|pluralize:"n" }} guardarse.</span>
-                    {% endif %}
+                <p id="pipeline-save-title" class="text-sm font-semibold text-blue-400">Guardando alertas en el sistema…</p>
+                <p id="pipeline-save-detail" class="text-xs text-slate-400 mt-0.5">
+                    Corre en segundo plano — puedes navegar sin perder los datos.
                 </p>
             </div>
         </div>
+        <script>
+        (function() {
+            const statusUrl = "{% url 'dataset_status' dataset_id %}";
+            const box    = document.getElementById('pipeline-save-status');
+            const icon   = document.getElementById('pipeline-save-icon');
+            const title  = document.getElementById('pipeline-save-title');
+            const detail = document.getElementById('pipeline-save-detail');
+
+            function poll() {
+                fetch(statusUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'processed') {
+                            box.classList.remove('bg-blue-500/10', 'border-blue-500/20');
+                            box.classList.add('bg-emerald-500/10', 'border-emerald-500/20');
+                            icon.classList.remove('animate-spin', 'text-blue-400');
+                            icon.classList.add('text-emerald-400');
+                            icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>';
+                            title.classList.remove('text-blue-400');
+                            title.classList.add('text-emerald-400');
+                            title.textContent = data.saved_count + ' alerta' + (data.saved_count === 1 ? '' : 's') + ' guardada' + (data.saved_count === 1 ? '' : 's') + ' en el sistema';
+                            detail.textContent = data.failed_count
+                                ? data.failed_count + ' registro(s) no pudieron guardarse.'
+                                : 'Clasificadas con ML y risk score asignado.';
+                        } else if (data.status === 'failed') {
+                            box.classList.remove('bg-blue-500/10', 'border-blue-500/20');
+                            box.classList.add('bg-red-500/10', 'border-red-500/20');
+                            icon.classList.remove('animate-spin', 'text-blue-400');
+                            icon.classList.add('text-red-400');
+                            title.classList.remove('text-blue-400');
+                            title.classList.add('text-red-400');
+                            title.textContent = 'No se pudo completar el guardado';
+                            detail.textContent = data.error_message || 'Ocurrió un error inesperado.';
+                        } else {
+                            setTimeout(poll, 2000);
+                        }
+                    })
+                    .catch(() => setTimeout(poll, 3000));
+            }
+            poll();
+        })();
+        </script>
         {% endif %}
 
         <!-- Descargar archivo (opcional) -->
@@ -484,7 +523,7 @@
                 <form method="post" action="{% url 'pipeline_export' %}">
                     {% csrf_token %}
                     <input type="hidden" name="format" value="csv">
-                    <button type="submit"
+                    <button type="submit" data-testid="pipeline-export-csv"
                         class="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
@@ -497,7 +536,7 @@
                 <form method="post" action="{% url 'pipeline_export' %}">
                     {% csrf_token %}
                     <input type="hidden" name="format" value="json">
-                    <button type="submit"
+                    <button type="submit" data-testid="pipeline-export-json"
                         class="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
@@ -507,7 +546,7 @@
                 </form>
 
                 <!-- Nuevo pipeline -->
-                <a href="{% url 'pipeline' %}"
+                <a href="{% url 'pipeline' %}" data-testid="pipeline-new-link"
                     class="inline-flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-md text-sm font-medium transition-colors">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>

@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_edit %}Editar conector{% else %}Nuevo conector{% endif %} — SOC Predictor{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto">
+
+    <a href="{% url 'connector_list' %}" class="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white mb-6 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+        </svg>
+        Volver a conectores
+    </a>
+
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+
+        <div class="flex items-center gap-4 mb-6 pb-6 border-b border-slate-700">
+            <div class="w-12 h-12 bg-blue-600/20 border border-blue-500/30 rounded-full flex items-center justify-center shrink-0">
+                <svg class="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                </svg>
+            </div>
+            <div>
+                <p class="text-white font-semibold">{% if is_edit %}Editar conector{% else %}Nuevo conector{% endif %}</p>
+                <p class="text-slate-400 text-sm">
+                    {% if is_edit %}Las credenciales no se muestran por seguridad — déjalas vacías para no cambiarlas.{% else %}Se guarda como configuración; la conexión se prueba después, por separado.{% endif %}
+                </p>
+            </div>
+        </div>
+
+        <form method="post" novalidate data-testid="connector-form">
+            {% csrf_token %}
+
+            <div class="mb-4">
+                <label for="{{ form.name.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">Nombre</label>
+                {{ form.name }}
+                {% if form.name.errors %}<p class="text-red-400 text-xs mt-1">{{ form.name.errors|join:", " }}</p>{% endif %}
+            </div>
+
+            <div class="mb-4">
+                <label for="{{ form.source_type.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">Tipo de SIEM</label>
+                {{ form.source_type }}
+                {% if form.source_type.errors %}<p class="text-red-400 text-xs mt-1">{{ form.source_type.errors|join:", " }}</p>{% endif %}
+            </div>
+
+            <div class="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="sm:col-span-2">
+                    <label for="{{ form.host.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">Host / IP</label>
+                    {{ form.host }}
+                    {% if form.host.errors %}<p class="text-red-400 text-xs mt-1">{{ form.host.errors|join:", " }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.port.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">Puerto</label>
+                    {{ form.port }}
+                    {% if form.port.errors %}<p class="text-red-400 text-xs mt-1">{{ form.port.errors|join:", " }}</p>{% endif %}
+                </div>
+            </div>
+
+            <div class="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label for="{{ form.poll_interval_minutes.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">Frecuencia de polling (minutos)</label>
+                    {{ form.poll_interval_minutes }}
+                    {% if form.poll_interval_minutes.errors %}<p class="text-red-400 text-xs mt-1">{{ form.poll_interval_minutes.errors|join:", " }}</p>{% endif %}
+                </div>
+                <div class="flex items-end pb-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        {{ form.verify_ssl }}
+                        <span class="text-sm text-slate-300">Verificar certificado SSL</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Configuración avanzada — un único bloque con TODOS los campos posibles;
+                 el JS solo muestra/oculta cada uno según el tipo de SIEM elegido, así
+                 cada campo del form se renderiza una sola vez en el HTML (sin duplicar
+                 el mismo <select>/<input> en varios lugares). -->
+            <div class="mb-5 bg-slate-700/30 border border-slate-700 rounded-lg p-4" data-testid="connector-advanced">
+                <p class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-3">Configuración avanzada</p>
+
+                <div class="mb-3" data-adv-field="auth_type">
+                    <label for="{{ form.auth_type.id_for_label }}" class="block text-xs text-slate-400 mb-1">Tipo de autenticación</label>
+                    {{ form.auth_type }}
+                </div>
+
+                <div class="mb-3" data-adv-field="custom_query">
+                    <label for="{{ form.custom_query.id_for_label }}" class="block text-xs text-slate-400 mb-1" data-query-label>Consulta personalizada</label>
+                    {{ form.custom_query }}
+                    <p class="text-slate-500 text-xs mt-1">Se le agrega automáticamente el rango de tiempo incremental (checkpointing) cuando corra el worker real.</p>
+                </div>
+
+                <div class="mb-3" data-adv-field="batch_size">
+                    <label for="{{ form.batch_size.id_for_label }}" class="block text-xs text-slate-400 mb-1">Límite de resultados</label>
+                    {{ form.batch_size }}
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div data-adv-field="subscription_id">
+                        <label for="{{ form.subscription_id.id_for_label }}" class="block text-xs text-slate-400 mb-1">Subscription ID</label>
+                        {{ form.subscription_id }}
+                    </div>
+                    <div data-adv-field="resource_group">
+                        <label for="{{ form.resource_group.id_for_label }}" class="block text-xs text-slate-400 mb-1">Resource Group</label>
+                        {{ form.resource_group }}
+                    </div>
+                    <div data-adv-field="workspace_name">
+                        <label for="{{ form.workspace_name.id_for_label }}" class="block text-xs text-slate-400 mb-1">Workspace Name/ID</label>
+                        {{ form.workspace_name }}
+                    </div>
+                </div>
+
+                <div class="mb-3" data-adv-field="index_pattern">
+                    <label for="{{ form.index_pattern.id_for_label }}" class="block text-xs text-slate-400 mb-1">Patrón de índice</label>
+                    {{ form.index_pattern }}
+                </div>
+
+                <div class="mb-3" data-adv-field="min_severity">
+                    <label for="{{ form.min_severity.id_for_label }}" class="block text-xs text-slate-400 mb-1">Severidad mínima</label>
+                    {{ form.min_severity }}
+                </div>
+
+                {% if is_edit and connector.last_synced_at %}
+                <p class="text-slate-500 text-xs mt-3" data-testid="connector-last-synced">Última sincronización: {{ connector.last_synced_at|date:"d/m/Y H:i" }}</p>
+                {% elif is_edit %}
+                <p class="text-slate-500 text-xs mt-3" data-testid="connector-last-synced">Última sincronización: nunca (todavía no hay worker de ingesta corriendo).</p>
+                {% endif %}
+            </div>
+
+            <!-- Credenciales — el bloque visible depende del tipo de SIEM (y, en Splunk, del método de auth elegido) -->
+            <div class="mb-5 bg-slate-700/30 border border-slate-700 rounded-lg p-4">
+                <p class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-3">Credenciales</p>
+
+                {% if is_edit and connector.masked_credential_fields %}
+                <div class="mb-3 flex flex-wrap gap-1.5" data-testid="connector-existing-credentials">
+                    {% for f in connector.masked_credential_fields %}
+                    <span class="text-xs bg-slate-800 border border-slate-600 text-slate-400 rounded-full px-2.5 py-0.5">{{ f.label }} configurado</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="connector-credential-fields">
+                    <div data-cred-field="username">
+                        <label for="{{ form.username.id_for_label }}" class="block text-xs text-slate-400 mb-1">Usuario</label>
+                        {{ form.username }}
+                    </div>
+                    <div data-cred-field="password">
+                        <label for="{{ form.password.id_for_label }}" class="block text-xs text-slate-400 mb-1">Contraseña</label>
+                        {{ form.password }}
+                    </div>
+                    <div data-cred-field="api_token">
+                        <label for="{{ form.api_token.id_for_label }}" class="block text-xs text-slate-400 mb-1">API Token</label>
+                        {{ form.api_token }}
+                    </div>
+                    <div data-cred-field="api_key">
+                        <label for="{{ form.api_key.id_for_label }}" class="block text-xs text-slate-400 mb-1">API Key</label>
+                        {{ form.api_key }}
+                    </div>
+                    <div data-cred-field="api_key_id">
+                        <label for="{{ form.api_key_id.id_for_label }}" class="block text-xs text-slate-400 mb-1">API Key ID</label>
+                        {{ form.api_key_id }}
+                    </div>
+                    <div data-cred-field="tenant_id">
+                        <label for="{{ form.tenant_id.id_for_label }}" class="block text-xs text-slate-400 mb-1">Tenant ID</label>
+                        {{ form.tenant_id }}
+                    </div>
+                    <div data-cred-field="client_id">
+                        <label for="{{ form.client_id.id_for_label }}" class="block text-xs text-slate-400 mb-1">Client ID</label>
+                        {{ form.client_id }}
+                    </div>
+                    <div data-cred-field="client_secret">
+                        <label for="{{ form.client_secret.id_for_label }}" class="block text-xs text-slate-400 mb-1">Client Secret</label>
+                        {{ form.client_secret }}
+                    </div>
+                    <div data-cred-field="sec_token">
+                        <label for="{{ form.sec_token.id_for_label }}" class="block text-xs text-slate-400 mb-1">SEC Token</label>
+                        {{ form.sec_token }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6 flex items-start gap-3 bg-slate-700/40 border border-slate-700 rounded-lg px-4 py-3">
+                <div class="flex items-center h-5 mt-0.5">{{ form.is_active }}</div>
+                <div>
+                    <label for="{{ form.is_active.id_for_label }}" class="text-sm font-medium text-slate-200 cursor-pointer">{{ form.is_active.label }}</label>
+                    <p class="text-slate-500 text-xs mt-0.5">Un conector inactivo no se incluye en el polling automático.</p>
+                </div>
+            </div>
+
+            {% if form.non_field_errors %}
+            <div class="mb-4 px-4 py-3 rounded-md text-sm bg-red-500/10 border border-red-500/30 text-red-400" data-testid="connector-form-error">
+                {{ form.non_field_errors|join:", " }}
+            </div>
+            {% endif %}
+
+            <div class="flex flex-wrap gap-3">
+                <button type="submit" data-testid="connector-form-submit"
+                        class="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-md px-4 py-2.5 transition-colors">
+                    {% if is_edit %}Guardar cambios{% else %}Crear conector{% endif %}
+                </button>
+                <a href="{% url 'connector_list' %}" data-testid="connector-form-cancel"
+                   class="flex-1 text-center bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-md px-4 py-2.5 transition-colors">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    var CREDENTIAL_FIELDS_BY_TYPE = {{ credential_fields_json|default:"{}"|safe }};
+    var AUTH_TYPE_CREDENTIAL_FIELDS = {{ auth_type_credential_fields_json|default:"{}"|safe }};
+    var AUTH_TYPE_CHOICES_BY_TYPE = {{ auth_type_choices_by_type_json|default:"{}"|safe }};
+    var ADV_FIELDS_BY_TYPE = {{ adv_fields_by_type_json|default:"{}"|safe }};
+    var QUERY_LANGUAGE_LABEL_BY_TYPE = {{ query_language_label_by_type_json|default:"{}"|safe }};
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var sourceSelect = document.getElementById('{{ form.source_type.id_for_label }}');
+        var authSelect = document.getElementById('{{ form.auth_type.id_for_label }}');
+        var credFieldBlocks = document.querySelectorAll('[data-cred-field]');
+        var advFieldBlocks = document.querySelectorAll('[data-adv-field]');
+        var queryLabel = document.querySelector('[data-query-label]');
+
+        function visibleCredentialFields() {
+            var fixed = CREDENTIAL_FIELDS_BY_TYPE[sourceSelect.value];
+            if (fixed === null) {
+                return AUTH_TYPE_CREDENTIAL_FIELDS[authSelect.value] || [];
+            }
+            return fixed || [];
+        }
+
+        function syncAuthTypeOptions() {
+            var allowed = AUTH_TYPE_CHOICES_BY_TYPE[sourceSelect.value];
+            if (!allowed) return;
+            var options = authSelect.querySelectorAll('option');
+            options.forEach(function (opt) {
+                opt.hidden = allowed.indexOf(opt.value) === -1;
+            });
+            if (allowed.indexOf(authSelect.value) === -1) {
+                authSelect.value = allowed[0];
+            }
+        }
+
+        function sync() {
+            if (authSelect) syncAuthTypeOptions();
+
+            var visibleAdv = ADV_FIELDS_BY_TYPE[sourceSelect.value] || [];
+            advFieldBlocks.forEach(function (block) {
+                block.style.display = visibleAdv.indexOf(block.dataset.advField) !== -1 ? '' : 'none';
+            });
+
+            var visibleCred = visibleCredentialFields();
+            credFieldBlocks.forEach(function (block) {
+                block.style.display = visibleCred.indexOf(block.dataset.credField) !== -1 ? '' : 'none';
+            });
+
+            if (queryLabel) {
+                queryLabel.textContent = QUERY_LANGUAGE_LABEL_BY_TYPE[sourceSelect.value] || 'Consulta personalizada';
+            }
+        }
+
+        if (sourceSelect) {
+            sourceSelect.addEventListener('change', sync);
+            if (authSelect) authSelect.addEventListener('change', sync);
+            sync();
+        }
+    });
+</script>
+{% endblock %}
