@@ -1,4 +1,5 @@
-﻿asgiref==3.11.1
+﻿# cache-bust: fuerza a Oryx a reconstruir el build en Azure en vez de reusar uno viejo
+asgiref==3.11.1
 Django==6.0.3
 djangorestframework==3.17.0
 djangorestframework_simplejwt==5.5.1
