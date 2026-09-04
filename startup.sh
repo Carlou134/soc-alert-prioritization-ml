@@ -10,4 +10,4 @@ python manage.py collectstatic --no-input
 # Requiere "Always On" activado en Azure App Service para no dormirse con la app.
 python manage.py qcluster &
 
-gunicorn soc_project.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120
+gunicorn soc_project.wsgi:application --bind 0.0.0.0:8000 --workers 1 --timeout 120
