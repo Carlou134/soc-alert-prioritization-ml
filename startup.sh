@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-cd /home/site/repository/soc_project
+cd "$(dirname "$0")/soc_project"
 
 python manage.py migrate --no-input
 python manage.py collectstatic --no-input
