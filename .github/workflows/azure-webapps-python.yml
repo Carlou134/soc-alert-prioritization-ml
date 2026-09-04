@@ -20,7 +20,7 @@
 name: Build and deploy Python app to Azure Web App
 
 env:
-  AZURE_WEBAPP_NAME: soc-tesis-final  # set this to the name of your Azure Web App
+  AZURE_WEBAPP_NAME: tesis-final-soc-lima-metropolitana  # set this to the name of your Azure Web App
   PYTHON_VERSION: '3.13'              # el proyecto corre en 3.13.5 local (Django 6.0.3 requiere 3.12+, no soporta 3.8)
 
 on:
