@@ -392,6 +392,16 @@ def alert_list_view(request):
     if severity_filter:
         qs = qs.filter(severity__iexact=severity_filter)
 
+    # Filtro por táctica MITRE (usado por el gráfico de tácticas del dashboard)
+    tactic_filter = request.GET.get('mitre_tactic', '').strip()
+    if tactic_filter:
+        qs = qs.filter(mitre_tactic__iexact=tactic_filter)
+
+    # Filtro por etapa de kill chain (usado por el gráfico de kill chain del dashboard)
+    killchain_filter = request.GET.get('kill_chain_stage', '').strip()
+    if killchain_filter:
+        qs = qs.filter(kill_chain_stage__iexact=killchain_filter)
+
     # Filtro por clase ML ('pending' → sin clasificar)
     class_filter = request.GET.get('predicted_class', '').strip()
     if class_filter == 'pending':
