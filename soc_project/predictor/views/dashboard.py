@@ -5,7 +5,7 @@ from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.shortcuts import redirect, render
 
-from ..models import Alert, TurnoNota
+from ..models import Alert, Incident, TurnoNota
 
 
 @login_required
@@ -68,6 +68,9 @@ def dashboard_view(request):
     daily_labels = [item['day'].strftime('%Y-%m-%d') for item in daily_data if item['day']]
     daily_totals = [item['total'] for item in daily_data]
 
+    total_incidents_active   = Incident.objects.filter(is_resolved=False).count()
+    total_incidents_resolved = Incident.objects.filter(is_resolved=True).count()
+
     turno_notas = TurnoNota.objects.select_related('autor')[:5]
 
     context = {
@@ -93,5 +96,8 @@ def dashboard_view(request):
 
         'daily_labels_json': json.dumps(daily_labels),
         'daily_totals_json': json.dumps(daily_totals),
+
+        'incident_labels_json': json.dumps(['Activos', 'Resueltos']),
+        'incident_data_json':   json.dumps([total_incidents_active, total_incidents_resolved]),
     }
     return render(request, 'predictor/dashboard.html', context)
