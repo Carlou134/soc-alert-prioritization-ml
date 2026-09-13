@@ -47,58 +47,61 @@
         </div>
     </div>
 
-    <!-- Charts row 1 -->
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-            <div class="flex items-center justify-between mb-4">
+    <!-- Charts grid — 3 arriba, 3 abajo -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
                 <p class="text-sm font-semibold text-white">Alertas por clase ML</p>
                 <span class="text-xs text-slate-500 font-mono">BARRAS</span>
             </div>
-            <div class="h-64">
+            <div class="h-48">
                 <canvas id="classChart"></canvas>
             </div>
         </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-            <div class="flex items-center justify-between mb-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
                 <p class="text-sm font-semibold text-white">Top tácticas MITRE ATT&amp;CK</p>
                 <span class="text-xs text-slate-500 font-mono">TOP 6</span>
             </div>
-            <div class="h-64">
+            <div class="h-48">
                 <canvas id="tacticChart"></canvas>
             </div>
         </div>
-    </div>
-
-    <!-- Charts row 2 -->
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-            <div class="flex items-center justify-between mb-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
                 <p class="text-sm font-semibold text-white">Distribución por severidad</p>
                 <span class="text-xs text-slate-500 font-mono">DONUT</span>
             </div>
-            <div class="h-64">
+            <div class="h-48">
                 <canvas id="severityChart"></canvas>
             </div>
         </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-            <div class="flex items-center justify-between mb-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
                 <p class="text-sm font-semibold text-white">Etapas Kill Chain</p>
                 <span class="text-xs text-slate-500 font-mono">BARRAS</span>
             </div>
-            <div class="h-64">
+            <div class="h-48">
                 <canvas id="killchainChart"></canvas>
             </div>
         </div>
-    </div>
-
-    <!-- Chart row 3 -->
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-        <div class="flex items-center justify-between mb-4">
-            <p class="text-sm font-semibold text-white">Tendencia de ingesta diaria</p>
-            <span class="text-xs text-slate-500 font-mono">LÍNEA DE TIEMPO</span>
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-sm font-semibold text-white">Tendencia de ingesta diaria</p>
+                <span class="text-xs text-slate-500 font-mono">LÍNEA</span>
+            </div>
+            <div class="h-48">
+                <canvas id="dailyChart"></canvas>
+            </div>
         </div>
-        <div class="h-64">
-            <canvas id="dailyChart"></canvas>
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-sm font-semibold text-white">Incidentes: activos vs resueltos</p>
+                <span class="text-xs text-slate-500 font-mono">DONUT</span>
+            </div>
+            <div class="h-48">
+                <canvas id="incidentChart"></canvas>
+            </div>
         </div>
     </div>
 
@@ -302,6 +305,8 @@
     const killchainData   = {{ killchain_data_json|safe }};
     const dailyLabels    = {{ daily_labels_json|safe }};
     const dailyTotals    = {{ daily_totals_json|safe }};
+    const incidentLabels = {{ incident_labels_json|safe }};
+    const incidentData   = {{ incident_data_json|safe }};
 
     function severityColor(label) {
         const l = label.toLowerCase();
@@ -436,6 +441,33 @@
             scales: {
                 x: { grid: { display: false } },
                 y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } }
+            }
+        }
+    });
+
+    // Donut — incidents active vs resolved
+    new Chart(document.getElementById('incidentChart'), {
+        type: 'doughnut',
+        data: {
+            labels: incidentLabels,
+            datasets: [{
+                data: incidentData,
+                backgroundColor: [
+                    'rgba(239, 68, 68, 0.85)',
+                    'rgba(16, 185, 129, 0.85)'
+                ],
+                borderWidth: 2,
+                borderColor: '#1e293b'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { padding: 12, font: { size: 11 } }
+                }
             }
         }
     });
