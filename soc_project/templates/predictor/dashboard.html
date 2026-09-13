@@ -11,10 +11,16 @@
             <h1 class="text-lg font-semibold text-white">Dashboard</h1>
             <p class="text-sm text-slate-400 mt-0.5">Estado de seguridad en tiempo real.</p>
         </div>
-        <a href="{% url 'alert_list' %}" data-testid="dashboard-view-all-alerts"
-           class="text-xs text-blue-400 hover:text-blue-300 font-medium">
-            Ver todas las alertas →
-        </a>
+        <div class="flex items-center gap-4">
+            <div class="text-right" data-testid="dashboard-clock">
+                <p id="dashboard-clock-time" class="text-sm font-mono font-semibold text-white"></p>
+                <p id="dashboard-clock-date" class="text-xs text-slate-500 capitalize"></p>
+            </div>
+            <a href="{% url 'alert_list' %}" data-testid="dashboard-view-all-alerts"
+               class="text-xs text-blue-400 hover:text-blue-300 font-medium">
+                Ver todas las alertas →
+            </a>
+        </div>
     </div>
 
     <!-- KPIs -->
@@ -270,6 +276,17 @@
 
 </div>
 
+<script>
+    function updateDashboardClock() {
+        const now = new Date();
+        document.getElementById('dashboard-clock-time').textContent =
+            now.toLocaleTimeString('es-ES');
+        document.getElementById('dashboard-clock-date').textContent =
+            now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+    updateDashboardClock();
+    setInterval(updateDashboardClock, 1000);
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     Chart.defaults.color = '#94a3b8';
