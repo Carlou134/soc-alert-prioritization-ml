@@ -3,6 +3,16 @@
 {% block title %}Dashboard — SOC Predictor{% endblock %}
 
 {% block content %}
+<style>
+    #classChart, #tacticChart, #severityChart, #killchainChart, #dailyChart {
+        cursor: pointer;
+    }
+    {% if can_see_incident_desk %}
+    #incidentChart {
+        cursor: pointer;
+    }
+    {% endif %}
+</style>
 <div class="space-y-6">
 
     <!-- Page header -->
@@ -25,26 +35,33 @@
 
     <!-- KPIs -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+        <a href="{% url 'alert_list' %}" data-testid="kpi-total-alerts-link"
+           class="block bg-slate-800 border border-slate-700 rounded-lg p-5 hover:border-blue-500/50 transition-colors">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Total alertas</p>
             <p class="text-3xl font-bold text-white mt-2 font-mono" data-testid="kpi-total-alerts">{{ total_alerts }}</p>
             <p class="text-xs text-slate-500 mt-1">Ingestadas en el sistema</p>
-        </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+        </a>
+        <a href="{% if can_see_pending %}{% url 'alert_list' %}?predicted_class=pending{% else %}#{% endif %}"
+           data-testid="kpi-total-pending-link"
+           class="block bg-slate-800 border border-slate-700 rounded-lg p-5 transition-colors {% if can_see_pending %}hover:border-blue-500/50{% else %}opacity-60 pointer-events-none{% endif %}">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Pendientes</p>
             <p class="text-3xl font-bold text-slate-300 mt-2 font-mono" data-testid="kpi-total-pending">{{ total_pending }}</p>
             <p class="text-xs text-slate-500 mt-1">Sin clasificar por ML</p>
-        </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+        </a>
+        <a href="{% if can_see_investigar_malicioso %}{% url 'alert_list' %}?predicted_class=a_investigar{% else %}#{% endif %}"
+           data-testid="kpi-total-investigar-link"
+           class="block bg-slate-800 border border-slate-700 rounded-lg p-5 transition-colors {% if can_see_investigar_malicioso %}hover:border-blue-500/50{% else %}opacity-60 pointer-events-none{% endif %}">
             <p class="text-xs text-slate-400 uppercase tracking-wide">A investigar</p>
             <p class="text-3xl font-bold text-amber-500 mt-2 font-mono" data-testid="kpi-total-investigar">{{ total_investigar }}</p>
             <p class="text-xs text-slate-500 mt-1">Requieren análisis</p>
-        </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 border-l-4 border-l-red-500">
+        </a>
+        <a href="{% if can_see_investigar_malicioso %}{% url 'alert_list' %}?predicted_class=malicioso{% else %}#{% endif %}"
+           data-testid="kpi-total-malicioso-link"
+           class="block bg-slate-800 border border-slate-700 rounded-lg p-5 border-l-4 border-l-red-500 transition-colors {% if can_see_investigar_malicioso %}hover:border-blue-500/50{% else %}opacity-60 pointer-events-none{% endif %}">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Maliciosos</p>
             <p class="text-3xl font-bold text-red-500 mt-2 font-mono" data-testid="kpi-total-malicioso">{{ total_malicioso }}</p>
             <p class="text-xs text-slate-500 mt-1">Amenazas confirmadas</p>
-        </div>
+        </a>
     </div>
 
     <!-- Charts grid — 3 arriba, 3 abajo -->
@@ -55,7 +72,7 @@
                 <span class="text-xs text-slate-500 font-mono">BARRAS</span>
             </div>
             <div class="h-48">
-                <canvas id="classChart"></canvas>
+                <canvas id="classChart" class="block"></canvas>
             </div>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
@@ -64,7 +81,7 @@
                 <span class="text-xs text-slate-500 font-mono">TOP 6</span>
             </div>
             <div class="h-48">
-                <canvas id="tacticChart"></canvas>
+                <canvas id="tacticChart" class="block"></canvas>
             </div>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
@@ -73,7 +90,7 @@
                 <span class="text-xs text-slate-500 font-mono">DONUT</span>
             </div>
             <div class="h-48">
-                <canvas id="severityChart"></canvas>
+                <canvas id="severityChart" class="block"></canvas>
             </div>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
@@ -82,7 +99,7 @@
                 <span class="text-xs text-slate-500 font-mono">BARRAS</span>
             </div>
             <div class="h-48">
-                <canvas id="killchainChart"></canvas>
+                <canvas id="killchainChart" class="block"></canvas>
             </div>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
@@ -91,7 +108,7 @@
                 <span class="text-xs text-slate-500 font-mono">LÍNEA</span>
             </div>
             <div class="h-48">
-                <canvas id="dailyChart"></canvas>
+                <canvas id="dailyChart" class="block"></canvas>
             </div>
         </div>
         <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
@@ -100,7 +117,7 @@
                 <span class="text-xs text-slate-500 font-mono">DONUT</span>
             </div>
             <div class="h-48">
-                <canvas id="incidentChart"></canvas>
+                <canvas id="incidentChart" class="block"></canvas>
             </div>
         </div>
     </div>
@@ -308,6 +325,37 @@
     const incidentLabels = {{ incident_labels_json|safe }};
     const incidentData   = {{ incident_data_json|safe }};
 
+    const classValues    = ['benigno', 'a_investigar', 'malicioso'];
+    const incidentValues = ['active', 'resolved'];
+
+    const alertListUrl    = "{% url 'alert_list' %}";
+    const incidentDeskUrl = "{% url 'incident_desk' %}";
+    const userRole        = {{ user_role_json|safe }};
+    const canSeeIncidentDesk = {{ can_see_incident_desk|yesno:"true,false" }};
+
+    // Mismo criterio de alert_list_view (predicted_class forzado por rol) —
+    // sin esto, un click navega a un filtro que el backend igual va a
+    // contradecir con el rol y siempre muestra 0 resultados, dando a
+    // entender (falsamente) que no hay alertas de esa clase.
+    function canSeeClass(cls) {
+        if (userRole === 'analyst_n1' || userRole === 'trainee') return cls === 'benigno';
+        if (userRole === 'analyst_n2') return cls === 'a_investigar' || cls === 'malicioso';
+        return true;
+    }
+
+    function goTo(baseUrl, params) {
+        window.location.href = `${baseUrl}?${new URLSearchParams(params).toString()}`;
+    }
+
+    function onChartClick(handler) {
+        return (evt, elements) => {
+            if (!elements.length) return;
+            handler(elements[0].index);
+        };
+    }
+
+    const allCharts = [];
+
     function severityColor(label) {
         const l = label.toLowerCase();
         if (l === 'critical' || l === 'crítica') return 'rgba(239, 68, 68, 0.85)';
@@ -317,7 +365,7 @@
     }
 
     // Bar — class distribution
-    new Chart(document.getElementById('classChart'), {
+    allCharts.push(new Chart(document.getElementById('classChart'), {
         type: 'bar',
         data: {
             labels: classLabels,
@@ -336,16 +384,19 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: onChartClick(i => {
+                if (canSeeClass(classValues[i])) goTo(alertListUrl, { predicted_class: classValues[i] });
+            }),
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { display: false } },
                 y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } }
             }
         }
-    });
+    }));
 
     // Horizontal bar — MITRE tactics
-    new Chart(document.getElementById('tacticChart'), {
+    allCharts.push(new Chart(document.getElementById('tacticChart'), {
         type: 'bar',
         data: {
             labels: tacticLabels,
@@ -361,16 +412,17 @@
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            onClick: onChartClick(i => goTo(alertListUrl, { mitre_tactic: tacticLabels[i] })),
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } },
                 y: { grid: { display: false } }
             }
         }
-    });
+    }));
 
     // Donut — severity distribution
-    new Chart(document.getElementById('severityChart'), {
+    allCharts.push(new Chart(document.getElementById('severityChart'), {
         type: 'doughnut',
         data: {
             labels: severityLabels,
@@ -384,6 +436,7 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: onChartClick(i => goTo(alertListUrl, { severity: severityLabels[i] })),
             plugins: {
                 legend: {
                     position: 'bottom',
@@ -391,10 +444,10 @@
                 }
             }
         }
-    });
+    }));
 
     // Horizontal bar — kill chain stages
-    new Chart(document.getElementById('killchainChart'), {
+    allCharts.push(new Chart(document.getElementById('killchainChart'), {
         type: 'bar',
         data: {
             labels: killchainLabels,
@@ -410,16 +463,17 @@
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            onClick: onChartClick(i => goTo(alertListUrl, { kill_chain_stage: killchainLabels[i] })),
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } },
                 y: { grid: { display: false } }
             }
         }
-    });
+    }));
 
     // Line — daily ingestion
-    new Chart(document.getElementById('dailyChart'), {
+    allCharts.push(new Chart(document.getElementById('dailyChart'), {
         type: 'line',
         data: {
             labels: dailyLabels,
@@ -437,16 +491,17 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: onChartClick(i => goTo(alertListUrl, { date_from: dailyLabels[i], date_to: dailyLabels[i] })),
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { display: false } },
                 y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } }
             }
         }
-    });
+    }));
 
     // Donut — incidents active vs resolved
-    new Chart(document.getElementById('incidentChart'), {
+    allCharts.push(new Chart(document.getElementById('incidentChart'), {
         type: 'doughnut',
         data: {
             labels: incidentLabels,
@@ -463,6 +518,9 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: canSeeIncidentDesk
+                ? onChartClick(i => goTo(incidentDeskUrl, { resolved_filter: incidentValues[i] }))
+                : undefined,
             plugins: {
                 legend: {
                     position: 'bottom',
@@ -470,6 +528,15 @@
                 }
             }
         }
+    }));
+
+    // Fix: si las fuentes web (Google Fonts) terminan de cargar después de
+    // que Chart.js midió el contenedor, el canvas queda con una altura
+    // menor a la real y el gráfico se ve pegado arriba de la card, con
+    // espacio vacío abajo. Forzar un resize cuando la página termina de
+    // cargar del todo corrige el tamaño sin esperar a un resize manual.
+    window.addEventListener('load', () => {
+        allCharts.forEach(chart => chart.resize());
     });
 </script>
 {% endblock %}
