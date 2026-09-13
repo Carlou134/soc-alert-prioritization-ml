@@ -2,8 +2,9 @@
 
 > Web system that automatically classifies and prioritizes cybersecurity alerts using Machine Learning, to reduce the operational load on a SOC (Security Operations Center).
 
-<!-- Optional: live demo badge -->
-<!-- [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://your-app.azurewebsites.net) -->
+[![CI/CD](https://github.com/Carlou134/soc-alert-prioritization-ml/actions/workflows/azure-webapps-python.yml/badge.svg)](https://github.com/Carlou134/soc-alert-prioritization-ml/actions/workflows/azure-webapps-python.yml)
+![F1 Macro](https://img.shields.io/badge/F1_Macro-0.83-blue)
+![Tests](https://img.shields.io/badge/tests-119_passing-brightgreen)
 
 ![login screen](docs/screenshots/login.png)
 
@@ -54,7 +55,7 @@ Key decisions:
 - **Problem:** uploading alerts depended on the browser tab staying open — navigating away silently dropped everything past the first preview rows → **Solution:** background processing via `django-q2` with an ORM broker (no Redis budget) — the upload returns instantly and a worker finishes the job independently of the request → **Why:** the task is persisted to the database before the HTTP response is sent, so it survives regardless of what the browser does next.
 - **Problem:** computing SHAP during ingestion added significant latency per batch of alerts → **Solution:** *lazy* SHAP computation (on-demand, only when an analyst opens an alert's detail view) → **Why:** in practice an analyst only reviews explainability for 2-3 alerts, not the entire ingested batch.
 - **Problem:** large alert uploads (10k+ rows) degraded database inserts → **Solution:** `bulk_create` with `batch_size=500` at every ingestion point → **Why:** inserting row by row (or without batching) doesn't scale on SQLite or PostgreSQL for realistic SOC volumes.
-- **Problem:** 0% test coverage on a system that decides security alert priority → **Solution:** 110-test unit and integration suite mapped 1:1 against the acceptance criteria defined by the QA team (30 user stories) → **Why:** you can't claim the prediction pipeline is reliable if it was never tested automatically.
+- **Problem:** 0% test coverage on a system that decides security alert priority → **Solution:** 119-test unit and integration suite mapped 1:1 against the acceptance criteria defined by the QA team (30 user stories) → **Why:** you can't claim the prediction pipeline is reliable if it was never tested automatically.
 
 📄 Full list of decisions, tradeoffs, and known gotchas: **[docs/technical.md](docs/technical.md)**
 
@@ -185,6 +186,8 @@ These users are created automatically by the migrations — useful for testing t
 | `gian` | `Gian@2025` | Analyst N2 |
 | `senior` | `Senior@2025` | Analyst N3 |
 | `practicante_rios` | `Practicante@2025` | Trainee |
+
+> ⚠️ **Local/demo environment only — never use hardcoded credentials like this in production.** These accounts exist purely to let you test each role without a manual signup flow; a real deployment must create users with unique, non-published passwords.
 
 ---
 
