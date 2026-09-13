@@ -3,6 +3,16 @@
 {% block title %}Dashboard — SOC Predictor{% endblock %}
 
 {% block content %}
+<style>
+    #classChart, #tacticChart, #severityChart, #killchainChart, #dailyChart {
+        cursor: pointer;
+    }
+    {% if can_see_incident_desk %}
+    #incidentChart {
+        cursor: pointer;
+    }
+    {% endif %}
+</style>
 <div class="space-y-6">
 
     <!-- Page header -->
@@ -11,88 +21,104 @@
             <h1 class="text-lg font-semibold text-white">Dashboard</h1>
             <p class="text-sm text-slate-400 mt-0.5">Estado de seguridad en tiempo real.</p>
         </div>
-        <a href="{% url 'alert_list' %}" data-testid="dashboard-view-all-alerts"
-           class="text-xs text-blue-400 hover:text-blue-300 font-medium">
-            Ver todas las alertas →
-        </a>
+        <div class="flex items-center gap-4">
+            <div class="text-right" data-testid="dashboard-clock">
+                <p id="dashboard-clock-time" class="text-sm font-mono font-semibold text-white"></p>
+                <p id="dashboard-clock-date" class="text-xs text-slate-500 capitalize"></p>
+            </div>
+            <a href="{% url 'alert_list' %}" data-testid="dashboard-view-all-alerts"
+               class="text-xs text-blue-400 hover:text-blue-300 font-medium">
+                Ver todas las alertas →
+            </a>
+        </div>
     </div>
 
     <!-- KPIs -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+        <a href="{% url 'alert_list' %}" data-testid="kpi-total-alerts-link"
+           class="block bg-slate-800 border border-slate-700 rounded-lg p-5 hover:border-blue-500/50 transition-colors">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Total alertas</p>
             <p class="text-3xl font-bold text-white mt-2 font-mono" data-testid="kpi-total-alerts">{{ total_alerts }}</p>
             <p class="text-xs text-slate-500 mt-1">Ingestadas en el sistema</p>
-        </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+        </a>
+        <a href="{% if can_see_pending %}{% url 'alert_list' %}?predicted_class=pending{% else %}#{% endif %}"
+           data-testid="kpi-total-pending-link"
+           class="block bg-slate-800 border border-slate-700 rounded-lg p-5 transition-colors {% if can_see_pending %}hover:border-blue-500/50{% else %}opacity-60 pointer-events-none{% endif %}">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Pendientes</p>
             <p class="text-3xl font-bold text-slate-300 mt-2 font-mono" data-testid="kpi-total-pending">{{ total_pending }}</p>
             <p class="text-xs text-slate-500 mt-1">Sin clasificar por ML</p>
-        </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+        </a>
+        <a href="{% if can_see_investigar_malicioso %}{% url 'alert_list' %}?predicted_class=a_investigar{% else %}#{% endif %}"
+           data-testid="kpi-total-investigar-link"
+           class="block bg-slate-800 border border-slate-700 rounded-lg p-5 transition-colors {% if can_see_investigar_malicioso %}hover:border-blue-500/50{% else %}opacity-60 pointer-events-none{% endif %}">
             <p class="text-xs text-slate-400 uppercase tracking-wide">A investigar</p>
             <p class="text-3xl font-bold text-amber-500 mt-2 font-mono" data-testid="kpi-total-investigar">{{ total_investigar }}</p>
             <p class="text-xs text-slate-500 mt-1">Requieren análisis</p>
-        </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 border-l-4 border-l-red-500">
+        </a>
+        <a href="{% if can_see_investigar_malicioso %}{% url 'alert_list' %}?predicted_class=malicioso{% else %}#{% endif %}"
+           data-testid="kpi-total-malicioso-link"
+           class="block bg-slate-800 border border-slate-700 rounded-lg p-5 border-l-4 border-l-red-500 transition-colors {% if can_see_investigar_malicioso %}hover:border-blue-500/50{% else %}opacity-60 pointer-events-none{% endif %}">
             <p class="text-xs text-slate-400 uppercase tracking-wide">Maliciosos</p>
             <p class="text-3xl font-bold text-red-500 mt-2 font-mono" data-testid="kpi-total-malicioso">{{ total_malicioso }}</p>
             <p class="text-xs text-slate-500 mt-1">Amenazas confirmadas</p>
-        </div>
+        </a>
     </div>
 
-    <!-- Charts row 1 -->
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-            <div class="flex items-center justify-between mb-4">
+    <!-- Charts grid — 3 arriba, 3 abajo -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
                 <p class="text-sm font-semibold text-white">Alertas por clase ML</p>
                 <span class="text-xs text-slate-500 font-mono">BARRAS</span>
             </div>
-            <div class="h-64">
-                <canvas id="classChart"></canvas>
+            <div class="h-48">
+                <canvas id="classChart" class="block"></canvas>
             </div>
         </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-            <div class="flex items-center justify-between mb-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
                 <p class="text-sm font-semibold text-white">Top tácticas MITRE ATT&amp;CK</p>
                 <span class="text-xs text-slate-500 font-mono">TOP 6</span>
             </div>
-            <div class="h-64">
-                <canvas id="tacticChart"></canvas>
+            <div class="h-48">
+                <canvas id="tacticChart" class="block"></canvas>
             </div>
         </div>
-    </div>
-
-    <!-- Charts row 2 -->
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-            <div class="flex items-center justify-between mb-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
                 <p class="text-sm font-semibold text-white">Distribución por severidad</p>
                 <span class="text-xs text-slate-500 font-mono">DONUT</span>
             </div>
-            <div class="h-64">
-                <canvas id="severityChart"></canvas>
+            <div class="h-48">
+                <canvas id="severityChart" class="block"></canvas>
             </div>
         </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-            <div class="flex items-center justify-between mb-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
                 <p class="text-sm font-semibold text-white">Etapas Kill Chain</p>
                 <span class="text-xs text-slate-500 font-mono">BARRAS</span>
             </div>
-            <div class="h-64">
-                <canvas id="killchainChart"></canvas>
+            <div class="h-48">
+                <canvas id="killchainChart" class="block"></canvas>
             </div>
         </div>
-    </div>
-
-    <!-- Chart row 3 -->
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-        <div class="flex items-center justify-between mb-4">
-            <p class="text-sm font-semibold text-white">Tendencia de ingesta diaria</p>
-            <span class="text-xs text-slate-500 font-mono">LÍNEA DE TIEMPO</span>
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-sm font-semibold text-white">Tendencia de ingesta diaria</p>
+                <span class="text-xs text-slate-500 font-mono">LÍNEA</span>
+            </div>
+            <div class="h-48">
+                <canvas id="dailyChart" class="block"></canvas>
+            </div>
         </div>
-        <div class="h-64">
-            <canvas id="dailyChart"></canvas>
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-sm font-semibold text-white">Incidentes: activos vs resueltos</p>
+                <span class="text-xs text-slate-500 font-mono">DONUT</span>
+            </div>
+            <div class="h-48">
+                <canvas id="incidentChart" class="block"></canvas>
+            </div>
         </div>
     </div>
 
@@ -270,6 +296,17 @@
 
 </div>
 
+<script>
+    function updateDashboardClock() {
+        const now = new Date();
+        document.getElementById('dashboard-clock-time').textContent =
+            now.toLocaleTimeString('es-ES');
+        document.getElementById('dashboard-clock-date').textContent =
+            now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+    updateDashboardClock();
+    setInterval(updateDashboardClock, 1000);
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     Chart.defaults.color = '#94a3b8';
@@ -285,6 +322,39 @@
     const killchainData   = {{ killchain_data_json|safe }};
     const dailyLabels    = {{ daily_labels_json|safe }};
     const dailyTotals    = {{ daily_totals_json|safe }};
+    const incidentLabels = {{ incident_labels_json|safe }};
+    const incidentData   = {{ incident_data_json|safe }};
+
+    const classValues    = ['benigno', 'a_investigar', 'malicioso'];
+    const incidentValues = ['active', 'resolved'];
+
+    const alertListUrl    = "{% url 'alert_list' %}";
+    const incidentDeskUrl = "{% url 'incident_desk' %}";
+    const userRole        = {{ user_role_json|safe }};
+    const canSeeIncidentDesk = {{ can_see_incident_desk|yesno:"true,false" }};
+
+    // Mismo criterio de alert_list_view (predicted_class forzado por rol) —
+    // sin esto, un click navega a un filtro que el backend igual va a
+    // contradecir con el rol y siempre muestra 0 resultados, dando a
+    // entender (falsamente) que no hay alertas de esa clase.
+    function canSeeClass(cls) {
+        if (userRole === 'analyst_n1' || userRole === 'trainee') return cls === 'benigno';
+        if (userRole === 'analyst_n2') return cls === 'a_investigar' || cls === 'malicioso';
+        return true;
+    }
+
+    function goTo(baseUrl, params) {
+        window.location.href = `${baseUrl}?${new URLSearchParams(params).toString()}`;
+    }
+
+    function onChartClick(handler) {
+        return (evt, elements) => {
+            if (!elements.length) return;
+            handler(elements[0].index);
+        };
+    }
+
+    const allCharts = [];
 
     function severityColor(label) {
         const l = label.toLowerCase();
@@ -295,7 +365,7 @@
     }
 
     // Bar — class distribution
-    new Chart(document.getElementById('classChart'), {
+    allCharts.push(new Chart(document.getElementById('classChart'), {
         type: 'bar',
         data: {
             labels: classLabels,
@@ -314,16 +384,19 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: onChartClick(i => {
+                if (canSeeClass(classValues[i])) goTo(alertListUrl, { predicted_class: classValues[i] });
+            }),
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { display: false } },
                 y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } }
             }
         }
-    });
+    }));
 
     // Horizontal bar — MITRE tactics
-    new Chart(document.getElementById('tacticChart'), {
+    allCharts.push(new Chart(document.getElementById('tacticChart'), {
         type: 'bar',
         data: {
             labels: tacticLabels,
@@ -339,16 +412,17 @@
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            onClick: onChartClick(i => goTo(alertListUrl, { mitre_tactic: tacticLabels[i] })),
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } },
                 y: { grid: { display: false } }
             }
         }
-    });
+    }));
 
     // Donut — severity distribution
-    new Chart(document.getElementById('severityChart'), {
+    allCharts.push(new Chart(document.getElementById('severityChart'), {
         type: 'doughnut',
         data: {
             labels: severityLabels,
@@ -362,6 +436,7 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: onChartClick(i => goTo(alertListUrl, { severity: severityLabels[i] })),
             plugins: {
                 legend: {
                     position: 'bottom',
@@ -369,10 +444,10 @@
                 }
             }
         }
-    });
+    }));
 
     // Horizontal bar — kill chain stages
-    new Chart(document.getElementById('killchainChart'), {
+    allCharts.push(new Chart(document.getElementById('killchainChart'), {
         type: 'bar',
         data: {
             labels: killchainLabels,
@@ -388,16 +463,17 @@
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            onClick: onChartClick(i => goTo(alertListUrl, { kill_chain_stage: killchainLabels[i] })),
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } },
                 y: { grid: { display: false } }
             }
         }
-    });
+    }));
 
     // Line — daily ingestion
-    new Chart(document.getElementById('dailyChart'), {
+    allCharts.push(new Chart(document.getElementById('dailyChart'), {
         type: 'line',
         data: {
             labels: dailyLabels,
@@ -415,12 +491,52 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: onChartClick(i => goTo(alertListUrl, { date_from: dailyLabels[i], date_to: dailyLabels[i] })),
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { display: false } },
                 y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } }
             }
         }
+    }));
+
+    // Donut — incidents active vs resolved
+    allCharts.push(new Chart(document.getElementById('incidentChart'), {
+        type: 'doughnut',
+        data: {
+            labels: incidentLabels,
+            datasets: [{
+                data: incidentData,
+                backgroundColor: [
+                    'rgba(239, 68, 68, 0.85)',
+                    'rgba(16, 185, 129, 0.85)'
+                ],
+                borderWidth: 2,
+                borderColor: '#1e293b'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            onClick: canSeeIncidentDesk
+                ? onChartClick(i => goTo(incidentDeskUrl, { resolved_filter: incidentValues[i] }))
+                : undefined,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { padding: 12, font: { size: 11 } }
+                }
+            }
+        }
+    }));
+
+    // Fix: si las fuentes web (Google Fonts) terminan de cargar después de
+    // que Chart.js midió el contenedor, el canvas queda con una altura
+    // menor a la real y el gráfico se ve pegado arriba de la card, con
+    // espacio vacío abajo. Forzar un resize cuando la página termina de
+    // cargar del todo corrige el tamaño sin esperar a un resize manual.
+    window.addEventListener('load', () => {
+        allCharts.forEach(chart => chart.resize());
     });
 </script>
 {% endblock %}

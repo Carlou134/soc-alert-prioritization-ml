@@ -5,7 +5,7 @@ from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.shortcuts import redirect, render
 
-from ..models import Alert, TurnoNota
+from ..models import Alert, Incident, TurnoNota
 
 
 @login_required
@@ -68,6 +68,18 @@ def dashboard_view(request):
     daily_labels = [item['day'].strftime('%Y-%m-%d') for item in daily_data if item['day']]
     daily_totals = [item['total'] for item in daily_data]
 
+    total_incidents_active   = Incident.objects.filter(is_resolved=False).count()
+    total_incidents_resolved = Incident.objects.filter(is_resolved=True).count()
+
+    # Gateo de interactividad del dashboard según el filtro por rol que ya
+    # aplica alert_list_view — evita links/segmentos que siempre dan vacío
+    # (ej: N1 no puede ver "malicioso" porque su rol fuerza predicted_class=
+    # benigno, así que ese click nunca debe navegar como si mostrara datos).
+    role = getattr(getattr(request.user, 'profile', None), 'role', None)
+    can_see_pending             = role in ('admin', 'analyst_n3')
+    can_see_investigar_malicioso = role not in ('analyst_n1', 'trainee')
+    can_see_incident_desk       = role in ('admin', 'analyst_n3')
+
     turno_notas = TurnoNota.objects.select_related('autor')[:5]
 
     context = {
@@ -78,6 +90,11 @@ def dashboard_view(request):
         'total_benigno':    total_benigno,
         'recent_alerts':    recent_alerts,
         'turno_notas':      turno_notas,
+
+        'can_see_pending':              can_see_pending,
+        'can_see_investigar_malicioso': can_see_investigar_malicioso,
+        'can_see_incident_desk':        can_see_incident_desk,
+        'user_role_json':               json.dumps(role),
 
         'class_labels_json': json.dumps(['Benigno', 'A investigar', 'Malicioso']),
         'class_data_json':   json.dumps([total_benigno, total_investigar, total_malicioso]),
@@ -93,5 +110,8 @@ def dashboard_view(request):
 
         'daily_labels_json': json.dumps(daily_labels),
         'daily_totals_json': json.dumps(daily_totals),
+
+        'incident_labels_json': json.dumps(['Activos', 'Resueltos']),
+        'incident_data_json':   json.dumps([total_incidents_active, total_incidents_resolved]),
     }
     return render(request, 'predictor/dashboard.html', context)

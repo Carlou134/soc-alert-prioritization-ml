@@ -138,7 +138,7 @@ SIMPLE_JWT = {
 # en startup.sh, necesita "Always On" para correr de forma continua).
 Q_CLUSTER = {
     'name': 'soc_alerts',
-    'workers': 2,
+    'workers': 1,
     'timeout': 90,
     'retry': 120,
     'queue_limit': 50,
