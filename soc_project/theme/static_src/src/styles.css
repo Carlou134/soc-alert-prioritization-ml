@@ -9,6 +9,61 @@
   */
 @source "../../../**/*.{html,py,js}";
 
+/**
+  * Tokens semánticos de color.
+  *
+  * Los templates usan clases por ROL (bg-surface-raised, text-fg-muted, border-line)
+  * en vez de tonos fijos (bg-slate-800). Cada tema redefine las variables --theme-*
+  * y todas las utilidades cambian sin tocar un solo template.
+  *
+  * @theme inline hace que la utilidad apunte directo a var(--theme-*), así la
+  * variable se resuelve en el elemento con data-theme y no queda fijada en :root.
+  *
+  * Los valores del tema oscuro son los tonos slate exactos de Tailwind v4, escritos
+  * en oklch y no como var(--color-slate-*): Tailwind solo emite las variables de la
+  * paleta que alguna clase usa, y al migrar los templates las slate dejan de usarse.
+  */
+:root {
+  /* Fondos, de más hundido a más elevado */
+  --theme-surface-sunken: oklch(12.9% 0.042 264.695);   /* slate-950 — sidebar, topbar */
+  --theme-surface: oklch(20.8% 0.042 265.755);          /* slate-900 — fondo de la app */
+  --theme-surface-raised: oklch(27.9% 0.041 260.031);   /* slate-800 — cards, tablas */
+  --theme-surface-overlay: oklch(37.2% 0.044 257.287);  /* slate-700 — inputs, botones secundarios */
+  --theme-surface-strong: oklch(44.6% 0.043 257.281);   /* slate-600 — hover de overlay, chips */
+
+  /* Bordes y divisores */
+  --theme-line-subtle: oklch(27.9% 0.041 260.031);      /* slate-800 */
+  --theme-line: oklch(37.2% 0.044 257.287);             /* slate-700 */
+  --theme-line-strong: oklch(44.6% 0.043 257.281);      /* slate-600 — bordes de inputs */
+
+  /* Texto, de más a menos contraste */
+  --theme-fg-strong: oklch(100% 0 0);                   /* white — títulos */
+  --theme-fg-emphasis: oklch(92.9% 0.013 255.508);      /* slate-200 */
+  --theme-fg: oklch(86.9% 0.022 252.894);               /* slate-300 — texto base */
+  --theme-fg-muted: oklch(70.4% 0.04 256.788);          /* slate-400 — texto secundario */
+  --theme-fg-subtle: oklch(55.4% 0.046 257.417);        /* slate-500 — ayudas, placeholders */
+  --theme-fg-faint: oklch(44.6% 0.043 257.281);         /* slate-600 — deshabilitado */
+}
+
+@theme inline {
+  --color-surface-sunken: var(--theme-surface-sunken);
+  --color-surface: var(--theme-surface);
+  --color-surface-raised: var(--theme-surface-raised);
+  --color-surface-overlay: var(--theme-surface-overlay);
+  --color-surface-strong: var(--theme-surface-strong);
+
+  --color-line-subtle: var(--theme-line-subtle);
+  --color-line: var(--theme-line);
+  --color-line-strong: var(--theme-line-strong);
+
+  --color-fg-strong: var(--theme-fg-strong);
+  --color-fg-emphasis: var(--theme-fg-emphasis);
+  --color-fg: var(--theme-fg);
+  --color-fg-muted: var(--theme-fg-muted);
+  --color-fg-subtle: var(--theme-fg-subtle);
+  --color-fg-faint: var(--theme-fg-faint);
+}
+
 @layer base {
   button {
     cursor: pointer;
