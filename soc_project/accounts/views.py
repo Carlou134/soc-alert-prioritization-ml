@@ -1,14 +1,15 @@
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .decorators import admin_required
-from .forms import AdminCreateUserForm, ProfileForm, RegisterForm, UserRoleForm
+from .forms import AdminCreateUserForm, ProfileForm, ProfilePasswordForm, RegisterForm, UserRoleForm
 from .models import (
     ACTION_LABELS,
+    ACTION_PASSWORD_CHANGED,
     ACTION_PROFILE_UPDATED,
     ACTION_USER_ACTIVATED,
     ACTION_USER_CREATED,
@@ -232,7 +233,31 @@ def profile_edit_view(request):
     else:
         form = ProfileForm(instance=request.user)
 
-    return render(request, 'accounts/profile_edit.html', {'form': form})
+    return render(request, 'accounts/profile_edit.html', {
+        'form': form,
+        'password_form': ProfilePasswordForm(user=request.user),
+    })
+
+
+@login_required
+def password_change_view(request):
+    # El formulario vive en la página de perfil; un GET directo vuelve allí.
+    if request.method != 'POST':
+        return redirect('profile_edit')
+
+    password_form = ProfilePasswordForm(user=request.user, data=request.POST)
+    if password_form.is_valid():
+        user = password_form.save()
+        # Sin esto, cambiar la contraseña invalida la sesión actual y desloguea al usuario.
+        update_session_auth_hash(request, user)
+        log_action(user, ACTION_PASSWORD_CHANGED, f'{user.username} cambió su contraseña.')
+        messages.success(request, 'Contraseña actualizada correctamente.')
+        return redirect('profile_edit')
+
+    return render(request, 'accounts/profile_edit.html', {
+        'form': ProfileForm(instance=request.user),
+        'password_form': password_form,
+    })
 
 
 # ── Auditoría ─────────────────────────────────────────────────────────────────

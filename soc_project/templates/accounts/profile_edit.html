@@ -76,5 +76,32 @@
         </form>
     </div>
 
+    <!-- Password card -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mt-6">
+        <p class="text-white font-semibold mb-1">Cambiar contraseña</p>
+        <p class="text-slate-400 text-sm mb-6">Tu sesión actual se mantiene activa después del cambio.</p>
+
+        <form method="post" action="{% url 'password_change' %}" novalidate data-testid="password-form">
+            {% csrf_token %}
+
+            {% for field in password_form %}
+            <div class="{% if forloop.last %}mb-6{% else %}mb-4{% endif %}">
+                <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">
+                    {{ field.label }}
+                </label>
+                {{ field }}
+                {% if field.errors %}
+                <p class="text-red-400 text-xs mt-1" data-testid="password-{{ field.name }}-error">{{ field.errors|join:" " }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <button type="submit" data-testid="password-submit"
+                    class="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-md px-4 py-2.5 transition-colors">
+                Actualizar contraseña
+            </button>
+        </form>
+    </div>
+
 </div>
 {% endblock %}

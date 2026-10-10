@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import PasswordChangeForm, UserCreationForm
 
 from .models import UserProfile
 
@@ -108,6 +108,25 @@ class ProfileForm(forms.ModelForm):
         if User.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
             raise forms.ValidationError('Este correo ya está registrado.')
         return email
+
+
+class ProfilePasswordForm(PasswordChangeForm):
+    """PasswordChangeForm de Django (valida la contraseña actual) con el estilo del sistema."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        labels = {
+            'old_password': 'Contraseña actual',
+            'new_password1': 'Nueva contraseña',
+            'new_password2': 'Confirmar nueva contraseña',
+        }
+        for name, label in labels.items():
+            self.fields[name].label = label
+            self.fields[name].help_text = ''
+            self.fields[name].widget.attrs.update({
+                'class': INPUT_CLASS,
+                'data-testid': f'profile-{name.replace("_", "-")}',
+            })
 
 
 class UserRoleForm(forms.Form):
