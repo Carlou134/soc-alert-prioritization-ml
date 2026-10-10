@@ -81,6 +81,35 @@ class AdminCreateUserForm(UserCreationForm):
         return email
 
 
+class ProfileForm(forms.ModelForm):
+    """Datos que el propio usuario puede editar. Rol, estado y username quedan
+    fuera a propósito: solo el admin los gestiona desde user_edit."""
+
+    email = forms.EmailField(
+        required=True,
+        label='Correo electrónico',
+        widget=forms.EmailInput(attrs={'class': INPUT_CLASS, 'data-testid': 'profile-email'}),
+    )
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email']
+        labels = {
+            'first_name': 'Nombre',
+            'last_name': 'Apellido',
+        }
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': INPUT_CLASS, 'data-testid': 'profile-first-name'}),
+            'last_name': forms.TextInput(attrs={'class': INPUT_CLASS, 'data-testid': 'profile-last-name'}),
+        }
+
+    def clean_email(self):
+        email = self.cleaned_data['email'].strip().lower()
+        if User.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError('Este correo ya está registrado.')
+        return email
+
+
 class UserRoleForm(forms.Form):
     role = forms.ChoiceField(
         choices=UserProfile.ROLE_CHOICES,

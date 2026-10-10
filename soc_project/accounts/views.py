@@ -6,9 +6,10 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .decorators import admin_required
-from .forms import AdminCreateUserForm, RegisterForm, UserRoleForm
+from .forms import AdminCreateUserForm, ProfileForm, RegisterForm, UserRoleForm
 from .models import (
     ACTION_LABELS,
+    ACTION_PROFILE_UPDATED,
     ACTION_USER_ACTIVATED,
     ACTION_USER_CREATED,
     ACTION_USER_DEACTIVATED,
@@ -210,6 +211,28 @@ def user_edit_view(request, user_id):
         'profile': profile,
         'next_url': next_url,
     })
+
+
+# ── Configuración de la cuenta ────────────────────────────────────────────────
+
+@login_required
+def profile_edit_view(request):
+    if request.method == 'POST':
+        form = ProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            if form.has_changed():
+                form.save()
+                log_action(
+                    request.user,
+                    ACTION_PROFILE_UPDATED,
+                    f'{request.user.username} actualizó su perfil ({", ".join(form.changed_data)}).',
+                )
+            messages.success(request, 'Perfil actualizado correctamente.')
+            return redirect('profile_edit')
+    else:
+        form = ProfileForm(instance=request.user)
+
+    return render(request, 'accounts/profile_edit.html', {'form': form})
 
 
 # ── Auditoría ─────────────────────────────────────────────────────────────────

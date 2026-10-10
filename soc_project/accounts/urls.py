@@ -1,6 +1,15 @@
 from django.urls import path
 
-from .views import audit_list_view, login_view, logout_view, register_view, user_create_view, user_edit_view, user_list_view
+from .views import (
+    audit_list_view,
+    login_view,
+    logout_view,
+    profile_edit_view,
+    register_view,
+    user_create_view,
+    user_edit_view,
+    user_list_view,
+)
 
 urlpatterns = [
     path('login/', login_view, name='login'),
@@ -10,6 +19,8 @@ urlpatterns = [
     path('users/', user_list_view, name='user_list'),
     path('users/create/', user_create_view, name='user_create'),
     path('users/<int:user_id>/edit/', user_edit_view, name='user_edit'),
+    # Configuración de la cuenta (cualquier usuario autenticado)
+    path('settings/profile/', profile_edit_view, name='profile_edit'),
     # Auditoría
     path('audit/', audit_list_view, name='audit_list'),
 ]

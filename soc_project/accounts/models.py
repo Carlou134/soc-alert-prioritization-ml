@@ -21,6 +21,7 @@ ACTION_CONNECTOR_UPDATED = 'connector_updated'
 ACTION_CONNECTOR_DELETED = 'connector_deleted'
 ACTION_CONNECTOR_TESTED = 'connector_tested'
 ACTION_CONNECTOR_RESYNCED = 'connector_resynced'
+ACTION_PROFILE_UPDATED = 'profile_updated'
 
 ACTION_LABELS = {
     ACTION_USER_CREATED: 'Creación de usuario',
@@ -42,6 +43,7 @@ ACTION_LABELS = {
     ACTION_CONNECTOR_DELETED: 'Eliminación de conector SIEM',
     ACTION_CONNECTOR_TESTED:  'Prueba de conexión SIEM',
     ACTION_CONNECTOR_RESYNCED: 'Resincronización forzada de conector SIEM',
+    ACTION_PROFILE_UPDATED: 'Actualización de perfil',
 }
 
 
