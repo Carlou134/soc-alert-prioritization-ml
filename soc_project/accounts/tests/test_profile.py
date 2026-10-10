@@ -41,6 +41,18 @@ def test_profile_page_prefills_current_data(analyst_n1_user):
     assert form.initial['email'] == 'n1_test@test.local'
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize('role', ['admin', 'analyst_n3', 'analyst_n2', 'analyst_n1', 'trainee'])
+def test_sidebar_shows_settings_link_for_every_role(make_user, role):
+    client = Client()
+    client.force_login(make_user(f'user_{role}', role=role))
+
+    resp = client.get(PROFILE_URL)
+
+    assert b'data-testid="nav-settings"' in resp.content
+    assert f'href="{PROFILE_URL}"'.encode() in resp.content
+
+
 # ── Edición ──────────────────────────────────────────────────────────────────
 
 @pytest.mark.django_db
