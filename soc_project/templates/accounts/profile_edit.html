@@ -16,17 +16,17 @@
     {% endif %}
 
     <!-- Card -->
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+    <div class="bg-surface-raised border border-line rounded-xl p-6">
 
         <!-- User info header -->
-        <div class="flex items-center gap-4 mb-6 pb-6 border-b border-slate-700">
-            <div class="w-12 h-12 bg-slate-700 rounded-full flex items-center justify-center shrink-0">
-                <span class="text-lg text-slate-300 font-semibold">{{ user.username|first|upper }}</span>
+        <div class="flex items-center gap-4 mb-6 pb-6 border-b border-line">
+            <div class="w-12 h-12 bg-surface-overlay rounded-full flex items-center justify-center shrink-0">
+                <span class="text-lg text-fg font-semibold">{{ user.username|first|upper }}</span>
             </div>
             <div>
-                <p class="text-white font-semibold">{{ user.username }}</p>
-                <p class="text-slate-400 text-sm">{{ user.profile.get_role_display }}</p>
-                <p class="text-slate-500 text-xs mt-0.5">Registrado el {{ user.date_joined|date:"d/m/Y" }}</p>
+                <p class="text-fg-strong font-semibold">{{ user.username }}</p>
+                <p class="text-fg-muted text-sm">{{ user.profile.get_role_display }}</p>
+                <p class="text-fg-subtle text-xs mt-0.5">Registrado el {{ user.date_joined|date:"d/m/Y" }}</p>
             </div>
         </div>
 
@@ -36,7 +36,7 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
-                    <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">
+                    <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-fg mb-1.5">
                         {{ form.first_name.label }}
                     </label>
                     {{ form.first_name }}
@@ -45,7 +45,7 @@
                     {% endif %}
                 </div>
                 <div>
-                    <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">
+                    <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-fg mb-1.5">
                         {{ form.last_name.label }}
                     </label>
                     {{ form.last_name }}
@@ -56,7 +56,7 @@
             </div>
 
             <div class="mb-6">
-                <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">
+                <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-fg mb-1.5">
                     {{ form.email.label }}
                 </label>
                 {{ form.email }}
@@ -65,7 +65,7 @@
                 {% endif %}
             </div>
 
-            <p class="text-slate-500 text-xs mb-6">
+            <p class="text-fg-subtle text-xs mb-6">
                 El nombre de usuario y el rol solo pueden ser modificados por un administrador.
             </p>
 
@@ -77,16 +77,16 @@
     </div>
 
     <!-- Password card -->
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mt-6">
-        <p class="text-white font-semibold mb-1">Cambiar contraseña</p>
-        <p class="text-slate-400 text-sm mb-6">Tu sesión actual se mantiene activa después del cambio.</p>
+    <div class="bg-surface-raised border border-line rounded-xl p-6 mt-6">
+        <p class="text-fg-strong font-semibold mb-1">Cambiar contraseña</p>
+        <p class="text-fg-muted text-sm mb-6">Tu sesión actual se mantiene activa después del cambio.</p>
 
         <form method="post" action="{% url 'password_change' %}" novalidate data-testid="password-form">
             {% csrf_token %}
 
             {% for field in password_form %}
             <div class="{% if forloop.last %}mb-6{% else %}mb-4{% endif %}">
-                <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">
+                <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-fg mb-1.5">
                     {{ field.label }}
                 </label>
                 {{ field }}

@@ -3,7 +3,7 @@
 {% block title %}Registro — SOC Predictor{% endblock %}
 
 {% block public_content %}
-<div class="min-h-screen flex items-center justify-center bg-slate-900 px-6 py-10">
+<div class="min-h-screen flex items-center justify-center bg-surface px-6 py-10">
     <div class="w-full max-w-sm">
 
         <!-- Header -->
@@ -13,19 +13,19 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
                 </svg>
             </div>
-            <h1 class="text-lg font-semibold text-white">SOC Predictor</h1>
-            <p class="text-slate-500 text-sm mt-1">Crear nueva cuenta</p>
+            <h1 class="text-lg font-semibold text-fg-strong">SOC Predictor</h1>
+            <p class="text-fg-subtle text-sm mt-1">Crear nueva cuenta</p>
         </div>
 
         <!-- Card -->
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
-            <h2 class="text-sm font-semibold text-white mb-5">Registro</h2>
+        <div class="bg-surface-raised border border-line rounded-lg p-6">
+            <h2 class="text-sm font-semibold text-fg-strong mb-5">Registro</h2>
 
             <form method="post" class="space-y-4" data-testid="register-form">
                 {% csrf_token %}
                 {% for field in form %}
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1.5">{{ field.label }}</label>
+                    <label class="block text-xs font-medium text-fg-muted mb-1.5">{{ field.label }}</label>
                     {{ field }}
                     {% if field.errors %}
                     <p class="text-red-400 text-xs mt-1" data-testid="register-{{ field.name }}-error">{{ field.errors|striptags }}</p>
@@ -39,7 +39,7 @@
             </form>
         </div>
 
-        <p class="text-center text-xs text-slate-500 mt-4">
+        <p class="text-center text-xs text-fg-subtle mt-4">
             ¿Ya tienes cuenta?
             <a href="{% url 'login' %}" data-testid="register-login-link" class="text-blue-400 hover:text-blue-300 font-medium">Inicia sesión</a>
         </p>
