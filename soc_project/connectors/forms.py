@@ -3,12 +3,12 @@ from django import forms
 from .models import SIEMConnector
 
 INPUT_CLASS = (
-    'w-full bg-slate-700 border border-slate-600 text-slate-100 '
-    'placeholder:text-slate-500 rounded-md px-3 py-2 text-sm '
+    'w-full bg-surface-overlay border border-line-strong text-fg-strong '
+    'placeholder:text-fg-subtle rounded-md px-3 py-2 text-sm '
     'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
 )
 SELECT_CLASS = (
-    'w-full bg-slate-700 border border-slate-600 text-slate-100 '
+    'w-full bg-surface-overlay border border-line-strong text-fg-strong '
     'rounded-md px-3 py-2 text-sm '
     'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
 )
@@ -142,9 +142,9 @@ class SIEMConnectorForm(forms.ModelForm):
             'auth_type': forms.Select(attrs={'class': SELECT_CLASS}),
             'custom_query': forms.TextInput(attrs={'class': INPUT_CLASS + ' font-mono', 'placeholder': 'search index=soc_alerts'}),
             'batch_size': forms.NumberInput(attrs={'class': INPUT_CLASS, 'min': 1}),
-            'verify_ssl': forms.CheckboxInput(attrs={'class': 'w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded'}),
+            'verify_ssl': forms.CheckboxInput(attrs={'class': 'w-4 h-4 text-blue-500 bg-surface-overlay border-line-strong rounded'}),
             'poll_interval_minutes': forms.NumberInput(attrs={'class': INPUT_CLASS, 'min': 1}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'w-4 h-4 text-blue-500 bg-surface-overlay border-line-strong rounded'}),
         }
 
     def __init__(self, *args, **kwargs):
