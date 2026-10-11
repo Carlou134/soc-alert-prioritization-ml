@@ -21,22 +21,22 @@
     <!-- Header -->
     <div class="flex flex-wrap items-center gap-4">
         <a href="{{ back_url }}" data-testid="alert-shap-back-link"
-           class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
+           class="flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg-strong transition-colors">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
             {{ back_label }}
         </a>
-        <span class="text-slate-700">·</span>
-        <h1 class="text-lg font-semibold text-white">
+        <span class="text-line">·</span>
+        <h1 class="text-lg font-semibold text-fg-strong">
             Explicabilidad SHAP — Alerta <span class="text-violet-400">#{{ alert.id }}</span>
         </h1>
     </div>
 
     <!-- Alert summary card -->
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="bg-surface-raised/50 border border-line/50 rounded-xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div>
-            <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Clasificación</p>
+            <p class="text-xs text-fg-subtle uppercase tracking-wide mb-1">Clasificación</p>
             {% if prediction.predicted_class == 'malicioso' %}
                 <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-red-500/15 text-red-400 border border-red-500/25">Malicioso</span>
             {% elif prediction.predicted_class == 'a_investigar' %}
@@ -46,22 +46,22 @@
             {% endif %}
         </div>
         <div>
-            <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Risk Score</p>
+            <p class="text-xs text-fg-subtle uppercase tracking-wide mb-1">Risk Score</p>
             <p class="text-sm font-semibold {% if prediction.risk_score >= 0.7 %}text-red-400{% elif prediction.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
                 {{ prediction.risk_score|floatformat:4 }}
             </p>
         </div>
         <div>
-            <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Severidad</p>
-            <p class="text-sm text-slate-300">{{ alert.severity }}</p>
+            <p class="text-xs text-fg-subtle uppercase tracking-wide mb-1">Severidad</p>
+            <p class="text-sm text-fg">{{ alert.severity }}</p>
         </div>
         <div>
-            <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Categoría</p>
-            <p class="text-sm text-slate-300">{{ alert.event_category }}</p>
+            <p class="text-xs text-fg-subtle uppercase tracking-wide mb-1">Categoría</p>
+            <p class="text-sm text-fg">{{ alert.event_category }}</p>
         </div>
         {% if prediction.probabilities %}
-        <div class="col-span-2 md:col-span-4 pt-3 border-t border-slate-700/50">
-            <p class="text-xs text-slate-500 uppercase tracking-wide mb-2">Probabilidades del modelo</p>
+        <div class="col-span-2 md:col-span-4 pt-3 border-t border-line/50">
+            <p class="text-xs text-fg-subtle uppercase tracking-wide mb-2">Probabilidades del modelo</p>
             <div class="flex items-center gap-4 flex-wrap">
                 <span class="text-xs text-emerald-400">Benigno: <strong>{{ prediction.probabilities.benigno|floatformat:4 }}</strong></span>
                 <span class="text-xs text-amber-400">A investigar: <strong>{{ prediction.probabilities.a_investigar|floatformat:4 }}</strong></span>
@@ -72,97 +72,97 @@
     </div>
 
     <!-- Full alert detail -->
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-5">
-        <h2 class="text-sm font-semibold text-white">Detalle completo de la alerta</h2>
+    <div class="bg-surface-raised/50 border border-line/50 rounded-xl p-5 space-y-5">
+        <h2 class="text-sm font-semibold text-fg-strong">Detalle completo de la alerta</h2>
 
         <!-- Red y tráfico -->
         <div>
-            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Red y tráfico</p>
+            <p class="text-xs font-medium text-fg-subtle uppercase tracking-wide mb-3">Red y tráfico</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Protocolo</p>
-                    <p class="text-sm text-slate-200 font-mono">{{ alert.protocol|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Protocolo</p>
+                    <p class="text-sm text-fg-emphasis font-mono">{{ alert.protocol|default:"—" }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Tipo de tráfico</p>
-                    <p class="text-sm text-slate-200">{{ alert.traffic_type|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Tipo de tráfico</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.traffic_type|default:"—" }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Fuente de log</p>
-                    <p class="text-sm text-slate-200">{{ alert.log_source|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Fuente de log</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.log_source|default:"—" }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Acción firewall</p>
-                    <p class="text-sm text-slate-200">{{ alert.firewall_action|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Acción firewall</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.firewall_action|default:"—" }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Alerta IDS/IPS</p>
-                    <p class="text-sm text-slate-200">{{ alert.ids_ips_alert|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Alerta IDS/IPS</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.ids_ips_alert|default:"—" }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Req / min</p>
-                    <p class="text-sm text-slate-200 font-mono">{{ alert.request_rate_per_min }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Req / min</p>
+                    <p class="text-sm text-fg-emphasis font-mono">{{ alert.request_rate_per_min }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Intentos login fallidos</p>
-                    <p class="text-sm font-mono {% if alert.failed_login_attempts > 0 %}text-amber-400{% else %}text-slate-200{% endif %}">
+                    <p class="text-xs text-fg-subtle mb-0.5">Intentos login fallidos</p>
+                    <p class="text-sm font-mono {% if alert.failed_login_attempts > 0 %}text-amber-400{% else %}text-fg-emphasis{% endif %}">
                         {{ alert.failed_login_attempts }}
                     </p>
                 </div>
             </div>
         </div>
 
-        <div class="border-t border-slate-700/50"></div>
+        <div class="border-t border-line/50"></div>
 
         <!-- Contexto de ataque -->
         <div>
-            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Contexto de ataque</p>
+            <p class="text-xs font-medium text-fg-subtle uppercase tracking-wide mb-3">Contexto de ataque</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Tipo de ataque</p>
-                    <p class="text-sm text-slate-200">{{ alert.attack_type|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Tipo de ataque</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.attack_type|default:"—" }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Firma de ataque</p>
-                    <p class="text-sm text-slate-200">{{ alert.attack_signature|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Firma de ataque</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.attack_signature|default:"—" }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Indicador malware</p>
-                    <p class="text-sm text-slate-200">{{ alert.malware_indicator|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Indicador malware</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.malware_indicator|default:"—" }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Familia de amenaza</p>
-                    <p class="text-sm {% if alert.has_threat_family %}text-red-400 font-medium{% else %}text-slate-200{% endif %}">
+                    <p class="text-xs text-fg-subtle mb-0.5">Familia de amenaza</p>
+                    <p class="text-sm {% if alert.has_threat_family %}text-red-400 font-medium{% else %}text-fg-emphasis{% endif %}">
                         {% if alert.has_threat_family %}Sí{% else %}No{% endif %}
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Táctica MITRE</p>
-                    <p class="text-sm text-slate-200">{{ alert.mitre_tactic|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Táctica MITRE</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.mitre_tactic|default:"—" }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Kill chain stage</p>
-                    <p class="text-sm text-slate-200">{{ alert.kill_chain_stage|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Kill chain stage</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.kill_chain_stage|default:"—" }}</p>
                 </div>
                 {% if mitre_techniques_resolved %}
                 <div class="col-span-2">
-                    <p class="text-xs text-slate-500 mb-1.5">Técnicas MITRE</p>
+                    <p class="text-xs text-fg-subtle mb-1.5">Técnicas MITRE</p>
                     <div class="flex flex-wrap gap-2" data-testid="mitre-techniques">
                         {% for t in mitre_techniques_resolved %}
                         {% if t.url %}
                         <a href="{{ t.url }}" target="_blank" rel="noopener"
                            title="{{ t.description|default:'' }}"
                            data-testid="mitre-technique-{{ t.code }}"
-                           class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-700/60 border border-slate-600 text-xs hover:border-blue-500 hover:bg-slate-700 transition-colors">
-                            <span class="font-mono text-slate-400">{{ t.code }}</span>
-                            {% if t.name %}<span class="text-slate-200">{{ t.name }}</span>{% endif %}
+                           class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-overlay/60 border border-line-strong text-xs hover:border-blue-500 hover:bg-surface-overlay transition-colors">
+                            <span class="font-mono text-fg-muted">{{ t.code }}</span>
+                            {% if t.name %}<span class="text-fg-emphasis">{{ t.name }}</span>{% endif %}
                         </a>
                         {% else %}
                         <span title="{{ t.description|default:'' }}"
                               data-testid="mitre-technique-{{ t.code }}"
-                              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-700/60 border border-slate-600 text-xs">
-                            <span class="font-mono text-slate-400">{{ t.code }}</span>
-                            {% if t.name %}<span class="text-slate-200">{{ t.name }}</span>{% endif %}
+                              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-overlay/60 border border-line-strong text-xs">
+                            <span class="font-mono text-fg-muted">{{ t.code }}</span>
+                            {% if t.name %}<span class="text-fg-emphasis">{{ t.name }}</span>{% endif %}
                         </span>
                         {% endif %}
                         {% endfor %}
@@ -172,51 +172,51 @@
             </div>
         </div>
 
-        <div class="border-t border-slate-700/50"></div>
+        <div class="border-t border-line/50"></div>
 
         <!-- Activo y entorno -->
         <div>
-            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Activo y entorno</p>
+            <p class="text-xs font-medium text-fg-subtle uppercase tracking-wide mb-3">Activo y entorno</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Criticidad del activo</p>
-                    <p class="text-sm text-slate-200">{{ alert.asset_criticality|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Criticidad del activo</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.asset_criticality|default:"—" }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">OS family</p>
-                    <p class="text-sm text-slate-200">{{ alert.os_family|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">OS family</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.os_family|default:"—" }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Rol de evidencia</p>
-                    <p class="text-sm text-slate-200">{{ alert.evidence_role|default:"—" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Rol de evidencia</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.evidence_role|default:"—" }}</p>
                 </div>
                 {% if alert.correlation_id and alert.correlation_id != 'unknown' %}
                 <div class="col-span-2">
-                    <p class="text-xs text-slate-500 mb-0.5">Correlation ID</p>
-                    <p class="text-sm text-slate-200 font-mono break-all">{{ alert.correlation_id }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Correlation ID</p>
+                    <p class="text-sm text-fg-emphasis font-mono break-all">{{ alert.correlation_id }}</p>
                 </div>
                 {% endif %}
             </div>
         </div>
 
-        <div class="border-t border-slate-700/50"></div>
+        <div class="border-t border-line/50"></div>
 
         <!-- Trazabilidad -->
         <div>
-            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Trazabilidad</p>
+            <p class="text-xs font-medium text-fg-subtle uppercase tracking-wide mb-3">Trazabilidad</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Subida por</p>
-                    <p class="text-sm text-slate-200">{{ alert.created_by.username }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Subida por</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.created_by.username }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Fecha de ingesta</p>
-                    <p class="text-sm text-slate-200 font-mono">{{ alert.created_at|date:"Y-m-d H:i:s" }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Fecha de ingesta</p>
+                    <p class="text-sm text-fg-emphasis font-mono">{{ alert.created_at|date:"Y-m-d H:i:s" }}</p>
                 </div>
                 {% if alert.label %}
                 <div>
-                    <p class="text-xs text-slate-500 mb-0.5">Label original</p>
-                    <p class="text-sm text-slate-200">{{ alert.label }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Label original</p>
+                    <p class="text-sm text-fg-emphasis">{{ alert.label }}</p>
                 </div>
                 {% endif %}
             </div>
@@ -225,7 +225,7 @@
 
     <!-- Explanation intro -->
     <div class="bg-violet-500/5 border border-violet-500/20 rounded-xl p-4">
-        <p class="text-sm text-slate-300">
+        <p class="text-sm text-fg">
             <span class="font-semibold text-violet-400">¿Cómo leer estos gráficos?</span>
             Las barras muestran el impacto de cada feature sobre la probabilidad de la clase correspondiente.
             Las barras <span class="text-red-400 font-medium">rojas / naranjas</span> empujan la predicción hacia esa clase;
@@ -235,11 +235,11 @@
     </div>
 
     <!-- Stage 1: Malicioso -->
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+    <div class="bg-surface-raised/50 border border-line/50 rounded-xl p-5 space-y-4">
         <div class="flex items-center justify-between">
             <div>
-                <h2 class="text-sm font-semibold text-white">Etapa 1 — Detección de amenaza</h2>
-                <p class="text-xs text-slate-400 mt-0.5">Features que más influyen en la probabilidad de <span class="text-red-400 font-medium">malicioso</span></p>
+                <h2 class="text-sm font-semibold text-fg-strong">Etapa 1 — Detección de amenaza</h2>
+                <p class="text-xs text-fg-muted mt-0.5">Features que más influyen en la probabilidad de <span class="text-red-400 font-medium">malicioso</span></p>
             </div>
             {% if prediction.predicted_class == 'malicioso' %}
             <span class="text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded font-medium">Etapa decisiva</span>
@@ -251,16 +251,16 @@
     </div>
 
     <!-- Stage 2: A investigar vs Benigno -->
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+    <div class="bg-surface-raised/50 border border-line/50 rounded-xl p-5 space-y-4">
         <div class="flex items-center justify-between">
             <div>
-                <h2 class="text-sm font-semibold text-white">Etapa 2 — Clasificación de investigación</h2>
-                <p class="text-xs text-slate-400 mt-0.5">Features que más influyen en la probabilidad de <span class="text-amber-400 font-medium">a investigar</span> vs benigno</p>
+                <h2 class="text-sm font-semibold text-fg-strong">Etapa 2 — Clasificación de investigación</h2>
+                <p class="text-xs text-fg-muted mt-0.5">Features que más influyen en la probabilidad de <span class="text-amber-400 font-medium">a investigar</span> vs benigno</p>
             </div>
             {% if prediction.predicted_class != 'malicioso' %}
             <span class="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-1 rounded font-medium">Etapa decisiva</span>
             {% else %}
-            <span class="text-xs bg-slate-700/50 text-slate-400 border border-slate-600 px-2 py-1 rounded">No determinante</span>
+            <span class="text-xs bg-surface-overlay/50 text-fg-muted border border-line-strong px-2 py-1 rounded">No determinante</span>
             {% endif %}
         </div>
         <div class="relative" style="height: 420px;">
@@ -269,11 +269,11 @@
     </div>
 
     <!-- Explicación IA -->
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+    <div class="bg-surface-raised/50 border border-line/50 rounded-xl p-5 space-y-4">
         <div class="flex items-center justify-between">
             <div>
-                <h2 class="text-sm font-semibold text-white">Explicación en lenguaje natural</h2>
-                <p class="text-xs text-slate-400 mt-0.5">Generada por IA — interpretación de los valores SHAP para el analista SOC</p>
+                <h2 class="text-sm font-semibold text-fg-strong">Explicación en lenguaje natural</h2>
+                <p class="text-xs text-fg-muted mt-0.5">Generada por IA — interpretación de los valores SHAP para el analista SOC</p>
             </div>
             {% if prediction.shap_explanation %}
             <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded">Guardada</span>
@@ -284,27 +284,27 @@
 
         <div id="explain-container">
             {% if prediction.shap_explanation %}
-            <div id="explain-static" class="prose-shap text-sm text-slate-300 leading-relaxed"
+            <div id="explain-static" class="prose-shap text-sm text-fg leading-relaxed"
                  data-markdown="{{ prediction.shap_explanation|escape }}"></div>
             {% else %}
-            <div id="explain-loading" class="flex items-center gap-2 text-sm text-slate-400">
+            <div id="explain-loading" class="flex items-center gap-2 text-sm text-fg-muted">
                 <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
                 </svg>
                 Analizando valores SHAP...
             </div>
-            <div id="explain-result" class="hidden prose-shap text-sm text-slate-300 leading-relaxed"></div>
+            <div id="explain-result" class="hidden prose-shap text-sm text-fg leading-relaxed"></div>
             <div id="explain-error" class="hidden text-sm text-red-400"></div>
             {% endif %}
         </div>
     </div>
 
     <!-- Estado de investigación -->
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+    <div class="bg-surface-raised/50 border border-line/50 rounded-xl p-5 space-y-4">
         <div>
-            <h2 class="text-sm font-semibold text-white">Estado de investigación</h2>
-            <p class="text-xs text-slate-400 mt-0.5">
+            <h2 class="text-sm font-semibold text-fg-strong">Estado de investigación</h2>
+            <p class="text-xs text-fg-muted mt-0.5">
                 {% if is_trainee and not assigned_to_me %}
                     Solo lectura
                 {% elif is_trainee and assigned_to_me %}
@@ -324,11 +324,11 @@
             {% elif alert.workflow.investigation_status == 'false_positive' %}
                 <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-violet-500/15 text-violet-400 border border-violet-500/25">Falso positivo</span>
             {% else %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-slate-600/50 text-slate-400 border border-slate-600">Nueva</span>
+                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-surface-strong/50 text-fg-muted border border-line-strong">Nueva</span>
             {% endif %}
         </div>
         {% if alert.workflow.investigation_notes %}
-        <p class="text-sm text-slate-400 bg-slate-700/40 rounded-md px-3 py-2">{{ alert.workflow.investigation_notes }}</p>
+        <p class="text-sm text-fg-muted bg-surface-overlay/40 rounded-md px-3 py-2">{{ alert.workflow.investigation_notes }}</p>
         {% endif %}
         {% else %}{# analistas normales + trainee asignado #}
         <div class="flex items-center gap-4 flex-wrap">
@@ -341,7 +341,7 @@
                     {% if value == 'investigated'   %}text-emerald-400
                     {% elif value == 'investigating' %}text-blue-400
                     {% elif value == 'false_positive'%}text-violet-400
-                    {% else %}text-slate-400{% endif %}">
+                    {% else %}text-fg-muted{% endif %}">
                     {{ label }}
                 </span>
             </label>
@@ -349,13 +349,13 @@
         </div>
 
         <div>
-            <label class="block text-xs font-medium text-slate-400 mb-1.5">
+            <label class="block text-xs font-medium text-fg-muted mb-1.5">
                 Justificación / acciones realizadas
-                <span class="text-slate-600">(requerida para Investigada o Falso positivo)</span>
+                <span class="text-fg-faint">(requerida para Investigada o Falso positivo)</span>
             </label>
             <textarea id="investigationNotes" data-testid="investigation-notes" rows="3"
                 placeholder="Describir qué revisaste, qué encontraste y por qué tomaste esta decisión…"
-                class="w-full bg-slate-700 border border-slate-600 text-slate-200 placeholder-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none">{{ alert.workflow.investigation_notes }}</textarea>
+                class="w-full bg-surface-overlay border border-line-strong text-fg-emphasis placeholder-fg-subtle rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none">{{ alert.workflow.investigation_notes }}</textarea>
         </div>
 
         <div class="flex items-center gap-3">
@@ -363,26 +363,26 @@
                 class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 Guardar estado
             </button>
-            <span id="statusFeedback" data-testid="status-feedback" class="text-xs text-slate-500"></span>
+            <span id="statusFeedback" data-testid="status-feedback" class="text-xs text-fg-subtle"></span>
         </div>
         {% endif %}
 
         {% if alert.workflow.investigated_by %}
-        <div class="pt-3 border-t border-slate-700/50">
-            <p class="text-xs text-slate-500">
+        <div class="pt-3 border-t border-line/50">
+            <p class="text-xs text-fg-subtle">
                 Última actualización por
-                <span class="text-slate-300 font-medium">{{ alert.workflow.investigated_by.username }}</span>
-                el <span class="text-slate-300 font-mono">{{ alert.workflow.investigated_at|date:"Y-m-d H:i" }}</span>
+                <span class="text-fg font-medium">{{ alert.workflow.investigated_by.username }}</span>
+                el <span class="text-fg font-mono">{{ alert.workflow.investigated_at|date:"Y-m-d H:i" }}</span>
             </p>
         </div>
         {% endif %}
     </div>
 
     <!-- Ajuste manual de prioridad -->
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+    <div class="bg-surface-raised/50 border border-line/50 rounded-xl p-5 space-y-4">
         <div>
-            <h2 class="text-sm font-semibold text-white">Ajuste manual de prioridad</h2>
-            <p class="text-xs text-slate-400 mt-0.5">
+            <h2 class="text-sm font-semibold text-fg-strong">Ajuste manual de prioridad</h2>
+            <p class="text-xs text-fg-muted mt-0.5">
                 {% if is_trainee or readonly %}Solo lectura{% else %}Nivel 2 — override basado en contexto operacional{% endif %}
             </p>
         </div>
@@ -390,7 +390,7 @@
         {% if is_trainee or readonly %}
         <div class="flex items-center gap-3 flex-wrap">
             <div>
-                <p class="text-xs text-slate-500 mb-1">Prioridad del analista</p>
+                <p class="text-xs text-fg-subtle mb-1">Prioridad del analista</p>
                 {% if alert.workflow.analyst_priority == 'critical' %}
                     <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-red-500/15 text-red-400 border border-red-500/25">▲ Crítica</span>
                 {% elif alert.workflow.analyst_priority == 'high' %}
@@ -398,24 +398,24 @@
                 {% elif alert.workflow.analyst_priority == 'medium' %}
                     <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-yellow-500/15 text-yellow-400 border border-yellow-500/25">◆ Media</span>
                 {% elif alert.workflow.analyst_priority == 'low' %}
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-slate-600/50 text-slate-300 border border-slate-600">▼ Baja</span>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-surface-strong/50 text-fg border border-line-strong">▼ Baja</span>
                 {% else %}
-                    <span class="text-sm text-slate-500">Sin ajuste (usando ML)</span>
+                    <span class="text-sm text-fg-subtle">Sin ajuste (usando ML)</span>
                 {% endif %}
             </div>
             {% if alert.workflow.analyst_note %}
             <div>
-                <p class="text-xs text-slate-500 mb-1">Nota del analista</p>
-                <p class="text-sm text-slate-400 bg-slate-700/40 rounded-md px-3 py-2">{{ alert.workflow.analyst_note }}</p>
+                <p class="text-xs text-fg-subtle mb-1">Nota del analista</p>
+                <p class="text-sm text-fg-muted bg-surface-overlay/40 rounded-md px-3 py-2">{{ alert.workflow.analyst_note }}</p>
             </div>
             {% endif %}
         </div>
         {% else %}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1.5">Prioridad del analista</label>
+                <label class="block text-xs font-medium text-fg-muted mb-1.5">Prioridad del analista</label>
                 <select id="prioritySelect" data-testid="priority-select"
-                    class="w-full bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="w-full bg-surface-overlay border border-line-strong text-fg-emphasis rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value=""         {% if not alert.workflow.analyst_priority %}selected{% endif %}>— Sin ajuste (usar ML)</option>
                     <option value="critical"  {% if alert.workflow.analyst_priority == 'critical' %}selected{% endif %}>▲ Crítica</option>
                     <option value="high"      {% if alert.workflow.analyst_priority == 'high'     %}selected{% endif %}>▲ Alta</option>
@@ -424,10 +424,10 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1.5">Nota del analista <span class="text-slate-600">(opcional)</span></label>
+                <label class="block text-xs font-medium text-fg-muted mb-1.5">Nota del analista <span class="text-fg-faint">(opcional)</span></label>
                 <input type="text" id="priorityNote" data-testid="priority-note" value="{{ alert.workflow.analyst_note|default:'' }}"
                     placeholder="Justificación del ajuste…"
-                    class="w-full bg-slate-700 border border-slate-600 text-slate-200 placeholder-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="w-full bg-surface-overlay border border-line-strong text-fg-emphasis placeholder-fg-subtle rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
         </div>
 
@@ -436,17 +436,17 @@
                 class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 Guardar prioridad
             </button>
-            <span id="priorityStatus" data-testid="priority-status" class="text-xs text-slate-500"></span>
+            <span id="priorityStatus" data-testid="priority-status" class="text-xs text-fg-subtle"></span>
         </div>
         {% endif %}
     </div>
 
     <!-- HU030 — Evaluación de decisión ML -->
     {% if can_evaluate %}
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+    <div class="bg-surface-raised/50 border border-line/50 rounded-xl p-5 space-y-4">
         <div>
-            <h2 class="text-sm font-semibold text-white">Evaluación de la decisión ML</h2>
-            <p class="text-xs text-slate-400 mt-0.5">Nivel 2 — ¿La predicción del modelo fue correcta?</p>
+            <h2 class="text-sm font-semibold text-fg-strong">Evaluación de la decisión ML</h2>
+            <p class="text-xs text-fg-muted mt-0.5">Nivel 2 — ¿La predicción del modelo fue correcta?</p>
         </div>
 
         {% if alert.workflow.ml_evaluation %}
@@ -469,12 +469,12 @@
             {% endif %}
         </div>
         {% if alert.workflow.ml_evaluation_notes %}
-        <p class="text-sm text-slate-400 bg-slate-700/40 rounded-md px-3 py-2">{{ alert.workflow.ml_evaluation_notes }}</p>
+        <p class="text-sm text-fg-muted bg-surface-overlay/40 rounded-md px-3 py-2">{{ alert.workflow.ml_evaluation_notes }}</p>
         {% endif %}
         {% if alert.workflow.ml_evaluated_by %}
-        <p class="text-xs text-slate-500">
-            Evaluado por <span class="text-slate-300 font-medium">{{ alert.workflow.ml_evaluated_by.username }}</span>
-            el <span class="text-slate-300 font-mono">{{ alert.workflow.ml_evaluated_at|date:"Y-m-d H:i" }}</span>
+        <p class="text-xs text-fg-subtle">
+            Evaluado por <span class="text-fg font-medium">{{ alert.workflow.ml_evaluated_by.username }}</span>
+            el <span class="text-fg font-mono">{{ alert.workflow.ml_evaluated_at|date:"Y-m-d H:i" }}</span>
         </p>
         {% endif %}
         {% if not readonly %}
@@ -487,7 +487,7 @@
         {% if not readonly %}
         <div id="evalForm" class="{% if alert.workflow.ml_evaluation %}hidden {% endif %}space-y-3">
             <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1.5">¿Cómo evaluás la predicción?</label>
+                <label class="block text-xs font-medium text-fg-muted mb-1.5">¿Cómo evaluás la predicción?</label>
                 <div class="flex flex-wrap gap-3" id="evalRadioGroup">
                     {% for val, label in evaluation_choices %}
                     <label class="flex items-center gap-2 cursor-pointer">
@@ -505,19 +505,19 @@
                 </div>
             </div>
             <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1.5">
-                    Observaciones <span class="text-slate-600">(opcional)</span>
+                <label class="block text-xs font-medium text-fg-muted mb-1.5">
+                    Observaciones <span class="text-fg-faint">(opcional)</span>
                 </label>
                 <textarea id="evalNotes" data-testid="eval-notes" rows="2"
                     placeholder="Describe por qué considerás que la predicción fue correcta o no…"
-                    class="w-full bg-slate-700 border border-slate-600 text-slate-200 placeholder-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none">{{ alert.workflow.ml_evaluation_notes }}</textarea>
+                    class="w-full bg-surface-overlay border border-line-strong text-fg-emphasis placeholder-fg-subtle rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none">{{ alert.workflow.ml_evaluation_notes }}</textarea>
             </div>
             <div class="flex items-center gap-3">
                 <button id="evalSave" data-testid="eval-save"
                     class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                     Guardar evaluación
                 </button>
-                <span id="evalFeedback" data-testid="eval-feedback" class="text-xs text-slate-500"></span>
+                <span id="evalFeedback" data-testid="eval-feedback" class="text-xs text-fg-subtle"></span>
             </div>
         </div>
         {% endif %}
@@ -534,40 +534,40 @@
             <div>
                 <p class="text-sm font-semibold text-red-400">Incidente Activo</p>
                 {% if alert.incident.escalated_by and alert.incident.escalated_at %}
-                <p class="text-xs text-slate-400 mt-0.5">
-                    Escalado por <span class="text-slate-300 font-medium">{{ alert.incident.escalated_by.username }}</span>
-                    el <span class="text-slate-300 font-mono">{{ alert.incident.escalated_at|date:"Y-m-d H:i" }}</span>
+                <p class="text-xs text-fg-muted mt-0.5">
+                    Escalado por <span class="text-fg font-medium">{{ alert.incident.escalated_by.username }}</span>
+                    el <span class="text-fg font-mono">{{ alert.incident.escalated_at|date:"Y-m-d H:i" }}</span>
                 </p>
                 {% endif %}
             </div>
         </div>
     </div>
     {% elif can_escalate %}
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+    <div class="bg-surface-raised/50 border border-line/50 rounded-xl p-5 space-y-4">
         <div>
-            <h2 class="text-sm font-semibold text-white">Escalado a Incidente</h2>
-            <p class="text-xs text-slate-400 mt-0.5">Nivel 2 — confirma que esta alerta es un ataque real y crítico</p>
+            <h2 class="text-sm font-semibold text-fg-strong">Escalado a Incidente</h2>
+            <p class="text-xs text-fg-muted mt-0.5">Nivel 2 — confirma que esta alerta es un ataque real y crítico</p>
         </div>
         <div class="flex items-center gap-3">
             <button id="escalateBtn" data-testid="escalate-btn"
                 class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 Escalar a Incidente
             </button>
-            <span id="escalateFeedback" data-testid="escalate-feedback" class="text-xs text-slate-500"></span>
+            <span id="escalateFeedback" data-testid="escalate-feedback" class="text-xs text-fg-subtle"></span>
         </div>
     </div>
     {% endif %}
 
     <!-- Asignación de alerta -->
     {% if can_assign or alert.workflow.assigned_to %}
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+    <div class="bg-surface-raised/50 border border-line/50 rounded-xl p-5 space-y-4">
         <div>
-            <h2 class="text-sm font-semibold text-white">Asignación de alerta</h2>
-            <p class="text-xs text-slate-400 mt-0.5">Delega esta alerta al analista responsable de investigarla</p>
+            <h2 class="text-sm font-semibold text-fg-strong">Asignación de alerta</h2>
+            <p class="text-xs text-fg-muted mt-0.5">Delega esta alerta al analista responsable de investigarla</p>
         </div>
 
         <div class="flex items-center gap-2">
-            <span class="text-xs text-slate-500">Asignada a:</span>
+            <span class="text-xs text-fg-subtle">Asignada a:</span>
             {% if alert.workflow.assigned_to %}
             <span id="assignedBadge"
                 class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">
@@ -577,14 +577,14 @@
             <span id="assignedBadge"
                 class="hidden items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">
             </span>
-            <span id="unassignedLabel" class="text-xs text-slate-600">Sin asignar</span>
+            <span id="unassignedLabel" class="text-xs text-fg-faint">Sin asignar</span>
             {% endif %}
         </div>
 
         {% if can_assign and not readonly %}
         <div class="flex items-center gap-3 flex-wrap">
             <select id="assignSelect" data-testid="assign-select"
-                class="bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                class="bg-surface-overlay border border-line-strong text-fg-emphasis rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">— Sin asignar</option>
                 {% for u in assignable_users %}
                 <option value="{{ u.pk }}" {% if alert.workflow.assigned_to_id == u.pk %}selected{% endif %}>
@@ -596,7 +596,7 @@
                 class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 Asignar
             </button>
-            <span id="assignFeedback" data-testid="assign-feedback" class="text-xs text-slate-500"></span>
+            <span id="assignFeedback" data-testid="assign-feedback" class="text-xs text-fg-subtle"></span>
         </div>
         {% endif %}
     </div>
@@ -759,10 +759,10 @@ document.getElementById('statusSave').addEventListener('click', function () {
             if (!trace) {
                 trace = document.createElement('div');
                 trace.id = 'traceInfo';
-                trace.className = 'pt-3 border-t border-slate-700/50 mt-2';
+                trace.className = 'pt-3 border-t border-line/50 mt-2';
                 document.getElementById('statusSave').closest('.space-y-4').appendChild(trace);
             }
-            trace.innerHTML = `<p class="text-xs text-slate-500">Última actualización por <span class="text-slate-300 font-medium">${data.by}</span> el <span class="text-slate-300 font-mono">${data.at}</span></p>`;
+            trace.innerHTML = `<p class="text-xs text-fg-subtle">Última actualización por <span class="text-fg font-medium">${data.by}</span> el <span class="text-fg font-mono">${data.at}</span></p>`;
         } else {
             feedback.textContent = data.error || 'Error al guardar';
             feedback.className = 'text-xs text-red-400';
