@@ -73,6 +73,77 @@
   --theme-fg-faint: oklch(70.4% 0.04 256.788);          /* slate-400 */
 }
 
+/**
+  * Acentos en tema claro.
+  *
+  * Los templates usan tonos claros de acento (text-red-400, text-emerald-300...)
+  * pensados para fondo oscuro; sobre blanco no llegan a AA (amber-400 ≈ 1.9:1).
+  * En vez de migrar ~320 clases, en tema claro esas variables de la paleta toman
+  * el tono oscuro equivalente: 400 → 700, 300 → 800, 100 → 900. Leé "red-400" como
+  * "rojo legible sobre el fondo del tema", no como el tono literal.
+  *
+  * Solo se redefinen los tonos que algún template usa. Si aparece uno nuevo
+  * (p. ej. text-lime-400), hay que agregarlo acá y en la isla oscura de abajo.
+  * Valores: paleta oficial de Tailwind v4, en oklch por la misma razón que los tokens.
+  */
+[data-theme="light"] {
+  --color-red-400: oklch(50.5% 0.213 27.518);       /* red-700 */
+  --color-orange-400: oklch(55.3% 0.195 38.402);    /* orange-700 */
+  --color-amber-400: oklch(55.5% 0.163 48.998);     /* amber-700 */
+  --color-yellow-400: oklch(55.4% 0.135 66.442);    /* yellow-700 */
+  --color-green-400: oklch(52.7% 0.154 150.069);    /* green-700 */
+  --color-emerald-400: oklch(50.8% 0.118 165.612);  /* emerald-700 */
+  --color-teal-400: oklch(51.1% 0.096 186.391);     /* teal-700 */
+  --color-cyan-400: oklch(52% 0.105 223.128);       /* cyan-700 */
+  --color-sky-400: oklch(50% 0.134 242.749);        /* sky-700 */
+  --color-blue-400: oklch(48.8% 0.243 264.376);     /* blue-700 */
+  --color-indigo-400: oklch(45.7% 0.24 277.023);    /* indigo-700 */
+  --color-violet-400: oklch(49.1% 0.27 292.581);    /* violet-700 */
+  --color-purple-400: oklch(49.6% 0.265 301.924);   /* purple-700 */
+  --color-fuchsia-400: oklch(51.8% 0.253 323.949);  /* fuchsia-700 */
+  --color-rose-400: oklch(51.4% 0.222 16.935);      /* rose-700 */
+
+  --color-red-300: oklch(44.4% 0.177 26.899);       /* red-800 */
+  --color-orange-300: oklch(47% 0.157 37.304);      /* orange-800 */
+  --color-amber-300: oklch(47.3% 0.137 46.201);     /* amber-800 */
+  --color-yellow-300: oklch(47.6% 0.114 61.907);    /* yellow-800 */
+  --color-emerald-300: oklch(43.2% 0.095 166.913);  /* emerald-800 */
+  --color-blue-300: oklch(42.4% 0.199 265.638);     /* blue-800 */
+
+  --color-amber-100: oklch(41.4% 0.112 45.904);     /* amber-900 */
+  --color-blue-100: oklch(37.9% 0.146 265.522);     /* blue-900 */
+}
+
+/* Isla oscura dentro de una página clara (p. ej. la terminal SOAR): los tokens ya
+   vuelven al oscuro por [data-theme="dark"]; acá se restauran los acentos originales. */
+[data-theme="light"] [data-theme="dark"] {
+  --color-red-400: oklch(70.4% 0.191 22.216);
+  --color-orange-400: oklch(75% 0.183 55.934);
+  --color-amber-400: oklch(82.8% 0.189 84.429);
+  --color-yellow-400: oklch(85.2% 0.199 91.936);
+  --color-green-400: oklch(79.2% 0.209 151.711);
+  --color-emerald-400: oklch(76.5% 0.177 163.223);
+  --color-teal-400: oklch(77.7% 0.152 181.912);
+  --color-cyan-400: oklch(78.9% 0.154 211.53);
+  --color-sky-400: oklch(74.6% 0.16 232.661);
+  --color-blue-400: oklch(70.7% 0.165 254.624);
+  --color-indigo-400: oklch(67.3% 0.182 276.935);
+  --color-violet-400: oklch(70.2% 0.183 293.541);
+  --color-purple-400: oklch(71.4% 0.203 305.504);
+  --color-fuchsia-400: oklch(74% 0.238 322.16);
+  --color-rose-400: oklch(71.2% 0.194 13.428);
+
+  --color-red-300: oklch(80.8% 0.114 19.571);
+  --color-orange-300: oklch(83.7% 0.128 66.29);
+  --color-amber-300: oklch(87.9% 0.169 91.605);
+  --color-yellow-300: oklch(90.5% 0.182 98.111);
+  --color-emerald-300: oklch(84.5% 0.143 164.978);
+  --color-blue-300: oklch(80.9% 0.105 251.813);
+
+  --color-amber-100: oklch(96.2% 0.059 95.617);
+  --color-blue-100: oklch(93.2% 0.032 255.585);
+}
+
 @theme inline {
   --color-surface-sunken: var(--theme-surface-sunken);
   --color-surface: var(--theme-surface);
