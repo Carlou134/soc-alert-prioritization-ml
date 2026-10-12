@@ -4,17 +4,17 @@
 
 {% block content %}
 <style>
-.prose-shap h1,.prose-shap h2,.prose-shap h3 { color:#e2e8f0; font-weight:600; margin:1rem 0 .4rem; }
+.prose-shap h1,.prose-shap h2,.prose-shap h3 { color:var(--theme-fg-emphasis); font-weight:600; margin:1rem 0 .4rem; }
 .prose-shap h1 { font-size:1.1rem; }
 .prose-shap h2 { font-size:1rem; }
-.prose-shap h3 { font-size:.9rem; color:#cbd5e1; }
-.prose-shap p  { margin:.5rem 0; color:#cbd5e1; }
-.prose-shap strong { color:#f1f5f9; font-weight:600; }
-.prose-shap em { color:#94a3b8; font-style:italic; }
-.prose-shap ul,.prose-shap ol { margin:.5rem 0 .5rem 1.25rem; color:#cbd5e1; }
+.prose-shap h3 { font-size:.9rem; color:var(--theme-fg); }
+.prose-shap p  { margin:.5rem 0; color:var(--theme-fg); }
+.prose-shap strong { color:var(--theme-fg-strong); font-weight:600; }
+.prose-shap em { color:var(--theme-fg-muted); font-style:italic; }
+.prose-shap ul,.prose-shap ol { margin:.5rem 0 .5rem 1.25rem; color:var(--theme-fg); }
 .prose-shap li { margin:.2rem 0; }
-.prose-shap code { background:rgba(148,163,184,.1); color:#7dd3fc; padding:.1rem .3rem; border-radius:.25rem; font-size:.8rem; }
-.prose-shap blockquote { border-left:3px solid #6366f1; padding-left:.75rem; color:#94a3b8; margin:.5rem 0; }
+.prose-shap code { background:color-mix(in oklab, var(--theme-fg-muted) 10%, transparent); color:#7dd3fc; padding:.1rem .3rem; border-radius:.25rem; font-size:.8rem; }
+.prose-shap blockquote { border-left:3px solid #6366f1; padding-left:.75rem; color:var(--theme-fg-muted); margin:.5rem 0; }
 </style>
 <div class="space-y-6">
 
@@ -614,8 +614,8 @@
     const shap_s1 = {{ shap_s1|safe }};
     const shap_s2 = {{ shap_s2|safe }};
 
-    Chart.defaults.color = '#94a3b8';
-    Chart.defaults.borderColor = 'rgba(148,163,184,0.1)';
+    Chart.defaults.color = themeColor('fg-muted');
+    Chart.defaults.borderColor = themeColor('fg-muted', 0.1);
     Chart.defaults.font.family = 'Inter, sans-serif';
     Chart.defaults.font.size = 11;
 
@@ -655,13 +655,13 @@
                 },
                 scales: {
                     x: {
-                        grid: { color: 'rgba(148,163,184,0.08)' },
-                        ticks: { color: '#94a3b8' },
+                        grid: { color: themeColor('fg-muted', 0.08) },
+                        ticks: { color: themeColor('fg-muted') },
                     },
                     y: {
                         grid: { display: false },
                         ticks: {
-                            color: '#cbd5e1',
+                            color: themeColor('fg'),
                             font: { size: 10.5 },
                         }
                     }
@@ -897,15 +897,15 @@ document.getElementById('escalateBtn').addEventListener('click', async function 
 
     const result = await Swal.fire({
         title:              '¿Escalar a incidente?',
-        html:               'Confirmás que la <strong>Alerta #{{ alert.pk }}</strong> es un ataque real.<br><span style="font-size:0.8rem;color:#94a3b8;">Desaparecerá del triaje y pasará a la Mesa de Incidentes Activos.</span>',
+        html:               'Confirmás que la <strong>Alerta #{{ alert.pk }}</strong> es un ataque real.<br><span style="font-size:0.8rem;color:var(--theme-fg-muted);">Desaparecerá del triaje y pasará a la Mesa de Incidentes Activos.</span>',
         icon:               'warning',
         showCancelButton:   true,
         confirmButtonColor: '#ef4444',
-        cancelButtonColor:  '#334155',
+        cancelButtonColor:  'var(--theme-surface-overlay)',
         confirmButtonText:  'Sí, escalar',
         cancelButtonText:   'Cancelar',
-        background:         '#1e293b',
-        color:              '#e2e8f0',
+        background:         'var(--theme-surface-raised)',
+        color:              'var(--theme-fg-emphasis)',
         iconColor:          '#f97316',
         reverseButtons:     true,
     });

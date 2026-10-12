@@ -381,23 +381,23 @@ async function resolveIncident() {
             text: 'Seleccioná una causa raíz antes de cerrar el incidente.',
             icon: 'warning',
             confirmButtonColor: '#3b82f6',
-            background: '#1e293b',
-            color: '#e2e8f0',
+            background: 'var(--theme-surface-raised)',
+            color: 'var(--theme-fg-emphasis)',
         });
         return;
     }
 
     const result = await Swal.fire({
         title: '¿Cerrar incidente oficialmente?',
-        html: `Confirmás el cierre del <strong>Incidente #{{ alert.pk }}</strong>.<br><span style="font-size:0.8rem;color:#94a3b8;">Se registrará el MTTR y no podrá deshacerse.</span>`,
+        html: `Confirmás el cierre del <strong>Incidente #{{ alert.pk }}</strong>.<br><span style="font-size:0.8rem;color:var(--theme-fg-muted);">Se registrará el MTTR y no podrá deshacerse.</span>`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#dc2626',
-        cancelButtonColor: '#334155',
+        cancelButtonColor: 'var(--theme-surface-overlay)',
         confirmButtonText: 'Sí, cerrar caso',
         cancelButtonText: 'Cancelar',
-        background: '#1e293b',
-        color: '#e2e8f0',
+        background: 'var(--theme-surface-raised)',
+        color: 'var(--theme-fg-emphasis)',
     });
 
     if (!result.isConfirmed) return;
@@ -420,8 +420,8 @@ async function resolveIncident() {
                 text: 'El caso fue cerrado oficialmente. Serás redirigido a la mesa.',
                 icon: 'success',
                 confirmButtonColor: '#16a34a',
-                background: '#1e293b',
-                color: '#e2e8f0',
+                background: 'var(--theme-surface-raised)',
+                color: 'var(--theme-fg-emphasis)',
                 timer: 2500,
                 timerProgressBar: true,
             });
@@ -432,8 +432,8 @@ async function resolveIncident() {
                 text: data.error || 'No se pudo cerrar el incidente.',
                 icon: 'error',
                 confirmButtonColor: '#3b82f6',
-                background: '#1e293b',
-                color: '#e2e8f0',
+                background: 'var(--theme-surface-raised)',
+                color: 'var(--theme-fg-emphasis)',
             });
             btn.disabled = false;
             btn.textContent = 'Confirmar Resolución y Cerrar Caso';
@@ -444,8 +444,8 @@ async function resolveIncident() {
             text: 'No se pudo conectar. Intentá nuevamente.',
             icon: 'error',
             confirmButtonColor: '#3b82f6',
-            background: '#1e293b',
-            color: '#e2e8f0',
+            background: 'var(--theme-surface-raised)',
+            color: 'var(--theme-fg-emphasis)',
         });
         btn.disabled = false;
         btn.textContent = 'Confirmar Resolución y Cerrar Caso';

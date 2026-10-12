@@ -284,8 +284,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     text: data.message || '',
                     icon: data.status === 'connected' ? 'success' : 'error',
                     confirmButtonColor: '#3b82f6',
-                    background: '#1e293b',
-                    color: '#e2e8f0',
+                    background: 'var(--theme-surface-raised)',
+                    color: 'var(--theme-fg-emphasis)',
                 });
             })
             .then(function () { window.location.reload(); })
@@ -297,8 +297,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     text: 'No se pudo completar la sincronización.',
                     icon: 'error',
                     confirmButtonColor: '#3b82f6',
-                    background: '#1e293b',
-                    color: '#e2e8f0',
+                    background: 'var(--theme-surface-raised)',
+                    color: 'var(--theme-fg-emphasis)',
                 });
             });
     }
@@ -319,15 +319,15 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.addEventListener('click', async function () {
             const result = await Swal.fire({
                 title: '¿Resetear el checkpoint completo?',
-                html: 'Vuelve a traer TODO desde que se creó el conector — incluidas las alertas que ya se guardaron antes.<br><span style="font-size:0.8rem;color:#f87171;">Puede duplicarlas: no hay control de duplicados contra lo ya guardado.</span><br><span style="font-size:0.8rem;color:#94a3b8;">Usalo solo si el checkpoint quedó "atascado" — para el uso normal, usá "Sincronizar ahora".</span>',
+                html: 'Vuelve a traer TODO desde que se creó el conector — incluidas las alertas que ya se guardaron antes.<br><span style="font-size:0.8rem;color:#f87171;">Puede duplicarlas: no hay control de duplicados contra lo ya guardado.</span><br><span style="font-size:0.8rem;color:var(--theme-fg-muted);">Usalo solo si el checkpoint quedó "atascado" — para el uso normal, usá "Sincronizar ahora".</span>',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#dc2626',
-                cancelButtonColor: '#334155',
+                cancelButtonColor: 'var(--theme-surface-overlay)',
                 confirmButtonText: 'Sí, resetear y traer todo',
                 cancelButtonText: 'Cancelar',
-                background: '#1e293b',
-                color: '#e2e8f0',
+                background: 'var(--theme-surface-raised)',
+                color: 'var(--theme-fg-emphasis)',
             });
             if (!result.isConfirmed) return;
 
@@ -343,15 +343,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const result = await Swal.fire({
                 title: '¿Eliminar conector?',
-                html: `Se va a eliminar <strong>"${name}"</strong> permanentemente.<br><span style="font-size:0.8rem;color:#94a3b8;">Esta acción no se puede deshacer.</span>`,
+                html: `Se va a eliminar <strong>"${name}"</strong> permanentemente.<br><span style="font-size:0.8rem;color:var(--theme-fg-muted);">Esta acción no se puede deshacer.</span>`,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#dc2626',
-                cancelButtonColor: '#334155',
+                cancelButtonColor: 'var(--theme-surface-overlay)',
                 confirmButtonText: 'Sí, eliminar',
                 cancelButtonText: 'Cancelar',
-                background: '#1e293b',
-                color: '#e2e8f0',
+                background: 'var(--theme-surface-raised)',
+                color: 'var(--theme-fg-emphasis)',
             });
             if (!result.isConfirmed) return;
 

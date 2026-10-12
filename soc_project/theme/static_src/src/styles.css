@@ -70,5 +70,12 @@
   }
 }
 
+/* SweetAlert2 fija el texto del botón cancelar en blanco; su fondo usa
+   var(--theme-surface-overlay), así que el texto tiene que seguir al tema.
+   Fuera de @layer y con dos clases para ganarle al CSS de la librería. */
+.swal2-popup .swal2-cancel {
+  color: var(--theme-fg-strong);
+}
+
 /* Clases usadas dinámicamente que el scanner no siempre detecta */
 @source inline("bg-red-500 hover:bg-red-600 bg-red-600 hover:bg-red-500 text-red-400 border-red-500/20 border-red-500/25 border-red-500/30 bg-red-500/5 bg-red-500/10 bg-red-500/15");

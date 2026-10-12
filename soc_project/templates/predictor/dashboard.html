@@ -309,8 +309,8 @@
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    Chart.defaults.color = '#94a3b8';
-    Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.5)';
+    Chart.defaults.color = themeColor('fg-muted');
+    Chart.defaults.borderColor = themeColor('line', 0.5);
 
     const classLabels    = {{ class_labels_json|safe }};
     const classData      = {{ class_data_json|safe }};
@@ -361,7 +361,7 @@
         if (l === 'critical' || l === 'crítica') return 'rgba(239, 68, 68, 0.85)';
         if (l === 'high'     || l === 'alta')    return 'rgba(249, 115, 22, 0.85)';
         if (l === 'medium'   || l === 'media')   return 'rgba(245, 158, 11, 0.85)';
-        return 'rgba(100, 116, 139, 0.75)';
+        return themeColor('fg-subtle', 0.75);
     }
 
     // Bar — class distribution
@@ -390,7 +390,7 @@
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { display: false } },
-                y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } }
+                y: { grid: { color: themeColor('line', 0.5) }, beginAtZero: true, ticks: { precision: 0 } }
             }
         }
     }));
@@ -415,7 +415,7 @@
             onClick: onChartClick(i => goTo(alertListUrl, { mitre_tactic: tacticLabels[i] })),
             plugins: { legend: { display: false } },
             scales: {
-                x: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } },
+                x: { grid: { color: themeColor('line', 0.5) }, beginAtZero: true, ticks: { precision: 0 } },
                 y: { grid: { display: false } }
             }
         }
@@ -430,7 +430,7 @@
                 data: severityData,
                 backgroundColor: severityLabels.map(severityColor),
                 borderWidth: 2,
-                borderColor: '#1e293b'
+                borderColor: themeColor('surface-raised')
             }]
         },
         options: {
@@ -466,7 +466,7 @@
             onClick: onChartClick(i => goTo(alertListUrl, { kill_chain_stage: killchainLabels[i] })),
             plugins: { legend: { display: false } },
             scales: {
-                x: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } },
+                x: { grid: { color: themeColor('line', 0.5) }, beginAtZero: true, ticks: { precision: 0 } },
                 y: { grid: { display: false } }
             }
         }
@@ -495,7 +495,7 @@
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { display: false } },
-                y: { grid: { color: 'rgba(51, 65, 85, 0.5)' }, beginAtZero: true, ticks: { precision: 0 } }
+                y: { grid: { color: themeColor('line', 0.5) }, beginAtZero: true, ticks: { precision: 0 } }
             }
         }
     }));
@@ -512,7 +512,7 @@
                     'rgba(16, 185, 129, 0.85)'
                 ],
                 borderWidth: 2,
-                borderColor: '#1e293b'
+                borderColor: themeColor('surface-raised')
             }]
         },
         options: {

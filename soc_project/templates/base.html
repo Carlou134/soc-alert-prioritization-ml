@@ -11,6 +11,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
     <style>body { font-family: 'Inter', sans-serif; }</style>
+    <script>
+        // Color de un token del tema activo (ver theme/static_src/src/styles.css).
+        // Para <canvas> (Chart.js), que no entiende var(); alpha opcional entre 0 y 1.
+        window.themeColor = function (name, alpha) {
+            var value = getComputedStyle(document.documentElement).getPropertyValue('--theme-' + name).trim();
+            return alpha === undefined ? value : value.replace(/\)$/, ' / ' + alpha + ')');
+        };
+    </script>
 </head>
 <body class="bg-surface text-fg min-h-screen">
     {% if user.is_authenticated %}
