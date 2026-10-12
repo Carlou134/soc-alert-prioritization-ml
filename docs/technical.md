@@ -47,8 +47,9 @@ Templates use role-based classes (`bg-surface-raised`, `text-fg-muted`, `border-
 - `data-theme="dark"` on any element creates a dark island inside a light page. The SOAR terminal in `incident_detail.html` uses it on purpose and keeps fixed `slate` classes, because it imitates a console.
 - `theme/static/css/dist/styles.css` is committed: rebuild Tailwind whenever classes or tokens change, and commit the result alongside.
 
-**Password strength validation is deliberately off in the MVP (`AUTH_PASSWORD_VALIDATORS = []`).**
-Registration, admin user creation and the profile password change currently accept any password. Enabling Django's four default validators is a six-line config change, but it changes which passwords the registration and user-creation flows accept, and that would invalidate test cases of the running TP2 test cycles. Deferred to after test cycle 2 (week 12); restore the weak-password test removed from `accounts/tests/test_password_change.py` when enabling it. Existing and migration-seeded passwords are unaffected — validators only run when a password is set.
+**Password strength: Django's four default validators, enforced in every flow that sets a password.**
+`AUTH_PASSWORD_VALIDATORS` was an empty list until it was enabled in the middle of the TP2 test cycles. Validators only run when a password is *set* (web registration, admin user creation, profile password change); login only compares hashes. So existing and migration-seeded accounts keep working even with weak passwords, and no data migration is involved.
+*Gotcha:* `User.objects.create_user()` does **not** run the validators — only Django's forms do. The API registration (`RegisterAPIView`) calls `validate_password()` explicitly for that reason; any new code path that creates users or sets passwords outside a Django form has to do the same.
 
 ## Dependencies and why
 

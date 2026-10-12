@@ -1,5 +1,7 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -30,6 +32,16 @@ class RegisterAPIView(APIView):
         if User.objects.filter(email=email).exists():
             return Response(
                 {'detail': 'El email ya existe.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # create_user() no corre AUTH_PASSWORD_VALIDATORS (los formularios web sí):
+        # sin esto, la API aceptaría contraseñas que el registro web rechaza.
+        try:
+            validate_password(password, user=User(username=username, email=email))
+        except ValidationError as exc:
+            return Response(
+                {'detail': ' '.join(exc.messages)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

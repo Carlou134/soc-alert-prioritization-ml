@@ -85,7 +85,14 @@ else:
         }
     }
 
-AUTH_PASSWORD_VALIDATORS = []
+# Solo se aplican al asignar una contraseña (registro, alta por admin, cambio);
+# el login no valida fortaleza, así que las cuentas existentes no se ven afectadas.
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
 
 LANGUAGE_CODE = 'es-pe'
 TIME_ZONE = 'America/Lima'
