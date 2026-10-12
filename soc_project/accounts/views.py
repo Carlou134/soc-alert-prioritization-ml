@@ -6,7 +6,14 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .decorators import admin_required
-from .forms import AdminCreateUserForm, ProfileForm, ProfilePasswordForm, RegisterForm, UserRoleForm
+from .forms import (
+    AdminCreateUserForm,
+    ProfileForm,
+    ProfilePasswordForm,
+    RegisterForm,
+    ThemeForm,
+    UserRoleForm,
+)
 from .models import (
     ACTION_LABELS,
     ACTION_PASSWORD_CHANGED,
@@ -216,27 +223,35 @@ def user_edit_view(request, user_id):
 
 # ── Configuración de la cuenta ────────────────────────────────────────────────
 
+def _render_settings(request, **forms):
+    """Renderiza la página de configuración. Cada vista pasa solo el formulario
+    que procesó (con sus errores); los demás se construyen limpios."""
+    context = {
+        'form': forms.get('form') or ProfileForm(instance=request.user),
+        'password_form': forms.get('password_form') or ProfilePasswordForm(user=request.user),
+        'theme_form': forms.get('theme_form') or ThemeForm(instance=request.user.profile),
+    }
+    return render(request, 'accounts/profile_edit.html', context)
+
+
 @login_required
 def profile_edit_view(request):
-    if request.method == 'POST':
-        form = ProfileForm(request.POST, instance=request.user)
-        if form.is_valid():
-            if form.has_changed():
-                form.save()
-                log_action(
-                    request.user,
-                    ACTION_PROFILE_UPDATED,
-                    f'{request.user.username} actualizó su perfil ({", ".join(form.changed_data)}).',
-                )
-            messages.success(request, 'Perfil actualizado correctamente.')
-            return redirect('profile_edit')
-    else:
-        form = ProfileForm(instance=request.user)
+    if request.method != 'POST':
+        return _render_settings(request)
 
-    return render(request, 'accounts/profile_edit.html', {
-        'form': form,
-        'password_form': ProfilePasswordForm(user=request.user),
-    })
+    form = ProfileForm(request.POST, instance=request.user)
+    if form.is_valid():
+        if form.has_changed():
+            form.save()
+            log_action(
+                request.user,
+                ACTION_PROFILE_UPDATED,
+                f'{request.user.username} actualizó su perfil ({", ".join(form.changed_data)}).',
+            )
+        messages.success(request, 'Perfil actualizado correctamente.')
+        return redirect('profile_edit')
+
+    return _render_settings(request, form=form)
 
 
 @login_required
@@ -254,10 +269,22 @@ def password_change_view(request):
         messages.success(request, 'Contraseña actualizada correctamente.')
         return redirect('profile_edit')
 
-    return render(request, 'accounts/profile_edit.html', {
-        'form': ProfileForm(instance=request.user),
-        'password_form': password_form,
-    })
+    return _render_settings(request, password_form=password_form)
+
+
+@login_required
+def theme_update_view(request):
+    # Igual que la contraseña: el formulario vive en la página de perfil.
+    if request.method != 'POST':
+        return redirect('profile_edit')
+
+    theme_form = ThemeForm(request.POST, instance=request.user.profile)
+    if theme_form.is_valid():
+        theme_form.save()
+        messages.success(request, 'Tema actualizado correctamente.')
+        return redirect('profile_edit')
+
+    return _render_settings(request, theme_form=theme_form)
 
 
 # ── Auditoría ─────────────────────────────────────────────────────────────────

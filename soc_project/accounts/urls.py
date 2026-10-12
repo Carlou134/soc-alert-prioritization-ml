@@ -7,6 +7,7 @@ from .views import (
     password_change_view,
     profile_edit_view,
     register_view,
+    theme_update_view,
     user_create_view,
     user_edit_view,
     user_list_view,
@@ -23,6 +24,7 @@ urlpatterns = [
     # Configuración de la cuenta (cualquier usuario autenticado)
     path('settings/profile/', profile_edit_view, name='profile_edit'),
     path('settings/password/', password_change_view, name='password_change'),
+    path('settings/theme/', theme_update_view, name='theme_update'),
     # Auditoría
     path('audit/', audit_list_view, name='audit_list'),
 ]

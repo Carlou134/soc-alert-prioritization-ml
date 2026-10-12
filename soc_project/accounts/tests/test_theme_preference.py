@@ -79,3 +79,79 @@ def test_invalid_stored_theme_falls_back_to_dark(make_user):
     resp = client.get('/settings/profile/')
 
     assert b'<html lang="es" data-theme="dark">' in resp.content
+
+
+# ── Selector de tema en Configuración ────────────────────────────────────────
+
+THEME_URL = '/settings/theme/'
+
+
+@pytest.mark.django_db
+def test_anonymous_cannot_change_theme():
+    resp = Client().post(THEME_URL, data={'theme': 'light'})
+    assert resp.status_code == 302
+    assert '/login/' in resp.url
+
+
+@pytest.mark.django_db
+def test_profile_page_includes_theme_form_with_current_value(make_user):
+    user = make_user('ve_selector')
+    client = Client()
+    client.force_login(user)
+
+    resp = client.get('/settings/profile/')
+
+    assert resp.context['theme_form'].initial['theme'] == 'dark'
+    assert b'data-testid="theme-form"' in resp.content
+
+
+@pytest.mark.django_db
+def test_user_switches_to_light_and_page_renders_light(make_user):
+    user = make_user('cambia_tema')
+    client = Client()
+    client.force_login(user)
+
+    resp = client.post(THEME_URL, data={'theme': 'light'}, follow=True)
+
+    user.profile.refresh_from_db()
+    assert user.profile.theme == 'light'
+    assert resp.redirect_chain[-1][0] == '/settings/profile/'
+    assert b'<html lang="es" data-theme="light">' in resp.content
+
+
+@pytest.mark.django_db
+def test_invalid_theme_is_rejected(make_user):
+    user = make_user('tema_invalido')
+    client = Client()
+    client.force_login(user)
+
+    resp = client.post(THEME_URL, data={'theme': 'neon'})
+
+    assert resp.status_code == 200
+    assert 'theme' in resp.context['theme_form'].errors
+    user.profile.refresh_from_db()
+    assert user.profile.theme == 'dark'
+
+
+@pytest.mark.django_db
+def test_get_on_theme_url_redirects_to_profile(make_user):
+    client = Client()
+    client.force_login(make_user('get_tema'))
+
+    resp = client.get(THEME_URL)
+
+    assert resp.status_code == 302
+    assert resp.url == '/settings/profile/'
+
+
+@pytest.mark.django_db
+def test_theme_post_cannot_change_role(make_user):
+    user = make_user('tema_y_rol')
+    client = Client()
+    client.force_login(user)
+
+    client.post(THEME_URL, data={'theme': 'light', 'role': 'admin'})
+
+    user.profile.refresh_from_db()
+    assert user.profile.theme == 'light'
+    assert user.profile.role == 'analyst_n1'

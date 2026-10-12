@@ -129,6 +129,17 @@ class ProfilePasswordForm(PasswordChangeForm):
             })
 
 
+class ThemeForm(forms.ModelForm):
+    """Preferencia de tema. Solo expone `theme`: el rol vive en el mismo modelo
+    y no debe poder tocarse desde aquí."""
+
+    class Meta:
+        model = UserProfile
+        fields = ['theme']
+        labels = {'theme': 'Tema'}
+        widgets = {'theme': forms.RadioSelect}
+
+
 class UserRoleForm(forms.Form):
     role = forms.ChoiceField(
         choices=UserProfile.ROLE_CHOICES,
