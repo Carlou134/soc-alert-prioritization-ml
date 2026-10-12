@@ -6,16 +6,16 @@
 <div class="space-y-6 max-w-4xl">
 
     <div>
-        <h1 class="text-lg font-semibold text-white">Predicción por JSON</h1>
-        <p class="text-sm text-slate-400 mt-0.5">Pega un JSON con los campos del evento SOC para obtener una predicción.</p>
+        <h1 class="text-lg font-semibold text-fg-strong">Predicción por JSON</h1>
+        <p class="text-sm text-fg-muted mt-0.5">Pega un JSON con los campos del evento SOC para obtener una predicción.</p>
     </div>
 
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
+    <div class="bg-surface-raised border border-line rounded-lg p-6">
         <form method="post" class="space-y-4" data-testid="predict-json-form">
             {% csrf_token %}
             {% for field in form %}
             <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1.5">{{ field.label }}</label>
+                <label class="block text-xs font-medium text-fg-muted mb-1.5">{{ field.label }}</label>
                 {{ field }}
                 {% if field.errors %}
                 <p class="text-red-400 text-xs mt-1">{{ field.errors|striptags }}</p>
@@ -33,11 +33,11 @@
     </div>
 
     {% if result %}
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 {% if result == 'malicioso' %}border-l-4 border-l-red-500{% elif result == 'a_investigar' %}border-l-4 border-l-amber-500{% else %}border-l-4 border-l-emerald-500{% endif %}" data-testid="predict-json-result">
-        <p class="text-xs text-slate-400 uppercase tracking-wide mb-3">Resultado de predicción</p>
+    <div class="bg-surface-raised border border-line rounded-lg p-6 {% if result == 'malicioso' %}border-l-4 border-l-red-500{% elif result == 'a_investigar' %}border-l-4 border-l-amber-500{% else %}border-l-4 border-l-emerald-500{% endif %}" data-testid="predict-json-result">
+        <p class="text-xs text-fg-muted uppercase tracking-wide mb-3">Resultado de predicción</p>
 
         <div class="flex items-center gap-3 mb-5">
-            <span class="text-sm text-slate-300">Clase predicha:</span>
+            <span class="text-sm text-fg">Clase predicha:</span>
             {% if result == 'benigno' %}
                 <span class="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" data-testid="predict-json-result-class">{{ result }}</span>
             {% elif result == 'a_investigar' %}
@@ -47,12 +47,12 @@
             {% endif %}
         </div>
 
-        <p class="text-xs text-slate-400 uppercase tracking-wide mb-3">Probabilidades</p>
+        <p class="text-xs text-fg-muted uppercase tracking-wide mb-3">Probabilidades</p>
         <div class="space-y-2">
             {% for key, value in probabilities.items %}
-            <div class="flex items-center justify-between border-b border-slate-700 pb-2 last:border-0 last:pb-0">
-                <span class="text-sm text-slate-300">{{ key }}</span>
-                <span class="text-sm font-mono text-slate-400">{{ value|floatformat:4 }}</span>
+            <div class="flex items-center justify-between border-b border-line pb-2 last:border-0 last:pb-0">
+                <span class="text-sm text-fg">{{ key }}</span>
+                <span class="text-sm font-mono text-fg-muted">{{ value|floatformat:4 }}</span>
             </div>
             {% endfor %}
         </div>

@@ -142,10 +142,10 @@ def _map_ctx(detected_cols, filename, missing_required, missing_optional, missin
         {
             'rows':           disp_rows,
             'title':          'Columnas de visualización — solo para la tabla de alertas, no afectan la predicción',
-            'header_class':   'bg-slate-700/40 border-slate-600',
-            'dot_class':      'bg-slate-400',
-            'title_class':    'text-slate-400',
-            'col_name_class': 'text-slate-400',
+            'header_class':   'bg-surface-overlay/40 border-line-strong',
+            'dot_class':      'bg-fg-muted',
+            'title_class':    'text-fg-muted',
+            'col_name_class': 'text-fg-muted',
         },
     ]
 

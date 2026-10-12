@@ -6,21 +6,21 @@
 <div class="space-y-6 max-w-3xl">
 
     <div>
-        <h1 class="text-lg font-semibold text-white">Subir Alertas</h1>
-        <p class="text-sm text-slate-400 mt-0.5">
-            Carga un archivo <span class="font-mono text-slate-300">.json</span> o <span class="font-mono text-slate-300">.csv</span> con alertas SOC para procesarlas automáticamente.
+        <h1 class="text-lg font-semibold text-fg-strong">Subir Alertas</h1>
+        <p class="text-sm text-fg-muted mt-0.5">
+            Carga un archivo <span class="font-mono text-fg">.json</span> o <span class="font-mono text-fg">.csv</span> con alertas SOC para procesarlas automáticamente.
         </p>
     </div>
 
     <!-- Formulario -->
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
+    <div class="bg-surface-raised border border-line rounded-lg p-6">
         <form id="upload-form" enctype="multipart/form-data" class="space-y-5" data-testid="upload-form">
             {% csrf_token %}
             <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1.5">Archivo de alertas</label>
+                <label class="block text-xs font-medium text-fg-muted mb-1.5">Archivo de alertas</label>
                 <input type="file" name="file" id="file-input" data-testid="upload-file-input" accept=".json,.csv"
-                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:bg-slate-600 file:border-0 file:text-slate-300 file:rounded file:px-3 file:py-1 file:mr-3 file:text-xs">
-                <p class="text-slate-500 text-xs mt-1.5">Formatos: .json, .csv — Máximo 10 MB</p>
+                    class="w-full bg-surface-overlay border border-line-strong text-fg rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:bg-surface-strong file:border-0 file:text-fg file:rounded file:px-3 file:py-1 file:mr-3 file:text-xs">
+                <p class="text-fg-subtle text-xs mt-1.5">Formatos: .json, .csv — Máximo 10 MB</p>
             </div>
             <button type="submit" id="submit-btn" data-testid="upload-submit"
                 class="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
@@ -35,13 +35,13 @@
     </div>
 
     <!-- Loading (parseo/limpieza síncronos, rápido) -->
-    <div id="loading-box" class="hidden bg-slate-800 border border-slate-700 rounded-lg px-5 py-4">
+    <div id="loading-box" class="hidden bg-surface-raised border border-line rounded-lg px-5 py-4">
         <div class="flex items-center gap-3">
             <svg class="animate-spin h-4 w-4 text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
-            <p class="text-sm text-slate-300">Analizando archivo...</p>
+            <p class="text-sm text-fg">Analizando archivo...</p>
         </div>
     </div>
 
@@ -49,12 +49,12 @@
     <div id="results-section" class="hidden space-y-5">
 
         <!-- Resumen -->
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-            <p class="text-xs text-slate-400 uppercase tracking-wide mb-4">Resumen</p>
+        <div class="bg-surface-raised border border-line rounded-lg p-5">
+            <p class="text-xs text-fg-muted uppercase tracking-wide mb-4">Resumen</p>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 text-center">
-                    <p id="stat-total" data-testid="upload-stat-total" class="text-2xl font-bold font-mono text-white">—</p>
-                    <p class="text-xs text-slate-400 mt-1">Total</p>
+                <div class="bg-surface-overlay/50 border border-line-strong rounded-lg p-4 text-center">
+                    <p id="stat-total" data-testid="upload-stat-total" class="text-2xl font-bold font-mono text-fg-strong">—</p>
+                    <p class="text-xs text-fg-muted mt-1">Total</p>
                 </div>
                 <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 text-center">
                     <p id="stat-saved" data-testid="upload-stat-saved" class="text-2xl font-bold font-mono text-emerald-500">—</p>
@@ -65,7 +65,7 @@
                     <p class="text-xs text-red-400 mt-1">Fallidas</p>
                 </div>
             </div>
-            <p id="stat-cleanup" class="text-xs text-slate-500 mt-3"></p>
+            <p id="stat-cleanup" class="text-xs text-fg-subtle mt-3"></p>
         </div>
 
         <!-- Progreso de guardado en segundo plano (Track 5) -->
@@ -76,7 +76,7 @@
             <div class="flex-1 flex items-center justify-between gap-3">
                 <div>
                     <p id="save-title" class="text-sm font-semibold text-blue-400">Guardando alertas en el sistema…</p>
-                    <p id="save-detail" class="text-xs text-slate-400 mt-0.5">
+                    <p id="save-detail" class="text-xs text-fg-muted mt-0.5">
                         Corre en segundo plano — puedes navegar sin perder los datos.
                     </p>
                 </div>

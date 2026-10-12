@@ -7,14 +7,14 @@
 
     <!-- ── Encabezado ─────────────────────────────────────────────────────── -->
     <div>
-        <h1 class="text-lg font-semibold text-white">Pipeline de Normalización</h1>
-        <p class="text-sm text-slate-400 mt-0.5">
+        <h1 class="text-lg font-semibold text-fg-strong">Pipeline de Normalización</h1>
+        <p class="text-sm text-fg-muted mt-0.5">
             Carga, valida, limpia y exporta datasets listos para el modelo ML.
         </p>
     </div>
 
     <!-- ── Indicador de pasos ─────────────────────────────────────────────── -->
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+    <div class="bg-surface-raised border border-line rounded-lg p-4">
         <ol class="flex items-center gap-0">
 
             {% with steps="upload,map,normalize,preview" %}
@@ -34,7 +34,7 @@
                         Cargar
                     </span>
                 </div>
-                <div class="flex-1 mx-3 h-px {% if stage != 'upload' %}bg-emerald-500/40{% else %}bg-slate-600{% endif %}"></div>
+                <div class="flex-1 mx-3 h-px {% if stage != 'upload' %}bg-emerald-500/40{% else %}bg-surface-strong{% endif %}"></div>
             </li>
 
             <!-- Paso 2: Mapeo -->
@@ -43,7 +43,7 @@
                     <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0
                         {% if stage == 'map' %}bg-blue-500/20 border border-blue-500 text-blue-400
                         {% elif stage == 'normalize' or stage == 'preview' %}bg-emerald-500/20 border border-emerald-500 text-emerald-400
-                        {% else %}bg-slate-700 border border-slate-600 text-slate-500{% endif %}">
+                        {% else %}bg-surface-overlay border border-line-strong text-fg-subtle{% endif %}">
                         {% if stage == 'normalize' or stage == 'preview' %}
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
                         {% else %}2{% endif %}
@@ -51,11 +51,11 @@
                     <span class="text-xs font-medium hidden sm:block
                         {% if stage == 'map' %}text-blue-400
                         {% elif stage == 'normalize' or stage == 'preview' %}text-emerald-400
-                        {% else %}text-slate-500{% endif %}">
+                        {% else %}text-fg-subtle{% endif %}">
                         Mapeo
                     </span>
                 </div>
-                <div class="flex-1 mx-3 h-px {% if stage == 'normalize' or stage == 'preview' %}bg-emerald-500/40{% else %}bg-slate-600{% endif %}"></div>
+                <div class="flex-1 mx-3 h-px {% if stage == 'normalize' or stage == 'preview' %}bg-emerald-500/40{% else %}bg-surface-strong{% endif %}"></div>
             </li>
 
             <!-- Paso 3: Normalizar -->
@@ -64,7 +64,7 @@
                     <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0
                         {% if stage == 'normalize' %}bg-blue-500/20 border border-blue-500 text-blue-400
                         {% elif stage == 'preview' %}bg-emerald-500/20 border border-emerald-500 text-emerald-400
-                        {% else %}bg-slate-700 border border-slate-600 text-slate-500{% endif %}">
+                        {% else %}bg-surface-overlay border border-line-strong text-fg-subtle{% endif %}">
                         {% if stage == 'preview' %}
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
                         {% else %}3{% endif %}
@@ -72,11 +72,11 @@
                     <span class="text-xs font-medium hidden sm:block
                         {% if stage == 'normalize' %}text-blue-400
                         {% elif stage == 'preview' %}text-emerald-400
-                        {% else %}text-slate-500{% endif %}">
+                        {% else %}text-fg-subtle{% endif %}">
                         Normalizar
                     </span>
                 </div>
-                <div class="flex-1 mx-3 h-px {% if stage == 'preview' %}bg-emerald-500/40{% else %}bg-slate-600{% endif %}"></div>
+                <div class="flex-1 mx-3 h-px {% if stage == 'preview' %}bg-emerald-500/40{% else %}bg-surface-strong{% endif %}"></div>
             </li>
 
             <!-- Paso 4: Exportar -->
@@ -84,11 +84,11 @@
                 <div class="flex items-center gap-2">
                     <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0
                         {% if stage == 'preview' %}bg-blue-500/20 border border-blue-500 text-blue-400
-                        {% else %}bg-slate-700 border border-slate-600 text-slate-500{% endif %}">
+                        {% else %}bg-surface-overlay border border-line-strong text-fg-subtle{% endif %}">
                         4
                     </div>
                     <span class="text-xs font-medium hidden sm:block
-                        {% if stage == 'preview' %}text-blue-400{% else %}text-slate-500{% endif %}">
+                        {% if stage == 'preview' %}text-blue-400{% else %}text-fg-subtle{% endif %}">
                         Exportar
                     </span>
                 </div>
@@ -113,30 +113,30 @@
          PASO 1 — CARGAR ARCHIVO
     ══════════════════════════════════════════════════════════════════════════ -->
     {% if stage == 'upload' %}
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-5">
+    <div class="bg-surface-raised border border-line rounded-lg p-6 space-y-5">
         <div>
-            <h2 class="text-sm font-semibold text-white">Cargar Dataset</h2>
-            <p class="text-xs text-slate-400 mt-0.5">
-                Sube un archivo <span class="font-mono text-slate-300">.csv</span> o
-                <span class="font-mono text-slate-300">.json</span> con los datos de alertas SOC.
+            <h2 class="text-sm font-semibold text-fg-strong">Cargar Dataset</h2>
+            <p class="text-xs text-fg-muted mt-0.5">
+                Sube un archivo <span class="font-mono text-fg">.csv</span> o
+                <span class="font-mono text-fg">.json</span> con los datos de alertas SOC.
             </p>
         </div>
 
         <form method="post" action="{% url 'pipeline_upload' %}" enctype="multipart/form-data" class="space-y-5" data-testid="pipeline-upload-form">
             {% csrf_token %}
             <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1.5">Archivo de datos</label>
+                <label class="block text-xs font-medium text-fg-muted mb-1.5">Archivo de datos</label>
                 <input type="file" name="file" accept=".json,.csv" required data-testid="pipeline-upload-file-input"
-                    class="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                           file:bg-slate-600 file:border-0 file:text-slate-300 file:rounded file:px-3 file:py-1 file:mr-3 file:text-xs cursor-pointer">
-                <p class="text-slate-500 text-xs mt-1.5">Formatos: .csv, .json — Máximo 10 MB</p>
+                    class="w-full bg-surface-overlay border border-line-strong text-fg rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                           file:bg-surface-strong file:border-0 file:text-fg file:rounded file:px-3 file:py-1 file:mr-3 file:text-xs cursor-pointer">
+                <p class="text-fg-subtle text-xs mt-1.5">Formatos: .csv, .json — Máximo 10 MB</p>
             </div>
 
             <div>
-                <p class="text-xs font-medium text-slate-400 mb-2">Columnas requeridas por el modelo ML:</p>
+                <p class="text-xs font-medium text-fg-muted mb-2">Columnas requeridas por el modelo ML:</p>
                 <div class="flex flex-wrap gap-1.5">
                     {% for col in required_cols %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-700/80 border border-slate-600 text-slate-300">{{ col }}</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-surface-overlay/80 border border-line-strong text-fg">{{ col }}</span>
                     {% endfor %}
                 </div>
             </div>
@@ -160,19 +160,19 @@
     <div class="space-y-4">
 
         <!-- Resumen -->
-        <div class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 flex items-start gap-3">
+        <div class="bg-surface-raised border border-line rounded-lg px-4 py-3 flex items-start gap-3">
             <svg class="w-4 h-4 text-blue-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>
             </svg>
             <div>
-                <p class="text-sm font-semibold text-white">
-                    Mapeo de columnas — <span class="font-mono text-slate-300">{{ filename }}</span>
+                <p class="text-sm font-semibold text-fg-strong">
+                    Mapeo de columnas — <span class="font-mono text-fg">{{ filename }}</span>
                 </p>
-                <p class="text-xs text-slate-400 mt-0.5">
-                    <strong class="text-white">{{ detected_cols|length }}</strong> columnas detectadas.
+                <p class="text-xs text-fg-muted mt-0.5">
+                    <strong class="text-fg-strong">{{ detected_cols|length }}</strong> columnas detectadas.
                     {% if required_rows %}<span class="text-red-400 ml-2"><strong>{{ required_rows|length }}</strong> requeridas faltantes.</span>{% endif %}
                     {% if optional_rows %}<span class="text-amber-400 ml-2">{{ optional_rows|length }} opcionales no encontradas.</span>{% endif %}
-                    {% if display_rows %}<span class="text-slate-400 ml-2">{{ display_rows|length }} de visualización no encontradas.</span>{% endif %}
+                    {% if display_rows %}<span class="text-fg-muted ml-2">{{ display_rows|length }} de visualización no encontradas.</span>{% endif %}
                 </p>
             </div>
         </div>
@@ -186,7 +186,7 @@
                 <span class="font-mono font-semibold text-amber-300">{{ col }}</span>
                 <span>← <span class="font-mono">{{ info.source }}</span> — se esperaba un número, valores inválidos encontrados:</span>
                 {% for row_num, val in info.bad_samples %}
-                <span class="inline-block font-mono bg-slate-700 px-1.5 py-0.5 rounded text-slate-300">fila {{ row_num }}: "{{ val }}"</span>
+                <span class="inline-block font-mono bg-surface-overlay px-1.5 py-0.5 rounded text-fg">fila {{ row_num }}: "{{ val }}"</span>
                 {% endfor %}
             </div>
             {% endfor %}
@@ -195,11 +195,11 @@
         {% endif %}
 
         <!-- Columnas detectadas -->
-        <div class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-3">
-            <p class="text-xs font-medium text-slate-400 mb-2">Columnas detectadas en el archivo:</p>
+        <div class="bg-surface-raised border border-line rounded-lg px-4 py-3">
+            <p class="text-xs font-medium text-fg-muted mb-2">Columnas detectadas en el archivo:</p>
             <div class="flex flex-wrap gap-1.5">
                 {% for col in detected_cols %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-700 border border-slate-600 text-slate-300">{{ col }}</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-surface-overlay border border-line-strong text-fg">{{ col }}</span>
                 {% endfor %}
             </div>
         </div>
@@ -211,7 +211,7 @@
             <!-- Macro: tabla de columnas reutilizable -->
             {% for section in sections %}
             {% if section.rows %}
-            <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+            <div class="bg-surface-raised border border-line rounded-lg overflow-hidden">
                 <div class="px-4 py-2.5 border-b {{ section.header_class }} flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full {{ section.dot_class }} shrink-0"></span>
                     <p class="text-xs font-semibold {{ section.title_class }} uppercase tracking-wide">{{ section.title }}</p>
@@ -219,16 +219,16 @@
                 <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm min-w-150">
                     <thead>
-                        <tr class="bg-slate-900 border-b border-slate-700">
-                            <th class="px-4 py-2.5 text-xs font-medium text-slate-400 w-44">Campo</th>
-                            <th class="px-4 py-2.5 text-xs font-medium text-slate-400">Descripción y ejemplo</th>
-                            <th class="px-4 py-2.5 text-xs font-medium text-slate-400 w-16">Tipo</th>
-                            <th class="px-4 py-2.5 text-xs font-medium text-slate-400 w-56">Columna en tu archivo</th>
+                        <tr class="bg-surface border-b border-line">
+                            <th class="px-4 py-2.5 text-xs font-medium text-fg-muted w-44">Campo</th>
+                            <th class="px-4 py-2.5 text-xs font-medium text-fg-muted">Descripción y ejemplo</th>
+                            <th class="px-4 py-2.5 text-xs font-medium text-fg-muted w-16">Tipo</th>
+                            <th class="px-4 py-2.5 text-xs font-medium text-fg-muted w-56">Columna en tu archivo</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for row in section.rows %}
-                        <tr class="border-b border-slate-800 hover:bg-slate-800/40{% if row.warning %} bg-amber-500/5{% endif %}">
+                        <tr class="border-b border-line-subtle hover:bg-surface-raised/40{% if row.warning %} bg-amber-500/5{% endif %}">
                             <td class="px-4 py-3 align-top">
                                 <span class="text-xs font-mono font-semibold {{ section.col_name_class }}">{{ row.name }}</span>
                                 {% if row.warning %}
@@ -236,8 +236,8 @@
                                 {% endif %}
                             </td>
                             <td class="px-4 py-3 align-top">
-                                <p class="text-xs text-slate-300">{{ row.desc }}</p>
-                                <p class="text-xs text-slate-500 mt-0.5 font-mono">ej: {{ row.example }}</p>
+                                <p class="text-xs text-fg">{{ row.desc }}</p>
+                                <p class="text-xs text-fg-subtle mt-0.5 font-mono">ej: {{ row.example }}</p>
                             </td>
                             <td class="px-4 py-3 align-top">
                                 <span class="text-xs font-mono {% if row.dtype == 'int' or row.dtype == 'float' %}text-blue-400{% else %}text-emerald-400{% endif %}">
@@ -246,7 +246,7 @@
                             </td>
                             <td class="px-4 py-3 align-top">
                                 <select name="map_{{ row.name }}" data-testid="pipeline-map-select-{{ row.name }}"
-                                    class="bg-slate-700 border border-slate-600 text-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 w-full">
+                                    class="bg-surface-overlay border border-line-strong text-fg rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 w-full">
                                     <option value="__skip__">— Ignorar —</option>
                                     {% for dcol in detected_cols %}
                                     <option value="{{ dcol }}" {% if row.prev_source == dcol %}selected{% endif %}>{{ dcol }}</option>
@@ -278,7 +278,7 @@
                     {% if type_warnings %}Continuar de todas formas{% else %}Aplicar mapeo y continuar{% endif %}
                 </button>
                 <a href="{% url 'pipeline' %}" data-testid="pipeline-map-cancel"
-                    class="inline-flex items-center bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    class="inline-flex items-center bg-surface-overlay hover:bg-surface-strong text-fg px-4 py-2 rounded-md text-sm font-medium transition-colors">
                     Cancelar
                 </a>
             </div>
@@ -294,13 +294,13 @@
     <div class="space-y-4">
 
         <!-- Info -->
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
+        <div class="bg-surface-raised border border-line rounded-lg p-5 space-y-4">
             <div class="flex items-start justify-between">
                 <div>
-                    <h2 class="text-sm font-semibold text-white">Listo para normalizar</h2>
-                    <p class="text-xs text-slate-400 mt-0.5">
-                        Archivo: <span class="font-mono text-slate-300">{{ filename }}</span>
-                        — <strong class="text-white">{{ total_records }}</strong> registros en cola.
+                    <h2 class="text-sm font-semibold text-fg-strong">Listo para normalizar</h2>
+                    <p class="text-xs text-fg-muted mt-0.5">
+                        Archivo: <span class="font-mono text-fg">{{ filename }}</span>
+                        — <strong class="text-fg-strong">{{ total_records }}</strong> registros en cola.
                     </p>
                 </div>
             </div>
@@ -316,20 +316,20 @@
 
             <!-- Operaciones que se aplicarán -->
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                <div class="bg-slate-700/40 border border-slate-600 rounded-md p-3 text-center">
-                    <p class="text-xs text-slate-300 font-medium">Eliminar duplicados</p>
+                <div class="bg-surface-overlay/40 border border-line-strong rounded-md p-3 text-center">
+                    <p class="text-xs text-fg font-medium">Eliminar duplicados</p>
                     <p class="text-emerald-400 text-xs mt-1 font-mono">✓ Activo</p>
                 </div>
-                <div class="bg-slate-700/40 border border-slate-600 rounded-md p-3 text-center">
-                    <p class="text-xs text-slate-300 font-medium">Rellenar nulos</p>
+                <div class="bg-surface-overlay/40 border border-line-strong rounded-md p-3 text-center">
+                    <p class="text-xs text-fg font-medium">Rellenar nulos</p>
                     <p class="text-emerald-400 text-xs mt-1 font-mono">✓ Activo</p>
                 </div>
-                <div class="bg-slate-700/40 border border-slate-600 rounded-md p-3 text-center">
-                    <p class="text-xs text-slate-300 font-medium">Normalizar categorías</p>
+                <div class="bg-surface-overlay/40 border border-line-strong rounded-md p-3 text-center">
+                    <p class="text-xs text-fg font-medium">Normalizar categorías</p>
                     <p class="text-emerald-400 text-xs mt-1 font-mono">✓ Activo</p>
                 </div>
-                <div class="bg-slate-700/40 border border-slate-600 rounded-md p-3 text-center">
-                    <p class="text-xs text-slate-300 font-medium">Validar rangos</p>
+                <div class="bg-surface-overlay/40 border border-line-strong rounded-md p-3 text-center">
+                    <p class="text-xs text-fg font-medium">Validar rangos</p>
                     <p class="text-emerald-400 text-xs mt-1 font-mono">✓ Activo</p>
                 </div>
             </div>
@@ -337,9 +337,9 @@
 
         <!-- Preview datos en bruto -->
         {% if preview_rows %}
-        <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-            <div class="px-5 py-3 border-b border-slate-700 flex items-center justify-between">
-                <p class="text-xs font-medium text-slate-400 uppercase tracking-wide">
+        <div class="bg-surface-raised border border-line rounded-lg overflow-hidden">
+            <div class="px-5 py-3 border-b border-line flex items-center justify-between">
+                <p class="text-xs font-medium text-fg-muted uppercase tracking-wide">
                     Vista previa — primeros {{ preview_rows|length }} registros (sin limpiar)
                 </p>
                 <span class="text-xs text-amber-400 font-medium">Sin procesar</span>
@@ -347,11 +347,11 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs">
                     <thead>
-                        <tr class="border-b border-slate-700 bg-slate-900">
-                            <th class="px-3 py-2.5 font-medium text-slate-500 whitespace-nowrap">#</th>
+                        <tr class="border-b border-line bg-surface">
+                            <th class="px-3 py-2.5 font-medium text-fg-subtle whitespace-nowrap">#</th>
                             {% for col in detected_cols %}
                             <th class="px-3 py-2.5 font-medium whitespace-nowrap
-                                {% if col in missing_cols %}text-amber-400{% else %}text-slate-400{% endif %}">
+                                {% if col in missing_cols %}text-amber-400{% else %}text-fg-muted{% endif %}">
                                 {{ col }}
                             </th>
                             {% endfor %}
@@ -359,12 +359,12 @@
                     </thead>
                     <tbody>
                         {% for row in preview_rows %}
-                        <tr class="border-b border-slate-800 hover:bg-slate-800/40">
-                            <td class="px-3 py-2 font-mono text-slate-600 text-xs">{{ forloop.counter }}</td>
+                        <tr class="border-b border-line-subtle hover:bg-surface-raised/40">
+                            <td class="px-3 py-2 font-mono text-fg-faint text-xs">{{ forloop.counter }}</td>
                             {% for val in row %}
-                            <td class="px-3 py-2 font-mono text-slate-400 whitespace-nowrap max-w-[8rem] truncate" title="{{ val }}">
+                            <td class="px-3 py-2 font-mono text-fg-muted whitespace-nowrap max-w-[8rem] truncate" title="{{ val }}">
                                 {% if val == '' or val == None %}
-                                    <span class="text-slate-600 italic">vacío</span>
+                                    <span class="text-fg-faint italic">vacío</span>
                                 {% else %}
                                     {{ val }}
                                 {% endif %}
@@ -403,7 +403,7 @@
             });
             </script>
             <a href="{% url 'pipeline' %}" data-testid="pipeline-normalize-cancel"
-                class="inline-flex items-center bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                class="inline-flex items-center bg-surface-overlay hover:bg-surface-strong text-fg px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 Cancelar
             </a>
         </div>
@@ -419,9 +419,9 @@
 
         <!-- Estadísticas de limpieza -->
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
-                <p class="text-2xl font-bold font-mono text-white" data-testid="pipeline-stat-total-original">{{ stats.total_original }}</p>
-                <p class="text-xs text-slate-400 mt-1">Originales</p>
+            <div class="bg-surface-raised border border-line rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold font-mono text-fg-strong" data-testid="pipeline-stat-total-original">{{ stats.total_original }}</p>
+                <p class="text-xs text-fg-muted mt-1">Originales</p>
             </div>
             <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 text-center">
                 <p class="text-2xl font-bold font-mono text-amber-400" data-testid="pipeline-stat-duplicates">{{ stats.duplicates_removed }}</p>
@@ -460,7 +460,7 @@
             </svg>
             <div>
                 <p id="pipeline-save-title" class="text-sm font-semibold text-blue-400">Guardando alertas en el sistema…</p>
-                <p id="pipeline-save-detail" class="text-xs text-slate-400 mt-0.5">
+                <p id="pipeline-save-detail" class="text-xs text-fg-muted mt-0.5">
                     Corre en segundo plano — puedes navegar sin perder los datos.
                 </p>
             </div>
@@ -510,10 +510,10 @@
         {% endif %}
 
         <!-- Descargar archivo (opcional) -->
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
+        <div class="bg-surface-raised border border-line rounded-lg p-5 space-y-4">
             <div>
-                <h2 class="text-sm font-semibold text-white">Descargar dataset limpio</h2>
-                <p class="text-xs text-slate-400 mt-0.5">
+                <h2 class="text-sm font-semibold text-fg-strong">Descargar dataset limpio</h2>
+                <p class="text-xs text-fg-muted mt-0.5">
                     Exporta el archivo normalizado para uso externo. No modifica la base de datos.
                 </p>
             </div>
@@ -524,7 +524,7 @@
                     {% csrf_token %}
                     <input type="hidden" name="format" value="csv">
                     <button type="submit" data-testid="pipeline-export-csv"
-                        class="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        class="inline-flex items-center gap-2 bg-surface-strong hover:bg-fg-subtle text-fg-strong px-4 py-2 rounded-md text-sm font-medium transition-colors">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
                         </svg>
@@ -537,7 +537,7 @@
                     {% csrf_token %}
                     <input type="hidden" name="format" value="json">
                     <button type="submit" data-testid="pipeline-export-json"
-                        class="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        class="inline-flex items-center gap-2 bg-surface-strong hover:bg-fg-subtle text-fg-strong px-4 py-2 rounded-md text-sm font-medium transition-colors">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
                         </svg>
@@ -547,7 +547,7 @@
 
                 <!-- Nuevo pipeline -->
                 <a href="{% url 'pipeline' %}" data-testid="pipeline-new-link"
-                    class="inline-flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    class="inline-flex items-center gap-2 bg-surface-overlay hover:bg-surface-strong text-fg px-4 py-2 rounded-md text-sm font-medium transition-colors">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
                     </svg>
@@ -557,9 +557,9 @@
         </div>
 
         <!-- Preview datos limpios -->
-        <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-            <div class="px-5 py-3 border-b border-slate-700 flex items-center justify-between">
-                <p class="text-xs font-medium text-slate-400 uppercase tracking-wide">
+        <div class="bg-surface-raised border border-line rounded-lg overflow-hidden">
+            <div class="px-5 py-3 border-b border-line flex items-center justify-between">
+                <p class="text-xs font-medium text-fg-muted uppercase tracking-wide">
                     Dataset limpio — primeros {{ preview_rows|length }} de {{ total_records }} registros
                 </p>
                 <span class="inline-flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
@@ -570,21 +570,21 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs">
                     <thead>
-                        <tr class="border-b border-slate-700 bg-slate-900">
-                            <th class="px-3 py-2.5 font-medium text-slate-500 whitespace-nowrap">#</th>
+                        <tr class="border-b border-line bg-surface">
+                            <th class="px-3 py-2.5 font-medium text-fg-subtle whitespace-nowrap">#</th>
                             {% for col in required_cols %}
-                            <th class="px-3 py-2.5 font-medium text-slate-400 whitespace-nowrap">{{ col }}</th>
+                            <th class="px-3 py-2.5 font-medium text-fg-muted whitespace-nowrap">{{ col }}</th>
                             {% endfor %}
                         </tr>
                     </thead>
                     <tbody>
                         {% for row in preview_rows %}
-                        <tr class="border-b border-slate-800 hover:bg-slate-800/40">
-                            <td class="px-3 py-2 font-mono text-slate-600 text-xs">{{ forloop.counter }}</td>
+                        <tr class="border-b border-line-subtle hover:bg-surface-raised/40">
+                            <td class="px-3 py-2 font-mono text-fg-faint text-xs">{{ forloop.counter }}</td>
                             {% for val in row %}
-                            <td class="px-3 py-2 font-mono text-slate-400 whitespace-nowrap max-w-28 truncate" title="{{ val }}">
+                            <td class="px-3 py-2 font-mono text-fg-muted whitespace-nowrap max-w-28 truncate" title="{{ val }}">
                                 {% if val == '' or val == None %}
-                                    <span class="text-slate-600">—</span>
+                                    <span class="text-fg-faint">—</span>
                                 {% else %}
                                     {{ val }}
                                 {% endif %}
