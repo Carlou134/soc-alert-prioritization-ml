@@ -9,9 +9,9 @@
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
             <div class="flex items-center gap-3 flex-wrap">
-                <a href="{% url 'incident_desk' %}{% if back_qs %}?{{ back_qs }}{% endif %}" class="text-slate-400 hover:text-white text-sm transition-colors">← Mesa de Incidentes</a>
-                <span class="text-slate-600">/</span>
-                <h1 class="text-xl font-semibold text-white">Incidente #{{ alert.pk }}</h1>
+                <a href="{% url 'incident_desk' %}{% if back_qs %}?{{ back_qs }}{% endif %}" class="text-fg-muted hover:text-fg-strong text-sm transition-colors">← Mesa de Incidentes</a>
+                <span class="text-fg-faint">/</span>
+                <h1 class="text-xl font-semibold text-fg-strong">Incidente #{{ alert.pk }}</h1>
                 {% if incident.is_resolved %}
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>RESUELTO
@@ -22,7 +22,7 @@
                     </span>
                 {% endif %}
             </div>
-            <p class="text-sm text-slate-400 mt-1">{{ alert.event_category }} — {{ alert.attack_type|default:"Tipo desconocido" }}</p>
+            <p class="text-sm text-fg-muted mt-1">{{ alert.event_category }} — {{ alert.attack_type|default:"Tipo desconocido" }}</p>
         </div>
         <a href="{% url 'alert_shap' alert.pk %}?next=incident_detail" data-testid="incident-detail-shap-link"
            class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-colors">
@@ -32,63 +32,63 @@
 
     <!-- KPIs del incidente -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
-            <p class="text-xs text-slate-400 uppercase tracking-wide">Risk Score</p>
+        <div class="bg-surface-raised border border-line rounded-lg p-4">
+            <p class="text-xs text-fg-muted uppercase tracking-wide">Risk Score</p>
             <p class="text-2xl font-bold mt-1 font-mono
                 {% if prediction.risk_score >= 0.7 %}text-red-400{% elif prediction.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
                 {{ prediction.risk_score|floatformat:4|default:"—" }}
             </p>
         </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
-            <p class="text-xs text-slate-400 uppercase tracking-wide">Clasificación ML</p>
+        <div class="bg-surface-raised border border-line rounded-lg p-4">
+            <p class="text-xs text-fg-muted uppercase tracking-wide">Clasificación ML</p>
             <p class="text-sm font-semibold mt-2
                 {% if prediction.predicted_class == 'malicioso' %}text-red-400{% elif prediction.predicted_class == 'a_investigar' %}text-amber-400{% else %}text-emerald-400{% endif %}">
                 {{ prediction.predicted_class|default:"—"|capfirst }}
             </p>
         </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
-            <p class="text-xs text-slate-400 uppercase tracking-wide">Escalado el</p>
-            <p class="text-sm font-mono text-slate-200 mt-2">{{ incident.escalated_at|date:"Y-m-d H:i"|default:"—" }}</p>
+        <div class="bg-surface-raised border border-line rounded-lg p-4">
+            <p class="text-xs text-fg-muted uppercase tracking-wide">Escalado el</p>
+            <p class="text-sm font-mono text-fg-emphasis mt-2">{{ incident.escalated_at|date:"Y-m-d H:i"|default:"—" }}</p>
         </div>
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
-            <p class="text-xs text-slate-400 uppercase tracking-wide">MTTR</p>
+        <div class="bg-surface-raised border border-line rounded-lg p-4">
+            <p class="text-xs text-fg-muted uppercase tracking-wide">MTTR</p>
             {% if mttr %}
                 <p class="text-2xl font-bold text-blue-400 mt-1 font-mono">{{ mttr }}</p>
             {% else %}
-                <p class="text-sm text-slate-500 mt-2">En curso…</p>
+                <p class="text-sm text-fg-subtle mt-2">En curso…</p>
             {% endif %}
         </div>
     </div>
 
     <!-- Detalles técnicos -->
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
-        <p class="text-sm font-semibold text-white mb-4">Datos técnicos de la alerta</p>
+    <div class="bg-surface-raised border border-line rounded-lg p-5">
+        <p class="text-sm font-semibold text-fg-strong mb-4">Datos técnicos de la alerta</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-3 text-sm">
             {% with fields=alert %}
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Severidad</p><p class="text-slate-200 mt-0.5">{{ alert.severity|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Protocolo</p><p class="text-slate-200 mt-0.5">{{ alert.protocol|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Táctica MITRE</p><p class="text-slate-200 mt-0.5">{{ alert.mitre_tactic|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Kill Chain</p><p class="text-slate-200 mt-0.5">{{ alert.kill_chain_stage|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">IDS/IPS Alert</p><p class="text-slate-200 mt-0.5">{{ alert.ids_ips_alert|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Firewall</p><p class="text-slate-200 mt-0.5">{{ alert.firewall_action|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Criticidad activo</p><p class="text-slate-200 mt-0.5">{{ alert.asset_criticality|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Fuente log</p><p class="text-slate-200 mt-0.5">{{ alert.log_source|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Firma del ataque</p><p class="text-slate-200 mt-0.5">{{ alert.attack_signature|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Indicador malware</p><p class="text-slate-200 mt-0.5">{{ alert.malware_indicator|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Correlation ID</p><p class="text-slate-200 mt-0.5 font-mono text-xs break-all">{{ alert.correlation_id|default:"—" }}</p></div>
-            <div><p class="text-xs text-slate-500 uppercase tracking-wide">Escalado por</p><p class="text-slate-200 mt-0.5">{{ incident.escalated_by.username|default:"—" }}</p></div>
+            <div><p class="text-xs text-fg-subtle uppercase tracking-wide">Severidad</p><p class="text-fg-emphasis mt-0.5">{{ alert.severity|default:"—" }}</p></div>
+            <div><p class="text-xs text-fg-subtle uppercase tracking-wide">Protocolo</p><p class="text-fg-emphasis mt-0.5">{{ alert.protocol|default:"—" }}</p></div>
+            <div><p class="text-xs text-fg-subtle uppercase tracking-wide">Táctica MITRE</p><p class="text-fg-emphasis mt-0.5">{{ alert.mitre_tactic|default:"—" }}</p></div>
+            <div><p class="text-xs text-fg-subtle uppercase tracking-wide">Kill Chain</p><p class="text-fg-emphasis mt-0.5">{{ alert.kill_chain_stage|default:"—" }}</p></div>
+            <div><p class="text-xs text-fg-subtle uppercase tracking-wide">IDS/IPS Alert</p><p class="text-fg-emphasis mt-0.5">{{ alert.ids_ips_alert|default:"—" }}</p></div>
+            <div><p class="text-xs text-fg-subtle uppercase tracking-wide">Firewall</p><p class="text-fg-emphasis mt-0.5">{{ alert.firewall_action|default:"—" }}</p></div>
+            <div><p class="text-xs text-fg-subtle uppercase tracking-wide">Criticidad activo</p><p class="text-fg-emphasis mt-0.5">{{ alert.asset_criticality|default:"—" }}</p></div>
+            <div><p class="text-xs text-fg-subtle uppercase tracking-wide">Fuente log</p><p class="text-fg-emphasis mt-0.5">{{ alert.log_source|default:"—" }}</p></div>
+            <div><p class="text-xs text-fg-subtle uppercase tracking-wide">Firma del ataque</p><p class="text-fg-emphasis mt-0.5">{{ alert.attack_signature|default:"—" }}</p></div>
+            <div><p class="text-xs text-fg-subtle uppercase tracking-wide">Indicador malware</p><p class="text-fg-emphasis mt-0.5">{{ alert.malware_indicator|default:"—" }}</p></div>
+            <div><p class="text-xs text-fg-subtle uppercase tracking-wide">Correlation ID</p><p class="text-fg-emphasis mt-0.5 font-mono text-xs break-all">{{ alert.correlation_id|default:"—" }}</p></div>
+            <div><p class="text-xs text-fg-subtle uppercase tracking-wide">Escalado por</p><p class="text-fg-emphasis mt-0.5">{{ incident.escalated_by.username|default:"—" }}</p></div>
             {% endwith %}
         </div>
     </div>
 
     <!-- SOAR Simulado -->
     {% if not incident.is_resolved %}
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+    <div class="bg-surface-raised border border-line rounded-lg p-5">
         <div class="flex items-center justify-between mb-1">
-            <p class="text-sm font-semibold text-white">Acciones de Contención Inmediata</p>
-            <span class="text-xs text-slate-500 font-mono uppercase tracking-wide">SOAR SIMULADO</span>
+            <p class="text-sm font-semibold text-fg-strong">Acciones de Contención Inmediata</p>
+            <span class="text-xs text-fg-subtle font-mono uppercase tracking-wide">SOAR SIMULADO</span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Playbooks de respuesta automática. Simulación para demostración — NIST SP 800-61 RS.MI</p>
+        <p class="text-xs text-fg-subtle mb-4">Playbooks de respuesta automática. Simulación para demostración — NIST SP 800-61 RS.MI</p>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
             <button onclick="runPlaybook('block_ip')" data-testid="soar-playbook-block-ip"
@@ -98,7 +98,7 @@
                 </svg>
                 <div>
                     <p class="text-sm font-medium text-red-300">Bloquear IP Atacante</p>
-                    <p class="text-xs text-slate-500 mt-0.5">Añadir regla DROP en firewall perimetral</p>
+                    <p class="text-xs text-fg-subtle mt-0.5">Añadir regla DROP en firewall perimetral</p>
                 </div>
             </button>
 
@@ -109,7 +109,7 @@
                 </svg>
                 <div>
                     <p class="text-sm font-medium text-orange-300">Aislar Host Afectado</p>
-                    <p class="text-xs text-slate-500 mt-0.5">Cortar conectividad de red del endpoint</p>
+                    <p class="text-xs text-fg-subtle mt-0.5">Cortar conectividad de red del endpoint</p>
                 </div>
             </button>
 
@@ -120,12 +120,13 @@
                 </svg>
                 <div>
                     <p class="text-sm font-medium text-amber-300">Revocar Credenciales</p>
-                    <p class="text-xs text-slate-500 mt-0.5">Deshabilitar usuario en Active Directory</p>
+                    <p class="text-xs text-fg-subtle mt-0.5">Deshabilitar usuario en Active Directory</p>
                 </div>
             </button>
         </div>
 
-        <!-- Terminal SOAR -->
+        <!-- Terminal SOAR: oscura en ambos temas a propósito (simula una consola);
+             por eso usa slate fijo y no tokens semánticos. -->
         <div id="soar-terminal" class="hidden bg-slate-950 border border-slate-700 rounded-md p-4 font-mono text-xs">
             <div class="flex items-center gap-2 mb-3 pb-2 border-b border-slate-800">
                 <span class="w-3 h-3 rounded-full bg-red-500"></span>
@@ -140,19 +141,19 @@
     {% endif %}
 
     <!-- Chat con Claude N3 -->
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+    <div class="bg-surface-raised border border-line rounded-lg p-5">
         <div class="flex items-center justify-between mb-1">
-            <p class="text-sm font-semibold text-white">IA Colaborativa — Análisis Forense</p>
-            <span class="text-xs text-slate-500 font-mono uppercase tracking-wide">Claude Sonnet 4.6</span>
+            <p class="text-sm font-semibold text-fg-strong">IA Colaborativa — Análisis Forense</p>
+            <span class="text-xs text-fg-subtle font-mono uppercase tracking-wide">Claude Sonnet 4.6</span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Consulta al modelo sobre el incidente. Puedes pedir reglas YARA, análisis de payloads, estrategias de hunting, etc.</p>
+        <p class="text-xs text-fg-subtle mb-4">Consulta al modelo sobre el incidente. Puedes pedir reglas YARA, análisis de payloads, estrategias de hunting, etc.</p>
 
         <div id="chat-history" class="space-y-3 mb-4 max-h-80 overflow-y-auto"></div>
 
         <div class="flex gap-2">
             <input id="chat-input" data-testid="incident-chat-input" type="text"
                 placeholder="Ej: Redactame reglas YARA para este patrón de ataque…"
-                class="flex-1 bg-slate-900/60 border border-slate-700 text-slate-200 placeholder-slate-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                class="flex-1 bg-surface/60 border border-line text-fg-emphasis placeholder-fg-faint rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             <button id="chat-send" data-testid="incident-chat-send"
                 onclick="sendChat()"
                 class="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors">
@@ -167,35 +168,35 @@
         <p class="text-sm font-semibold text-emerald-300 mb-4">Incidente cerrado — NIST SP 800-61 RC</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-                <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Causa Raíz</p>
-                <p class="text-slate-200">{{ incident.get_root_cause_display|default:"—" }}</p>
+                <p class="text-xs text-fg-muted uppercase tracking-wide mb-1">Causa Raíz</p>
+                <p class="text-fg-emphasis">{{ incident.get_root_cause_display|default:"—" }}</p>
             </div>
             <div>
-                <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Cerrado por</p>
-                <p class="text-slate-200">{{ incident.resolved_by.username|default:"—" }} — {{ incident.resolved_at|date:"Y-m-d H:i" }}</p>
+                <p class="text-xs text-fg-muted uppercase tracking-wide mb-1">Cerrado por</p>
+                <p class="text-fg-emphasis">{{ incident.resolved_by.username|default:"—" }} — {{ incident.resolved_at|date:"Y-m-d H:i" }}</p>
             </div>
             {% if incident.lessons_learned %}
             <div class="md:col-span-2">
-                <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Lecciones Aprendidas</p>
-                <p class="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">{{ incident.lessons_learned }}</p>
+                <p class="text-xs text-fg-muted uppercase tracking-wide mb-1">Lecciones Aprendidas</p>
+                <p class="text-fg-emphasis text-sm leading-relaxed whitespace-pre-wrap">{{ incident.lessons_learned }}</p>
             </div>
             {% endif %}
         </div>
     </div>
 
     {% else %}
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5">
+    <div class="bg-surface-raised border border-line rounded-lg p-5">
         <div class="flex items-center justify-between mb-1">
-            <p class="text-sm font-semibold text-white">Cierre Oficial del Incidente</p>
-            <span class="text-xs text-slate-500 font-mono uppercase tracking-wide">NIST SP 800-61 RC</span>
+            <p class="text-sm font-semibold text-fg-strong">Cierre Oficial del Incidente</p>
+            <span class="text-xs text-fg-subtle font-mono uppercase tracking-wide">NIST SP 800-61 RC</span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Completa el análisis post-incidente antes de cerrar. Se registrará el MTTR exacto.</p>
+        <p class="text-xs text-fg-subtle mb-4">Completa el análisis post-incidente antes de cerrar. Se registrará el MTTR exacto.</p>
 
         <div id="close-form" class="space-y-4">
             <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1">Causa Raíz <span class="text-red-400">*</span></label>
+                <label class="block text-xs font-medium text-fg-muted mb-1">Causa Raíz <span class="text-red-400">*</span></label>
                 <select id="root-cause" data-testid="incident-root-cause"
-                    class="w-full bg-slate-900/60 border border-slate-700 text-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+                    class="w-full bg-surface/60 border border-line text-fg-emphasis rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
                     <option value="">Selecciona la causa raíz…</option>
                     <option value="phishing">Phishing</option>
                     <option value="unpatched_vuln">Vulnerabilidad no parchada</option>
@@ -206,10 +207,10 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1">Lecciones Aprendidas</label>
+                <label class="block text-xs font-medium text-fg-muted mb-1">Lecciones Aprendidas</label>
                 <textarea id="lessons-learned" data-testid="incident-lessons-learned" rows="4"
                     placeholder="Ej: Se solicita parchar el servidor Apache de inmediato y habilitar MFA para todos los usuarios del dominio."
-                    class="w-full bg-slate-900/60 border border-slate-700 text-slate-200 placeholder-slate-600 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
+                    class="w-full bg-surface/60 border border-line text-fg-emphasis placeholder-fg-faint rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
             </div>
             <button id="resolve-btn" data-testid="incident-resolve-btn" onclick="resolveIncident()"
                 class="w-full py-3 bg-red-700 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
@@ -222,7 +223,7 @@
 
         <div id="close-success" class="hidden text-center py-4">
             <p class="text-emerald-400 font-semibold">Incidente cerrado correctamente.</p>
-            <p class="text-slate-400 text-sm mt-1">Recargá la página para ver el resumen final.</p>
+            <p class="text-fg-muted text-sm mt-1">Recargá la página para ver el resumen final.</p>
         </div>
     </div>
     {% endif %}
@@ -312,7 +313,7 @@ function appendMessage(role, text) {
     const bubble = document.createElement('div');
     bubble.className = role === 'user'
         ? 'max-w-lg bg-blue-600/20 border border-blue-600/30 text-blue-100 rounded-lg px-3 py-2 text-sm whitespace-pre-wrap'
-        : 'max-w-lg bg-slate-700/60 border border-slate-600 text-slate-200 rounded-lg px-3 py-2 text-sm prose prose-invert prose-sm max-w-none';
+        : 'max-w-lg bg-surface-overlay/60 border border-line-strong text-fg-emphasis rounded-lg px-3 py-2 text-sm prose prose-invert prose-sm max-w-none';
     if (role === 'assistant') {
         bubble.innerHTML = marked.parse(text);
     } else {
@@ -337,7 +338,7 @@ async function sendChat() {
     const thinking = document.createElement('div');
     thinking.className = 'flex justify-start';
     thinking.id = 'chat-thinking';
-    thinking.innerHTML = '<div class="bg-slate-700/60 border border-slate-600 text-slate-400 rounded-lg px-3 py-2 text-sm italic">Claude está analizando…</div>';
+    thinking.innerHTML = '<div class="bg-surface-overlay/60 border border-line-strong text-fg-muted rounded-lg px-3 py-2 text-sm italic">Claude está analizando…</div>';
     document.getElementById('chat-history').appendChild(thinking);
 
     try {
