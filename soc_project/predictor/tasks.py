@@ -3,13 +3,18 @@ import logging
 from django.contrib.auth.models import User
 
 from .models import Dataset, log_error
-from .utils import predict_alert, predict_batch
+from .utils import ModelUnavailableError, predict_alert, predict_batch
 
 logger = logging.getLogger(__name__)
 
 STORAGE_ERROR_MESSAGE = (
     'No se pudieron guardar las alertas en la base de datos. '
     'El incidente quedó registrado; intenta nuevamente.'
+)
+
+MODEL_UNAVAILABLE_NOTICE = (
+    'El modelo de clasificación no está disponible. '
+    'Las alertas se guardaron como pendientes de clasificación.'
 )
 
 
@@ -41,8 +46,16 @@ def process_alert_batch(dataset_id, records, user_id):
         return
 
     try:
+        model_unavailable = False
         try:
             batch_results = predict_batch(records)
+        except ModelUnavailableError as exc:
+            # CP014-B: sin modelo no tiene sentido reintentar alerta por alerta.
+            # Se guardan sin PredictionLog (pendientes) para clasificarlas después.
+            logger.error('Modelo ML no disponible al procesar el dataset #%s', dataset_id)
+            log_error(user, 'process_alert_batch_model', str(exc))
+            batch_results = None
+            model_unavailable = True
         except Exception as exc:
             log_error(user, 'process_alert_batch_predict', str(exc))
             batch_results = None
@@ -51,7 +64,9 @@ def process_alert_batch(dataset_id, records, user_id):
         failed_count = 0
         for i, record in enumerate(records):
             try:
-                if batch_results is not None:
+                if model_unavailable:
+                    predicted_class, probabilities = None, None
+                elif batch_results is not None:
                     predicted_class, probabilities = batch_results[i]
                 else:
                     predicted_class, probabilities = predict_alert(record)
@@ -85,6 +100,8 @@ def process_alert_batch(dataset_id, records, user_id):
             dataset.error_message = STORAGE_ERROR_MESSAGE
         else:
             dataset.status = 'processed'
+            if model_unavailable:
+                dataset.error_message = MODEL_UNAVAILABLE_NOTICE
         dataset.save(update_fields=['saved_count', 'failed_count', 'status', 'error_message'])
     except Exception as exc:
         dataset.status = 'failed'

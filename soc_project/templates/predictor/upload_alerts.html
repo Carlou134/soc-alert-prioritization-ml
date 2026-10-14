@@ -137,9 +137,12 @@
                         saveTitle.classList.remove('text-blue-400');
                         saveTitle.classList.add('text-emerald-400');
                         saveTitle.textContent = data.saved_count + ' alerta' + (data.saved_count === 1 ? '' : 's') + ' guardada' + (data.saved_count === 1 ? '' : 's') + ' en el sistema';
-                        saveDetail.textContent = data.failed_count
-                            ? data.failed_count + ' registro(s) no pudieron guardarse.'
-                            : 'Clasificadas con ML y risk score asignado.';
+                        saveDetail.textContent = data.error_message
+                            || (data.failed_count
+                                ? data.failed_count + ' registro(s) no pudieron guardarse.'
+                                : 'Clasificadas con ML y risk score asignado.');
+                        // Guardadas sin clasificar (modelo no disponible, CP014-B)
+                        if (data.error_message) saveDetail.classList.add('text-amber-400');
                         viewAlertsLink.classList.remove('hidden');
                         submitBtn.disabled = false;
                         submitBtn.textContent = 'Procesar archivo';

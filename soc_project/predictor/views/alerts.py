@@ -26,8 +26,8 @@ from ..mitre_metadata import resolve_techniques
 from ..models import Alert, AlertWorkflow, Dataset, Incident, PredictionLog, log_error
 from ..pipeline import REQUIRED_COLUMNS, parse_file, validate_columns, clean_records
 from ..utils import (
-    calculate_risk_score, calculate_shap_values, compute_shap_safe,
-    get_active_model_version, predict_alert,
+    ModelUnavailableError, calculate_risk_score, calculate_shap_values,
+    compute_shap_safe, get_active_model_version, predict_alert,
 )
 
 # Roles a los que cada rol puede asignar alertas (incluye auto-asignación)
@@ -40,6 +40,11 @@ ASSIGNMENT_TARGETS = {
 }
 
 STATUS_SAVE_ERROR_MESSAGE = 'No se pudo guardar el estado de la alerta. Intente nuevamente.'
+
+MODEL_UNAVAILABLE_PENDING_MESSAGE = (
+    'El modelo de clasificación no está disponible. '
+    'Las alertas siguen pendientes; intente nuevamente más tarde.'
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HU028 — Historial de alertas procesadas (n2 / n3 / admin)
@@ -149,6 +154,8 @@ def _build_alert_instance(record, predicted_class, probabilities, user):
 
     Los campos de predicción ya no viven en Alert (Track 1); se devuelven
     aparte para construir el PredictionLog pareado en _bulk_create_alerts().
+    Sin predicción (modelo no disponible, CP014-B) prediction_kwargs es None
+    y la alerta queda pendiente de clasificación.
     """
     alert = Alert(
         event_category        = record.get('event_category', ''),
@@ -174,6 +181,8 @@ def _build_alert_instance(record, predicted_class, probabilities, user):
         label                 = record.get('label', ''),
         created_by            = user,
     )
+    if predicted_class is None:
+        return alert, None
     prediction_kwargs = {
         'predicted_class': predicted_class,
         'risk_score': calculate_risk_score(probabilities),
@@ -557,6 +566,11 @@ def predict_pending_view(request):
                 shap_values=compute_shap_safe(data),
             )
             classified += 1
+        except ModelUnavailableError as exc:
+            # Sin modelo fallarían todas: se corta y las restantes siguen pendientes.
+            log_error(request.user, 'predict_pending', str(exc))
+            messages.error(request, MODEL_UNAVAILABLE_PENDING_MESSAGE)
+            return redirect('alert_list')
         except Exception as exc:
             log_error(request.user, 'predict_pending', str(exc))
 

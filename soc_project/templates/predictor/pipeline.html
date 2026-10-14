@@ -486,9 +486,12 @@
                             title.classList.remove('text-blue-400');
                             title.classList.add('text-emerald-400');
                             title.textContent = data.saved_count + ' alerta' + (data.saved_count === 1 ? '' : 's') + ' guardada' + (data.saved_count === 1 ? '' : 's') + ' en el sistema';
-                            detail.textContent = data.failed_count
-                                ? data.failed_count + ' registro(s) no pudieron guardarse.'
-                                : 'Clasificadas con ML y risk score asignado.';
+                            detail.textContent = data.error_message
+                                || (data.failed_count
+                                    ? data.failed_count + ' registro(s) no pudieron guardarse.'
+                                    : 'Clasificadas con ML y risk score asignado.');
+                            // Guardadas sin clasificar (modelo no disponible, CP014-B)
+                            if (data.error_message) detail.classList.add('text-amber-400');
                         } else if (data.status === 'failed') {
                             box.classList.remove('bg-blue-500/10', 'border-blue-500/20');
                             box.classList.add('bg-red-500/10', 'border-red-500/20');
