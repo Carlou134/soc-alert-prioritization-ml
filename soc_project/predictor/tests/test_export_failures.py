@@ -62,10 +62,11 @@ def test_pdf_fault_does_not_break_excel_export(admin_user, make_alert, enable_fa
 def test_export_succeeds_once_fault_is_disabled(
     admin_user, make_alert, enable_faults, fault_key, url, view_name,
 ):
-    make_alert(admin_user, predicted_class='malicioso')
+    alert = make_alert(admin_user, predicted_class='malicioso')
     _activate(fault_key)
     client = Client()
     client.force_login(admin_user)
+    client.post(f'/alerts/{alert.pk}/escalate/')  # el PDF de incidentes necesita al menos uno
     client.get(url)
 
     FaultFlag.objects.all().delete()

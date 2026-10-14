@@ -33,6 +33,20 @@ logger = logging.getLogger(__name__)
 
 EXPORT_ERROR_MESSAGE = 'No se pudo exportar el reporte.'
 
+NO_DATA_MESSAGE = 'No hay información para los filtros seleccionados.'
+
+
+def _back_to_report(request):
+    """Vuelve a la página de reportes conservando los filtros aplicados."""
+    query = request.GET.urlencode()
+    return redirect(reverse('reports') + (f'?{query}' if query else ''))
+
+
+def _no_data_response(request):
+    """CP026: sin datos no se descarga ningún archivo — se avisa en el reporte."""
+    messages.info(request, NO_DATA_MESSAGE)
+    return _back_to_report(request)
+
 
 def _export_guard(fault_key):
     """CP027-A/B: si la generación del archivo falla, se registra el error y se
@@ -48,8 +62,7 @@ def _export_guard(fault_key):
                 logger.exception('Fallo al exportar el reporte (%s)', view.__name__)
                 log_error(request.user, view.__name__, str(exc))
                 messages.error(request, EXPORT_ERROR_MESSAGE)
-                query = request.GET.urlencode()
-                return redirect(reverse('reports') +(f'?{query}' if query else ''))
+                return _back_to_report(request)
         return wrapper
     return decorator
 
@@ -249,6 +262,8 @@ def report_view(request):
         'status_breakdown':  status_breakdown,
         'eval_breakdown':    eval_breakdown,
         'query_string':      _qs_params.urlencode(),
+        'no_data':           summary['total'] == 0,
+        'no_data_message':   NO_DATA_MESSAGE,
     })
 
 
@@ -258,6 +273,8 @@ def report_view(request):
 def report_export_excel_view(request):
     params = request.GET
     qs = _build_report_queryset(params)
+    if not qs.exists():
+        return _no_data_response(request)
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -331,6 +348,8 @@ def report_export_excel_view(request):
 def report_export_pdf_view(request):
     params = request.GET
     qs = _build_report_queryset(params)
+    if not qs.exists():
+        return _no_data_response(request)
     summary = _build_report_summary(qs)
 
     buffer = io.BytesIO()
@@ -559,6 +578,8 @@ def report_export_incidents_pdf_view(request):
             pass
 
     total_incidents = qs.count()
+    if not total_incidents:
+        return _no_data_response(request)
     resolved_qs     = qs.filter(
         incident__is_resolved=True, incident__resolved_at__isnull=False, incident__escalated_at__isnull=False,
     )

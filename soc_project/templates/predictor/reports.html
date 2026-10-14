@@ -40,8 +40,8 @@
 
     <!-- Django messages (CP027: fallo al exportar) -->
     {% for message in messages %}
-    <div data-testid="report-message" class="{% if message.tags == 'success' %}bg-emerald-500/10 border border-emerald-500/20{% else %}bg-red-500/10 border border-red-500/20{% endif %} rounded-lg px-4 py-3">
-        <p class="text-sm {% if message.tags == 'success' %}text-emerald-400{% else %}text-red-400{% endif %}">
+    <div data-testid="report-message" class="{% if message.tags == 'success' %}bg-emerald-500/10 border border-emerald-500/20{% elif message.tags == 'info' %}bg-blue-500/5 border border-blue-500/20{% else %}bg-red-500/10 border border-red-500/20{% endif %} rounded-lg px-4 py-3">
+        <p class="text-sm {% if message.tags == 'success' %}text-emerald-400{% elif message.tags == 'info' %}text-blue-400{% else %}text-red-400{% endif %}">
             {{ message }}
         </p>
     </div>
@@ -121,6 +121,13 @@
             </div>
         </div>
     </form>
+
+    {% if no_data and not messages %}
+    <!-- Sin información (CP026) — si viene de una exportación bloqueada, ya lo dice el mensaje -->
+    <div data-testid="report-no-data" class="bg-blue-500/5 border border-blue-500/20 rounded-lg px-4 py-3">
+        <p class="text-sm text-blue-400">{{ no_data_message }}</p>
+    </div>
+    {% endif %}
 
     <!-- Tarjetas de resumen -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
