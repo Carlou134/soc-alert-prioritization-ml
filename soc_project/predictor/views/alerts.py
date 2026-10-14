@@ -600,7 +600,7 @@ def alert_set_status_view(request, pk):
         'ok':       True,
         'status':   status_value,
         'by':       request.user.username,
-        'at':       workflow.investigated_at.strftime('%Y-%m-%d %H:%M'),
+        'at':       timezone.localtime(workflow.investigated_at).strftime('%Y-%m-%d %H:%M'),
     })
 
 
