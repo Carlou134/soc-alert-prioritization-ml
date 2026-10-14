@@ -7,6 +7,15 @@ from django.shortcuts import redirect, render
 
 from ..models import Alert, Incident, TurnoNota
 
+# CP017: por debajo de este número de alertas clasificadas los gráficos no
+# son representativos y se avisa al usuario.
+MIN_CLASSIFIED_ALERTS = 10
+
+INSUFFICIENT_DATA_MESSAGE = (
+    'Aún no hay datos suficientes para mostrar métricas representativas. '
+    f'Se necesitan al menos {MIN_CLASSIFIED_ALERTS} alertas clasificadas.'
+)
+
 
 @login_required
 def dashboard_view(request):
@@ -90,6 +99,9 @@ def dashboard_view(request):
         'total_benigno':    total_benigno,
         'recent_alerts':    recent_alerts,
         'turno_notas':      turno_notas,
+
+        'insufficient_data':         total_alerts - total_pending < MIN_CLASSIFIED_ALERTS,
+        'insufficient_data_message': INSUFFICIENT_DATA_MESSAGE,
 
         'can_see_pending':              can_see_pending,
         'can_see_investigar_malicioso': can_see_investigar_malicioso,
