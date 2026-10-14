@@ -360,7 +360,10 @@
                                 SHAP
                             </a>
                             {% else %}
-                            <span class="text-xs text-fg-faint">—</span>
+                            <a href="{% url 'alert_shap' alert.pk %}?next=alert_list{% if query_string %}&back_qs={{ query_string|urlencode }}{% endif %}" data-testid="alert-detail-link-{{ alert.pk }}"
+                               class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-surface-strong/50 text-fg-muted border border-line-strong hover:text-fg-strong transition-colors">
+                                Detalle
+                            </a>
                             {% endif %}
                         </td>
                     </tr>

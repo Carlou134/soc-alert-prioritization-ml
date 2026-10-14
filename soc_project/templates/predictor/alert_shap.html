@@ -30,7 +30,7 @@
         </a>
         <span class="text-line">·</span>
         <h1 class="text-lg font-semibold text-fg-strong">
-            Explicabilidad SHAP — Alerta <span class="text-violet-400">#{{ alert.id }}</span>
+            {% if classified %}Explicabilidad SHAP{% else %}Detalle{% endif %} — Alerta <span class="text-violet-400">#{{ alert.id }}</span>
         </h1>
     </div>
 
@@ -38,7 +38,9 @@
     <div class="bg-surface-raised/50 border border-line/50 rounded-xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div>
             <p class="text-xs text-fg-subtle uppercase tracking-wide mb-1">Clasificación</p>
-            {% if prediction.predicted_class == 'malicioso' %}
+            {% if not classified %}
+                <span data-testid="alert-unclassified" class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-surface-strong/50 text-fg-muted border border-line-strong">Sin clasificar</span>
+            {% elif prediction.predicted_class == 'malicioso' %}
                 <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-red-500/15 text-red-400 border border-red-500/25">Malicioso</span>
             {% elif prediction.predicted_class == 'a_investigar' %}
                 <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/25">A investigar</span>
@@ -48,9 +50,13 @@
         </div>
         <div>
             <p class="text-xs text-fg-subtle uppercase tracking-wide mb-1">Risk Score</p>
+            {% if classified %}
             <p class="text-sm font-semibold {% if prediction.risk_score >= 0.7 %}text-red-400{% elif prediction.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
                 {{ prediction.risk_score|floatformat:4 }}
             </p>
+            {% else %}
+            <p data-testid="risk-requires-classification" class="text-sm text-amber-400">{{ requires_classification_message }}</p>
+            {% endif %}
         </div>
         <div>
             <p class="text-xs text-fg-subtle uppercase tracking-wide mb-1">Severidad</p>

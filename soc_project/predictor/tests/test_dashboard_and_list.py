@@ -169,18 +169,6 @@ def test_alert_shap_view_renders_and_computes_shap(admin_user, make_alert):
 
 
 @pytest.mark.django_db
-def test_alert_shap_view_redirects_when_not_classified(admin_user, make_alert):
-    alert = make_alert(admin_user, predicted_class=None)
-
-    client = Client()
-    client.force_login(admin_user)
-    resp = client.get(f'/alerts/{alert.pk}/shap/')
-
-    assert resp.status_code == 302
-    assert resp.url == '/alerts/'
-
-
-@pytest.mark.django_db
 def test_alert_shap_view_404_for_nonexistent_alert(admin_user):
     client = Client()
     client.force_login(admin_user)

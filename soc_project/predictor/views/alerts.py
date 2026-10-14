@@ -43,6 +43,10 @@ STATUS_SAVE_ERROR_MESSAGE = 'No se pudo guardar el estado de la alerta. Intente 
 
 SHAP_UNAVAILABLE_MESSAGE = 'No hay información de explicabilidad disponible para esta alerta.'
 
+UNCLASSIFIED_MESSAGE = 'No hay información disponible: la alerta aún no fue clasificada.'
+
+REQUIRES_CLASSIFICATION_MESSAGE = 'Debe clasificarse primero.'
+
 MODEL_UNAVAILABLE_PENDING_MESSAGE = (
     'El modelo de clasificación no está disponible. '
     'Las alertas siguen pendientes; intente nuevamente más tarde.'
@@ -708,14 +712,12 @@ def alert_shap_view(request, pk):
 
     alert = get_object_or_404(Alert.objects.select_related('workflow', 'incident'), pk=pk)
 
+    # CP030 / CP012-B: una alerta sin clasificar (ej. modelo no disponible al
+    # ingerirla) también muestra su detalle, sin inventar clasificación ni score.
     prediction = alert.latest_prediction
-    if prediction is None:
-        messages.warning(request, 'Esta alerta no está clasificada. Clasificala primero para ver la explicabilidad.')
-        return redirect('alert_list')
+    shap_data = prediction.shap_values if prediction else None
 
-    shap_data = prediction.shap_values
-
-    if shap_data is None:
+    if prediction is not None and shap_data is None:
         data = {
             'event_category'       : alert.event_category,
             'protocol'             : alert.protocol,
@@ -755,10 +757,14 @@ def alert_shap_view(request, pk):
     )
 
     is_trainee   = request.user.profile.is_trainee
-    can_evaluate = request.user.profile.role in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1')
+    can_evaluate = (
+        prediction is not None
+        and request.user.profile.role in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1')
+    )
     can_escalate = (
         user_role in ('admin', 'analyst_n2')
         and alert.incident_id is None
+        and prediction is not None
         and prediction.predicted_class in ('malicioso', 'a_investigar')
     )
     readonly     = request.GET.get('readonly') == '1'
@@ -789,8 +795,10 @@ def alert_shap_view(request, pk):
         'alert'              : alert,
         'prediction'         : prediction,
         'mitre_techniques_resolved': resolve_techniques(alert.mitre_techniques),
+        'classified'         : prediction is not None,
         'shap_available'     : shap_data is not None,
-        'shap_unavailable_message': SHAP_UNAVAILABLE_MESSAGE,
+        'shap_unavailable_message': SHAP_UNAVAILABLE_MESSAGE if prediction else UNCLASSIFIED_MESSAGE,
+        'requires_classification_message': REQUIRES_CLASSIFICATION_MESSAGE,
         'shap_s1'            : _json.dumps(shap_data['s1']) if shap_data else 'null',
         'shap_s2'            : _json.dumps(shap_data['s2']) if shap_data else 'null',
         'status_choices'     : AlertWorkflow.INVESTIGATION_STATUS_CHOICES,
