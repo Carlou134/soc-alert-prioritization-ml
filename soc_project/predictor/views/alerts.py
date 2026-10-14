@@ -16,6 +16,7 @@ from accounts.models import (
     ACTION_ALERT_ASSIGNED,
     ACTION_ALERT_ESCALATED,
     ACTION_ALERT_EVALUATED,
+    ACTION_ALERT_NOT_FOUND,
     ACTION_ALERT_STATUS_CHANGED,
     ACTION_UPLOAD_ALERTS,
     log_action,
@@ -46,6 +47,8 @@ SHAP_UNAVAILABLE_MESSAGE = 'No hay información de explicabilidad disponible par
 UNCLASSIFIED_MESSAGE = 'No hay información disponible: la alerta aún no fue clasificada.'
 
 REQUIRES_CLASSIFICATION_MESSAGE = 'Debe clasificarse primero.'
+
+ALERT_NOT_FOUND_MESSAGE = 'La alerta solicitada no existe.'
 
 MODEL_UNAVAILABLE_PENDING_MESSAGE = (
     'El modelo de clasificación no está disponible. '
@@ -710,7 +713,14 @@ def alert_set_priority_view(request, pk):
 def alert_shap_view(request, pk):
     import json as _json
 
-    alert = get_object_or_404(Alert.objects.select_related('workflow', 'incident'), pk=pk)
+    # CP020: una alerta inexistente (URL manual, alerta borrada, link viejo) vuelve
+    # al listado con un mensaje claro y el intento queda en la auditoría.
+    try:
+        alert = Alert.objects.select_related('workflow', 'incident').get(pk=pk)
+    except Alert.DoesNotExist:
+        log_action(request.user, ACTION_ALERT_NOT_FOUND, f'Intentó acceder a la alerta #{pk}, que no existe.')
+        messages.error(request, ALERT_NOT_FOUND_MESSAGE)
+        return redirect('alert_list')
 
     # CP030 / CP012-B: una alerta sin clasificar (ej. modelo no disponible al
     # ingerirla) también muestra su detalle, sin inventar clasificación ni score.

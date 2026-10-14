@@ -8,7 +8,7 @@ def test_404_page_for_authenticated_user_keeps_navigation(admin_user):
     client = Client()
     client.force_login(admin_user)
 
-    resp = client.get('/alerts/999999/shap/')
+    resp = client.get('/esta-ruta-no-existe/')
 
     assert resp.status_code == 404
     assert '404.html' in [t.name for t in resp.templates]
