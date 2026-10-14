@@ -315,7 +315,7 @@ The AC scenarios without a QA TC are covered by the `pytest` suite (unit + integ
 | 018 | Sc.1 Filter applied | `predictor/tests/test_dashboard_and_list.py::test_alert_list_severity_filter_matches` |
 | 019 | Sc.1 By risk | `predictor/tests/test_dashboard_and_list.py::test_alert_list_order_by_risk_desc` |
 | 020 | Sc.1 Alert analysis | `predictor/tests/test_dashboard_and_list.py::test_alert_shap_view_renders_and_computes_shap` |
-| 021 | Sc.1 Order by priority | `predictor/tests/test_dashboard_and_list.py::test_alert_list_priority_filter` |
+| 021 | Sc.1 Order by priority | `predictor/tests/test_priority_ordering.py::test_list_is_ordered_by_priority_by_default` |
 | 022 | Sc.1 Update | `predictor/tests/test_priority_and_assignment.py::test_set_priority_updates_workflow` |
 | 023 | Sc.1 Successful marking | `predictor/tests/test_state_transitions.py::test_set_status_updates_workflow` |
 | 024 | Sc.1 Correct assignment | `predictor/tests/test_priority_and_assignment.py::test_admin_assigns_alert_to_allowed_target` |

@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import DatabaseError, transaction
-from django.db.models import F, Q
+from django.db.models import Case, F, IntegerField, Q, Value, When
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -40,7 +40,10 @@ ASSIGNMENT_TARGETS = {
     'trainee':    (),
 }
 
-STATUS_SAVE_ERROR_MESSAGE = 'No se pudo guardar el estado de la alerta. Intente nuevamente.'
+# Peso de cada prioridad del analista para ordenar el listado (mayor = más urgente).
+PRIORITY_RANK = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
+
+STATUS_SAVE_ERROR_MESSAGE ='No se pudo guardar el estado de la alerta. Intente nuevamente.'
 
 SHAP_UNAVAILABLE_MESSAGE = 'No hay información de explicabilidad disponible para esta alerta.'
 
@@ -500,14 +503,25 @@ def alert_list_view(request):
     if assigned_filter:
         qs = qs.filter(workflow__assigned_to__username__icontains=assigned_filter)
 
-    order = request.GET.get('order', 'date_desc').strip()
+    # HU021 / CP021: por defecto, de mayor a menor prioridad del analista; las
+    # alertas sin prioridad van al final y, dentro de cada nivel, por fecha.
+    order = request.GET.get('order', 'priority_desc').strip()
+    qs = qs.annotate(priority_rank=Case(
+        *[When(workflow__analyst_priority=value, then=Value(rank)) for value, rank in PRIORITY_RANK.items()],
+        default=None,
+        output_field=IntegerField(),
+    ))
     _order_map = {
-        'risk_desc': F('predictionlog__risk_score').desc(nulls_last=True),
-        'risk_asc':  F('predictionlog__risk_score').asc(nulls_last=True),
-        'date_desc': '-created_at',
-        'date_asc':  'created_at',
+        'priority_desc': (F('priority_rank').desc(nulls_last=True), '-created_at'),
+        'priority_asc':  (F('priority_rank').asc(nulls_last=True), '-created_at'),
+        'risk_desc': (F('predictionlog__risk_score').desc(nulls_last=True),),
+        'risk_asc':  (F('predictionlog__risk_score').asc(nulls_last=True),),
+        'date_desc': ('-created_at',),
+        'date_asc':  ('created_at',),
     }
-    qs = qs.order_by(_order_map.get(order, '-created_at')).distinct()
+    if order not in _order_map:
+        order = 'priority_desc'
+    qs = qs.order_by(*_order_map[order]).distinct()
 
     severity_choices = (
         Alert.objects.values_list('severity', flat=True)

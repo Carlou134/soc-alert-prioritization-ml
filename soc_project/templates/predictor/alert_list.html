@@ -64,13 +64,13 @@
 
     <!-- Toggle Todas / Mis alertas -->
     <div class="flex flex-wrap items-center gap-2">
-        <a href="{% url 'alert_list' %}?{% if search %}q={{ search }}&{% endif %}{% if severity_filter %}severity={{ severity_filter }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}{% if status_filter %}investigation_status={{ status_filter }}&{% endif %}{% if priority_filter %}analyst_priority={{ priority_filter }}&{% endif %}{% if risk_min %}risk_min={{ risk_min }}&{% endif %}{% if risk_max %}risk_max={{ risk_max }}&{% endif %}{% if assigned_filter %}assigned_to={{ assigned_filter }}&{% endif %}{% if order and order != 'date_desc' %}order={{ order }}&{% endif %}"
+        <a href="{% url 'alert_list' %}?{% if search %}q={{ search }}&{% endif %}{% if severity_filter %}severity={{ severity_filter }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}{% if status_filter %}investigation_status={{ status_filter }}&{% endif %}{% if priority_filter %}analyst_priority={{ priority_filter }}&{% endif %}{% if risk_min %}risk_min={{ risk_min }}&{% endif %}{% if risk_max %}risk_max={{ risk_max }}&{% endif %}{% if assigned_filter %}assigned_to={{ assigned_filter }}&{% endif %}{% if order and order != 'priority_desc' %}order={{ order }}&{% endif %}"
            data-testid="alert-list-toggle-all"
            class="px-4 py-2 rounded-md text-sm font-medium border transition-colors
                   {% if mine != '1' %}bg-blue-500 text-white border-blue-500{% else %}bg-transparent text-fg-muted border-line hover:text-fg-strong hover:border-fg-subtle{% endif %}">
             Todas las alertas
         </a>
-        <a href="{% url 'alert_list' %}?mine=1&{% if search %}q={{ search }}&{% endif %}{% if severity_filter %}severity={{ severity_filter }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}{% if status_filter %}investigation_status={{ status_filter }}&{% endif %}{% if priority_filter %}analyst_priority={{ priority_filter }}&{% endif %}{% if risk_min %}risk_min={{ risk_min }}&{% endif %}{% if risk_max %}risk_max={{ risk_max }}&{% endif %}{% if assigned_filter %}assigned_to={{ assigned_filter }}&{% endif %}{% if order and order != 'date_desc' %}order={{ order }}&{% endif %}"
+        <a href="{% url 'alert_list' %}?mine=1&{% if search %}q={{ search }}&{% endif %}{% if severity_filter %}severity={{ severity_filter }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}{% if status_filter %}investigation_status={{ status_filter }}&{% endif %}{% if priority_filter %}analyst_priority={{ priority_filter }}&{% endif %}{% if risk_min %}risk_min={{ risk_min }}&{% endif %}{% if risk_max %}risk_max={{ risk_max }}&{% endif %}{% if assigned_filter %}assigned_to={{ assigned_filter }}&{% endif %}{% if order and order != 'priority_desc' %}order={{ order }}&{% endif %}"
            data-testid="alert-list-toggle-mine"
            class="px-4 py-2 rounded-md text-sm font-medium border transition-colors
                   {% if mine == '1' %}bg-blue-500 text-white border-blue-500{% else %}bg-transparent text-fg-muted border-line hover:text-fg-strong hover:border-fg-subtle{% endif %}">
@@ -176,7 +176,9 @@
                 <label class="block text-xs font-medium text-fg-muted mb-1">Ordenar por</label>
                 <select name="order" data-testid="alert-list-filter-order"
                     class="w-full bg-surface-overlay border border-line-strong text-fg rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="date_desc" {% if order == 'date_desc' or not order %}selected{% endif %}>Fecha ↓ (más reciente)</option>
+                    <option value="priority_desc" {% if order == 'priority_desc' %}selected{% endif %}>Prioridad ↓ (más urgente)</option>
+                    <option value="priority_asc"  {% if order == 'priority_asc'  %}selected{% endif %}>Prioridad ↑ (menos urgente)</option>
+                    <option value="date_desc" {% if order == 'date_desc' %}selected{% endif %}>Fecha ↓ (más reciente)</option>
                     <option value="date_asc"  {% if order == 'date_asc'  %}selected{% endif %}>Fecha ↑ (más antigua)</option>
                     <option value="risk_desc" {% if order == 'risk_desc' %}selected{% endif %}>Risk Score ↓ (mayor riesgo)</option>
                     <option value="risk_asc"  {% if order == 'risk_asc'  %}selected{% endif %}>Risk Score ↑ (menor riesgo)</option>
@@ -236,9 +238,9 @@
                         <th class="px-4 py-3 text-xs font-medium text-fg-muted uppercase tracking-wide">Fuente log</th>
                         <th class="px-4 py-3 text-xs font-medium text-fg-muted uppercase tracking-wide">Firewall</th>
                         <th class="px-4 py-3 text-xs font-medium text-fg-muted uppercase tracking-wide">Subido por</th>
-                        <th class="px-4 py-3 text-xs font-medium uppercase tracking-wide {% if order == 'date_asc' %}text-blue-400{% elif order == 'date_desc' or not order %}text-blue-400{% else %}text-fg-muted{% endif %}">
+                        <th class="px-4 py-3 text-xs font-medium uppercase tracking-wide {% if order == 'date_asc' or order == 'date_desc' %}text-blue-400{% else %}text-fg-muted{% endif %}">
                             Fecha
-                            {% if order == 'date_asc' %}<span class="ml-1">↑</span>{% else %}<span class="ml-1">↓</span>{% endif %}
+                            {% if order == 'date_asc' %}<span class="ml-1">↑</span>{% elif order == 'date_desc' %}<span class="ml-1">↓</span>{% endif %}
                         </th>
                         <th class="px-4 py-3 text-xs font-medium text-fg-muted uppercase tracking-wide">Estado</th>
                         <th class="px-4 py-3 text-xs font-medium text-fg-muted uppercase tracking-wide">Asignado a</th>
