@@ -23,6 +23,7 @@ ACTION_CONNECTOR_TESTED = 'connector_tested'
 ACTION_CONNECTOR_RESYNCED = 'connector_resynced'
 ACTION_PROFILE_UPDATED = 'profile_updated'
 ACTION_PASSWORD_CHANGED = 'password_changed'
+ACTION_FAULT_TOGGLED = 'fault_toggled'
 
 ACTION_LABELS = {
     ACTION_USER_CREATED: 'Creación de usuario',
@@ -46,6 +47,7 @@ ACTION_LABELS = {
     ACTION_CONNECTOR_RESYNCED: 'Resincronización forzada de conector SIEM',
     ACTION_PROFILE_UPDATED: 'Actualización de perfil',
     ACTION_PASSWORD_CHANGED: 'Cambio de contraseña',
+    ACTION_FAULT_TOGGLED: 'Simulación de fallo (desarrollador)',
 }
 
 

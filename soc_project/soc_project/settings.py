@@ -9,6 +9,9 @@ load_dotenv(BASE_DIR.parent / '.env')
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-change-this-key')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+# Módulo de desarrollador (devtools): simula fallos para los casos de prueba de QA.
+# Apagado por defecto — sin esta variable el panel ni siquiera existe (404).
+ENABLE_FAULT_INJECTION = os.environ.get('ENABLE_FAULT_INJECTION', 'False') == 'True'
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()]
 CSRF_TRUSTED_ORIGINS = [f'https://{host}' for host in ALLOWED_HOSTS if host]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -28,6 +31,7 @@ INSTALLED_APPS = [
     'accounts',
     'predictor',
     'connectors',
+    'devtools',
     'tailwind',
     'theme',
 ]
@@ -56,6 +60,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'accounts.context_processors.theme',
+                'devtools.context_processors.fault_injection',
             ],
         },
     },
