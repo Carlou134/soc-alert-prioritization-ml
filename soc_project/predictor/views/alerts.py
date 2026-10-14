@@ -53,6 +53,23 @@ REQUIRES_CLASSIFICATION_MESSAGE = 'Debe clasificarse primero.'
 
 ALERT_NOT_FOUND_MESSAGE = 'La alerta solicitada no existe.'
 
+ANALYST_NOT_FOUND_MESSAGE = 'El analista seleccionado no existe.'
+
+
+def _find_alert(pk, queryset=None):
+    """Alerta o None — los endpoints JSON responden 404 en JSON (CP022) en vez
+    de la página HTML de get_object_or_404, que el fetch() no puede leer."""
+    if queryset is None:
+        queryset = Alert.objects.select_related('workflow')
+    try:
+        return queryset.get(pk=pk)
+    except Alert.DoesNotExist:
+        return None
+
+
+def _alert_not_found_response():
+    return JsonResponse({'error': ALERT_NOT_FOUND_MESSAGE}, status=404)
+
 MODEL_UNAVAILABLE_PENDING_MESSAGE = (
     'El modelo de clasificación no está disponible. '
     'Las alertas siguen pendientes; intente nuevamente más tarde.'
@@ -636,7 +653,9 @@ def alert_set_status_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-    alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
+    alert = _find_alert(pk)
+    if alert is None:
+        return _alert_not_found_response()
 
     # Una alerta escalada pasa a la mesa de incidentes: su estado ya no se gestiona
     # desde aquí (CP023 — otro analista puede escalarla con este formulario abierto).
@@ -702,7 +721,9 @@ def alert_set_priority_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-    alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
+    alert = _find_alert(pk)
+    if alert is None:
+        return _alert_not_found_response()
 
     try:
         data = json.loads(request.body)
@@ -878,7 +899,9 @@ def alert_assign_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-    alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
+    alert = _find_alert(pk)
+    if alert is None:
+        return _alert_not_found_response()
     assigner_role = request.user.profile.role
     allowed_roles = ASSIGNMENT_TARGETS.get(assigner_role, ())
 
@@ -896,7 +919,11 @@ def alert_assign_view(request, pk):
         log_action(request.user, ACTION_ALERT_ASSIGNED, f'Alerta #{pk} desasignada.')
         return JsonResponse({'ok': True, 'assigned_to': None, 'username': ''})
 
-    target_user = get_object_or_404(User, pk=assigned_to_id)
+    # CP024: id inexistente o malformado → error en JSON, la asignación no cambia.
+    try:
+        target_user = User.objects.get(pk=assigned_to_id)
+    except (User.DoesNotExist, ValueError, TypeError):
+        return JsonResponse({'error': ANALYST_NOT_FOUND_MESSAGE}, status=404)
     target_profile = getattr(target_user, 'profile', None)
 
     if target_profile is None or target_profile.role not in allowed_roles:
@@ -925,7 +952,9 @@ def alert_evaluate_view(request, pk):
     if profile.role not in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1'):
         return JsonResponse({'error': 'No tienes permisos para evaluar decisiones ML.'}, status=403)
 
-    alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
+    alert = _find_alert(pk)
+    if alert is None:
+        return _alert_not_found_response()
 
     if alert.latest_prediction is None:
         return JsonResponse({'error': 'La alerta no está clasificada aún.'}, status=400)
@@ -977,7 +1006,9 @@ def alert_escalate_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-    alert = get_object_or_404(Alert, pk=pk)
+    alert = _find_alert(pk, Alert.objects.all())
+    if alert is None:
+        return _alert_not_found_response()
 
     if alert.incident_id is not None:
         return JsonResponse({'error': 'Esta alerta ya fue escalada a incidente.'}, status=400)
