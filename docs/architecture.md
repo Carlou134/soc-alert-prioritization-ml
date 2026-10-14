@@ -10,7 +10,7 @@ flowchart LR
     ExtClient["External clients<br/>(future: Splunk worker)<br/>(JWT auth)"]
 
     subgraph Azure["Azure App Service (Basic B1)"]
-        Gunicorn["Django / gunicorn<br/>2 workers"]
+        Gunicorn["Django / gunicorn<br/>1 worker · 4 threads"]
         QCluster["qcluster worker<br/>(django-q2)"]
     end
 
@@ -163,7 +163,7 @@ Alerts escalated to an `Incident` (`incident_id` set) leave the main queue entir
 ## Deployment topology
 
 - **Azure App Service, Linux, Basic (B1) tier.** Free (F1) doesn't support "Always On", which this design depends on.
-- `startup.sh` starts `qcluster &` before `gunicorn ... --workers 2`. Both run in the same container — `qcluster` is not an independently scaled process, and it dies if the container is recycled (deploy, manual restart, or — without "Always On" — idle timeout).
+- `startup.sh` starts `qcluster &` before `gunicorn ... --workers 1 --threads 4 --worker-class gthread`. Both run in the same container — `qcluster` is not an independently scaled process, and it dies if the container is recycled (deploy, manual restart, or — without "Always On" — idle timeout).
 - **PostgreSQL** in production; **SQLite** for local development (`DB_HOST` empty in `.env`).
 - Static files served by **WhiteNoise** (`CompressedManifestStaticFilesStorage`), requiring `collectstatic` to have run — the test suite overrides this to a manifest-less backend since `collectstatic` doesn't run in CI.
 
