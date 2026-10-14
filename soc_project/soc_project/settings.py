@@ -145,6 +145,7 @@ LOGGING = {
     },
     'handlers': {
         'console': {'class': 'logging.StreamHandler', 'formatter': 'default'},
+        'null': {'class': 'logging.NullHandler'},
     },
     'root': {'handlers': ['console'], 'level': 'WARNING'},
     'loggers': {
@@ -152,7 +153,9 @@ LOGGING = {
         # Azure sondea el contenedor por su IP interna (169.254.x.x), que no está
         # en ALLOWED_HOSTS: Django lo rechaza con 400, como debe. No se agrega la
         # IP (cambia entre instancias); solo se evita que ensucie el log.
-        'django.security.DisallowedHost': {'handlers': [], 'propagate': False},
+        # NullHandler y no handlers=[]: un logger sin ningún handler cae en
+        # logging.lastResort, que igual imprime el error en stderr.
+        'django.security.DisallowedHost': {'handlers': ['null'], 'propagate': False},
     },
 }
 
