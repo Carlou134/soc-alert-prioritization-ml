@@ -122,8 +122,10 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
-# HU005 — sesión del navegador expira tras 1h de inactividad (no 1h fija desde el login)
-SESSION_COOKIE_AGE = 3600
+# HU005 — la sesión del navegador expira tras N minutos de inactividad (no N
+# fijos desde el login). Configurable para que QA pruebe CP005-B sin esperar 1h.
+SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT_MINUTES', '60'))
+SESSION_COOKIE_AGE = SESSION_TIMEOUT_MINUTES * 60
 SESSION_SAVE_EVERY_REQUEST = True
 
 from datetime import timedelta
