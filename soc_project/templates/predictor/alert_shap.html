@@ -306,7 +306,9 @@
         <div>
             <h2 class="text-sm font-semibold text-fg-strong">Estado de investigación</h2>
             <p class="text-xs text-fg-muted mt-0.5">
-                {% if is_trainee and not assigned_to_me %}
+                {% if alert.incident %}
+                    Alerta escalada a incidente — el estado se gestiona desde la mesa de incidentes
+                {% elif status_locked %}
                     Solo lectura
                 {% elif is_trainee and assigned_to_me %}
                     Alerta asignada a ti — puedes actualizar el estado
@@ -316,7 +318,7 @@
             </p>
         </div>
 
-        {% if is_trainee and not assigned_to_me or readonly %}
+        {% if status_locked %}
         <div class="flex items-center gap-2">
             {% if alert.workflow.investigation_status == 'investigated' %}
                 <span class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">Investigada</span>
@@ -721,7 +723,7 @@ document.addEventListener('DOMContentLoaded', function () {
 {% endif %}
 
 // Estado de investigación
-{% if not is_trainee or assigned_to_me %}
+{% if not status_locked %}
 document.getElementById('statusSave').addEventListener('click', function () {
     const selected = document.querySelector('.status-radio:checked');
     if (!selected) return;

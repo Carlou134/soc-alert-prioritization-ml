@@ -570,6 +570,11 @@ def alert_set_status_view(request, pk):
 
     alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
 
+    # Una alerta escalada pasa a la mesa de incidentes: su estado ya no se gestiona
+    # desde aquí (CP023 — otro analista puede escalarla con este formulario abierto).
+    if alert.incident_id is not None:
+        return JsonResponse({'error': 'La alerta ya no se encuentra disponible.'}, status=409)
+
     profile = request.user.profile
     if profile.is_trainee and alert.workflow.assigned_to_id != request.user.pk:
         return JsonResponse({'error': 'No tienes permisos para modificar esta alerta.'}, status=403)
@@ -685,6 +690,12 @@ def alert_shap_view(request, pk):
         and prediction.predicted_class in ('malicioso', 'a_investigar')
     )
     readonly     = request.GET.get('readonly') == '1'
+    assigned_to_me = alert.workflow.assigned_to_id == request.user.pk
+    status_locked  = (
+        readonly
+        or alert.incident_id is not None
+        or (is_trainee and not assigned_to_me)
+    )
 
     _back_map = {
         'alert_list':    ('alert_list',    'Volver a alertas'),
@@ -713,7 +724,8 @@ def alert_shap_view(request, pk):
         'can_assign'         : bool(allowed_roles),
         'assignable_users'   : assignable_users,
         'is_trainee'         : is_trainee,
-        'assigned_to_me'     : alert.workflow.assigned_to_id == request.user.pk,
+        'assigned_to_me'     : assigned_to_me,
+        'status_locked'      : status_locked,
         'can_evaluate'       : can_evaluate,
         'can_escalate'       : can_escalate,
         'readonly'           : readonly,

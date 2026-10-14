@@ -66,6 +66,37 @@ def test_set_status_trainee_allowed_when_assigned_to_self(trainee_user, admin_us
     assert resp.status_code == 200
 
 
+@pytest.mark.django_db
+def test_set_status_rejects_escalated_alert(analyst_n2_user, admin_user, make_alert):
+    """CP023: otro analista escaló la alerta mientras este tenía el formulario abierto."""
+    alert = make_alert(admin_user, predicted_class='malicioso')
+    client = Client()
+    client.force_login(analyst_n2_user)
+    client.post(f'/alerts/{alert.pk}/escalate/')
+
+    resp = _post_json(client, f'/alerts/{alert.pk}/status/', {'status': 'investigated', 'notes': 'revisada'})
+
+    assert resp.status_code == 409
+    assert resp.json()['error'] == 'La alerta ya no se encuentra disponible.'
+    alert.workflow.refresh_from_db()
+    assert alert.workflow.investigation_status == 'new'
+    assert alert.workflow.investigation_notes == ''
+
+
+@pytest.mark.django_db
+def test_shap_view_hides_status_form_for_escalated_alert(analyst_n2_user, admin_user, make_alert):
+    alert = make_alert(admin_user, predicted_class='malicioso')
+    client = Client()
+    client.force_login(analyst_n2_user)
+    client.post(f'/alerts/{alert.pk}/escalate/')
+
+    resp = client.get(f'/alerts/{alert.pk}/shap/?next=incident_detail')
+
+    assert resp.status_code == 200
+    assert resp.context['status_locked'] is True
+    assert b'data-testid="status-save"' not in resp.content
+
+
 # ── alert_evaluate_view ──────────────────────────────────────────────────────
 
 @pytest.mark.django_db
