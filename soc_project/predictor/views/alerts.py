@@ -16,6 +16,7 @@ from accounts.models import (
     ACTION_ALERT_ASSIGNED,
     ACTION_ALERT_ESCALATED,
     ACTION_ALERT_EVALUATED,
+    ACTION_ALERT_STATUS_CHANGED,
     ACTION_UPLOAD_ALERTS,
     log_action,
 )
@@ -597,14 +598,26 @@ def alert_set_status_view(request, pk):
         return JsonResponse({'error': 'Estado inválido'}, status=400)
 
     workflow = alert.workflow
+    LABELS = dict(AlertWorkflow.INVESTIGATION_STATUS_CHOICES)
+    prev_label = LABELS.get(workflow.investigation_status, workflow.investigation_status)
+
     workflow.investigation_status = status_value
     workflow.investigation_notes  = notes
     workflow.investigated_by      = request.user
     workflow.investigated_at      = timezone.now()
-    workflow.save(update_fields=[
-        'investigation_status', 'investigation_notes',
-        'investigated_by', 'investigated_at',
-    ])
+
+    # HU025: la acción y su justificación se registran juntas o no se registran.
+    with transaction.atomic():
+        workflow.save(update_fields=[
+            'investigation_status', 'investigation_notes',
+            'investigated_by', 'investigated_at',
+        ])
+        log_action(
+            request.user,
+            ACTION_ALERT_STATUS_CHANGED,
+            f'Cambió el estado de la alerta #{pk} de "{prev_label}" a "{LABELS[status_value]}". '
+            f'Justificación: {notes or "—"}',
+        )
 
     return JsonResponse({
         'ok':       True,

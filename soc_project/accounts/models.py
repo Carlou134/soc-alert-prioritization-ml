@@ -15,6 +15,7 @@ ACTION_ALERT_ASSIGNED = 'alert_assigned'
 ACTION_REPORT_EXPORT = 'report_export'
 ACTION_ALERT_EVALUATED = 'alert_evaluated'
 ACTION_ALERT_ESCALATED = 'alert_escalated'
+ACTION_ALERT_STATUS_CHANGED = 'alert_status_changed'
 ACTION_INCIDENT_RESOLVED = 'incident_resolved'
 ACTION_CONNECTOR_CREATED = 'connector_created'
 ACTION_CONNECTOR_UPDATED = 'connector_updated'
@@ -39,6 +40,7 @@ ACTION_LABELS = {
     ACTION_REPORT_EXPORT:   'Exportación de reporte',
     ACTION_ALERT_EVALUATED: 'Evaluación de decisión ML',
     ACTION_ALERT_ESCALATED:   'Escalado a incidente',
+    ACTION_ALERT_STATUS_CHANGED: 'Cambio de estado de alerta',
     ACTION_INCIDENT_RESOLVED: 'Cierre de incidente',
     ACTION_CONNECTOR_CREATED: 'Creación de conector SIEM',
     ACTION_CONNECTOR_UPDATED: 'Edición de conector SIEM',

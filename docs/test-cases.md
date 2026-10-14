@@ -319,7 +319,7 @@ The AC scenarios without a QA TC are covered by the `pytest` suite (unit + integ
 | 022 | Sc.1 Update | `predictor/tests/test_priority_and_assignment.py::test_set_priority_updates_workflow` |
 | 023 | Sc.1 Successful marking | `predictor/tests/test_state_transitions.py::test_set_status_updates_workflow` |
 | 024 | Sc.1 Correct assignment | `predictor/tests/test_priority_and_assignment.py::test_admin_assigns_alert_to_allowed_target` |
-| 025 | Sc.1 Action logging | `accounts/tests/test_audit.py::test_log_action_persists_entry` |
+| 025 | Sc.1 Action logging | `predictor/tests/test_state_transitions.py::test_set_status_records_action_with_justification_in_audit` |
 | 026 | Sc.1 Report generation | `predictor/tests/test_reports_and_history.py::test_report_view_summarizes_alerts` |
 | 027 | Sc.1 Successful export | `predictor/tests/test_reports_and_history.py::test_report_export_excel_returns_xlsx_attachment` |
 | 028 | Sc.1 History query | `predictor/tests/test_reports_and_history.py::test_history_shows_only_classified_alerts` |

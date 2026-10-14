@@ -3,6 +3,7 @@ import json
 import pytest
 from django.test import Client
 
+from accounts.models import ACTION_ALERT_STATUS_CHANGED, UserActionLog
 from predictor.models import Incident
 
 
@@ -64,6 +65,33 @@ def test_set_status_trainee_allowed_when_assigned_to_self(trainee_user, admin_us
     client.force_login(trainee_user)
     resp = _post_json(client, f'/alerts/{alert.pk}/status/', {'status': 'investigating'})
     assert resp.status_code == 200
+
+
+@pytest.mark.django_db
+def test_set_status_records_action_with_justification_in_audit(analyst_n1_user, admin_user, make_alert):
+    """HU025 esc. 1: la acción queda registrada con su justificación."""
+    alert = make_alert(admin_user, predicted_class='benigno')
+    client = Client()
+    client.force_login(analyst_n1_user)
+
+    _post_json(client, f'/alerts/{alert.pk}/status/', {'status': 'investigated', 'notes': 'IP interna conocida'})
+
+    entry = UserActionLog.objects.get(user=analyst_n1_user, action=ACTION_ALERT_STATUS_CHANGED)
+    assert f'alerta #{alert.pk}' in entry.description
+    assert '"Nueva" a "Investigada"' in entry.description
+    assert 'Justificación: IP interna conocida' in entry.description
+
+
+@pytest.mark.django_db
+def test_rejected_status_change_is_not_audited(analyst_n2_user, admin_user, make_alert):
+    alert = make_alert(admin_user, predicted_class='malicioso')
+    client = Client()
+    client.force_login(analyst_n2_user)
+    client.post(f'/alerts/{alert.pk}/escalate/')
+
+    _post_json(client, f'/alerts/{alert.pk}/status/', {'status': 'investigated', 'notes': 'x'})
+
+    assert not UserActionLog.objects.filter(action=ACTION_ALERT_STATUS_CHANGED).exists()
 
 
 @pytest.mark.django_db
