@@ -124,10 +124,10 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
-# HU005 — la sesión del navegador expira tras N minutos de inactividad (no N
-# fijos desde el login). Para CP005-B no hace falta tocarla: el módulo de
-# desarrollador tiene "Sesión corta (3 minutos)", que se activa sin reiniciar.
-SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT_MINUTES', '60'))
+# HU005 — la sesión del navegador expira tras 60 minutos de inactividad (no 60
+# fijos desde el login). Para probar CP005-B se usa "Sesión corta (3 minutos)"
+# del módulo de desarrollador, que la acorta al instante sin reiniciar la app.
+SESSION_TIMEOUT_MINUTES = 60
 SESSION_COOKIE_AGE = SESSION_TIMEOUT_MINUTES * 60
 SESSION_SAVE_EVERY_REQUEST = True
 

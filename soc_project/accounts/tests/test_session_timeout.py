@@ -10,8 +10,8 @@ from django.utils import timezone
 pytestmark = pytest.mark.django_db
 
 
-def test_session_age_follows_timeout_minutes():
-    assert settings.SESSION_COOKIE_AGE == settings.SESSION_TIMEOUT_MINUTES * 60
+def test_session_expires_after_60_minutes_of_inactivity():
+    assert settings.SESSION_COOKIE_AGE == 60 * 60
     assert settings.SESSION_SAVE_EVERY_REQUEST is True
 
 
