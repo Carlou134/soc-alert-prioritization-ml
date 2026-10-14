@@ -39,6 +39,8 @@ ASSIGNMENT_TARGETS = {
     'trainee':    (),
 }
 
+STATUS_SAVE_ERROR_MESSAGE = 'No se pudo guardar el estado de la alerta. Intente nuevamente.'
+
 # ─────────────────────────────────────────────────────────────────────────────
 # HU028 — Historial de alertas procesadas (n2 / n3 / admin)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -607,17 +609,24 @@ def alert_set_status_view(request, pk):
     workflow.investigated_at      = timezone.now()
 
     # HU025: la acción y su justificación se registran juntas o no se registran.
-    with transaction.atomic():
-        workflow.save(update_fields=[
-            'investigation_status', 'investigation_notes',
-            'investigated_by', 'investigated_at',
-        ])
-        log_action(
-            request.user,
-            ACTION_ALERT_STATUS_CHANGED,
-            f'Cambió el estado de la alerta #{pk} de "{prev_label}" a "{LABELS[status_value]}". '
-            f'Justificación: {notes or "—"}',
-        )
+    try:
+        with transaction.atomic():
+            workflow.save(update_fields=[
+                'investigation_status', 'investigation_notes',
+                'investigated_by', 'investigated_at',
+            ])
+            # Devtools (CP025): falla entre el cambio de estado y su auditoría,
+            # para comprobar que el rollback no deja un cambio sin registrar.
+            raise_if_active('db_save', DatabaseError('Fallo simulado al guardar en la base de datos.'))
+            log_action(
+                request.user,
+                ACTION_ALERT_STATUS_CHANGED,
+                f'Cambió el estado de la alerta #{pk} de "{prev_label}" a "{LABELS[status_value]}". '
+                f'Justificación: {notes or "—"}',
+            )
+    except DatabaseError as exc:
+        log_error(request.user, 'alert_set_status', str(exc))
+        return JsonResponse({'error': STATUS_SAVE_ERROR_MESSAGE}, status=503)
 
     return JsonResponse({
         'ok':       True,
