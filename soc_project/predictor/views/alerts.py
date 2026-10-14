@@ -40,6 +40,15 @@ ASSIGNMENT_TARGETS = {
     'trainee':    (),
 }
 
+# Niveles de severidad estándar del pipeline, de mayor a menor.
+SEVERITY_LEVELS = [
+    ('critical', 'Crítica'),
+    ('high',     'Alta'),
+    ('medium',   'Media'),
+    ('low',      'Baja'),
+    ('unknown',  'Desconocida'),
+]
+
 # Peso de cada prioridad del analista para ordenar el listado (mayor = más urgente).
 PRIORITY_RANK = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
 
@@ -540,11 +549,16 @@ def alert_list_view(request):
         order = 'priority_desc'
     qs = qs.order_by(*_order_map[order]).distinct()
 
-    severity_choices = (
-        Alert.objects.values_list('severity', flat=True)
+    # CP018: los niveles estándar siempre aparecen, haya o no alertas con ese
+    # nivel; se suman los valores no estándar que existan en la BD.
+    stored_severities = (
+        Alert.objects.exclude(severity='')
+        .values_list('severity', flat=True)
         .distinct()
-        .order_by('severity')
     )
+    known = {value for value, _ in SEVERITY_LEVELS}
+    extra = sorted({s.lower() for s in stored_severities} - known)
+    severity_choices = SEVERITY_LEVELS + [(s, s) for s in extra]
 
     # Contador de alertas pendientes (sin clasificar) para mostrar el botón
     pending_base = Alert.objects.filter(predictionlog__isnull=True)
@@ -579,6 +593,7 @@ def alert_list_view(request):
         'risk_max':         risk_max,
         'assigned_filter':  assigned_filter,
         'query_string':     _qs_params.urlencode(),
+        'has_filters':      any(v for k, v in _qs_params.items() if k != 'order'),
         'ingestion_errors': _unseen_failed_datasets(request.user),
     }
     return render(request, 'predictor/alert_list.html', context)
