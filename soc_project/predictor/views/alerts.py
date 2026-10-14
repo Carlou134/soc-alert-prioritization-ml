@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -17,6 +18,7 @@ from accounts.models import (
     ACTION_ALERT_ESCALATED,
     ACTION_ALERT_EVALUATED,
     ACTION_ALERT_NOT_FOUND,
+    ACTION_ALERT_STATUS_CHANGE_FAILED,
     ACTION_ALERT_STATUS_CHANGED,
     ACTION_UPLOAD_ALERTS,
     log_action,
@@ -25,11 +27,15 @@ from devtools.faults import raise_if_active
 
 from ..mitre_metadata import resolve_techniques
 from ..models import Alert, AlertWorkflow, Dataset, Incident, PredictionLog, log_error
-from ..pipeline import REQUIRED_COLUMNS, parse_file, validate_columns, clean_records
+from ..pipeline import (
+    REQUIRED_COLUMNS, clean_records, incomplete_data_message, parse_file, validate_columns,
+)
 from ..utils import (
     ModelUnavailableError, calculate_risk_score, calculate_shap_values,
     compute_shap_safe, get_active_model_version, predict_alert,
 )
+
+logger = logging.getLogger(__name__)
 
 # Roles a los que cada rol puede asignar alertas (incluye auto-asignación)
 ASSIGNMENT_TARGETS = {
@@ -52,13 +58,13 @@ SEVERITY_LEVELS = [
 # Peso de cada prioridad del analista para ordenar el listado (mayor = más urgente).
 PRIORITY_RANK = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
 
-STATUS_SAVE_ERROR_MESSAGE ='No se pudo guardar el estado de la alerta. Intente nuevamente.'
+STATUS_SAVE_ERROR_MESSAGE = 'No se pudo registrar la acción. Intente nuevamente.'
 
-SHAP_UNAVAILABLE_MESSAGE = 'No hay información de explicabilidad disponible para esta alerta.'
+SHAP_UNAVAILABLE_MESSAGE = 'No hay información disponible sobre la explicabilidad de esta alerta.'
 
 UNCLASSIFIED_MESSAGE = 'No hay información disponible: la alerta aún no fue clasificada.'
 
-REQUIRES_CLASSIFICATION_MESSAGE = 'Debe clasificarse primero.'
+REQUIRES_CLASSIFICATION_MESSAGE = 'Debe clasificarse previamente.'
 
 ALERT_NOT_FOUND_MESSAGE = 'La alerta solicitada no existe.'
 
@@ -295,7 +301,7 @@ def upload_alerts_view(request):
 
     _, missing_cols = validate_columns(records)
     if missing_cols:
-        return JsonResponse({'error': f'Faltan columnas requeridas: {", ".join(missing_cols)}'}, status=400)
+        return JsonResponse({'error': incomplete_data_message(missing_cols)}, status=400)
 
     clean, stats = clean_records(records)
     if not clean:
@@ -723,6 +729,16 @@ def alert_set_status_view(request, pk):
             )
     except DatabaseError as exc:
         log_error(request.user, 'alert_set_status', str(exc))
+        # CP025: el intento fallido también queda en auditoría (fuera de la
+        # transacción revertida). Si la BD sigue caída, queda solo el log.
+        try:
+            log_action(
+                request.user,
+                ACTION_ALERT_STATUS_CHANGE_FAILED,
+                f'Intento fallido de cambiar el estado de la alerta #{pk} a "{LABELS[status_value]}".',
+            )
+        except DatabaseError:
+            logger.exception('No se pudo auditar el intento fallido sobre la alerta #%s', pk)
         return JsonResponse({'error': STATUS_SAVE_ERROR_MESSAGE}, status=503)
 
     return JsonResponse({

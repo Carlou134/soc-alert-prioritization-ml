@@ -275,7 +275,7 @@
         <p class="text-fg-muted text-sm font-medium">Sin resultados para los filtros aplicados.</p>
         <a href="{% url 'alert_history' %}" class="text-blue-400 hover:text-blue-300 text-xs mt-2 inline-block">Limpiar filtros</a>
         {% else %}
-        <p class="text-fg-muted text-sm font-medium">No hay alertas clasificadas aún.</p>
+        <p class="text-fg-muted text-sm font-medium" data-testid="alert-history-empty-message">No existen alertas en el historial.</p>
         {% endif %}
     </div>
     {% endif %}

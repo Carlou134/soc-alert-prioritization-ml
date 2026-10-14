@@ -30,6 +30,9 @@ from .models import (
 
 USER_NOT_FOUND_MESSAGE = 'El usuario no existe.'
 
+# CP004-B: el CA pide "usuario inactivo" y el CP "usuario está desactivado".
+INACTIVE_USER_MESSAGE = 'El usuario está desactivado (inactivo). Contacta al administrador.'
+
 
 def _safe_next(url):
     """Return url only if it's a relative path (prevents open redirect)."""
@@ -60,7 +63,7 @@ def login_view(request):
             try:
                 existing = User.objects.get(username=username)
                 if not existing.is_active:
-                    error = 'Tu cuenta está desactivada. Contacta al administrador.'
+                    error = INACTIVE_USER_MESSAGE
                 else:
                     error = 'Usuario o contraseña incorrectos.'
             except User.DoesNotExist:

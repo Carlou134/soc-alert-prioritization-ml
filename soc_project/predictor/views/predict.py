@@ -10,6 +10,8 @@ from ..models import log_error
 from ..pipeline import REQUIRED_COLUMNS
 from ..utils import predict_alert, extract_valid_fields
 
+CLASSIFY_ERROR_MESSAGE = 'No se pudo clasificar la alerta.'
+
 
 @login_required
 @analyst_required
@@ -33,8 +35,7 @@ def predict_view(request):
                 log_error(request.user, 'predict_manual', str(exc))
                 messages.error(
                     request,
-                    'Ocurrió un error al ejecutar la predicción. '
-                    'Verifique los datos ingresados e intente nuevamente.',
+                    f'{CLASSIFY_ERROR_MESSAGE} Verifique los datos ingresados e intente nuevamente.',
                 )
 
     return render(request, 'predictor/predict.html', {
@@ -71,8 +72,7 @@ def predict_json_view(request):
                 log_error(request.user, 'predict_json', str(exc))
                 messages.error(
                     request,
-                    'El payload JSON no pudo ser procesado. '
-                    'Verifique que los campos y valores sean correctos.',
+                    f'{CLASSIFY_ERROR_MESSAGE} Verifique que los campos y valores sean correctos.',
                 )
 
     return render(request, 'predictor/predict_json.html', {

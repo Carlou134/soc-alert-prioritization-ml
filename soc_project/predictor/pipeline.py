@@ -128,17 +128,27 @@ def validate_column_types(records: list, mapping: dict) -> dict:
     return warnings
 
 
+INVALID_FORMAT_PREFIX = 'Formato inválido'
+
+
 def parse_file(file):
     """
     Parsea un archivo CSV o JSON.
     Devuelve (records: list[dict], error: str | None).
+
+    CP006: todo error de parseo empieza con "Formato inválido" y sigue con el
+    detalle concreto (JSON mal formado, CSV roto, extensión no soportada...).
     """
     filename = file.name.lower()
     if filename.endswith('.json'):
-        return _parse_json(file)
-    if filename.endswith('.csv'):
-        return _parse_csv(file)
-    return None, f'Tipo de archivo no soportado: "{file.name}". Use .json o .csv.'
+        records, error = _parse_json(file)
+    elif filename.endswith('.csv'):
+        records, error = _parse_csv(file)
+    else:
+        records, error = None, f'Tipo de archivo no soportado: "{file.name}". Use .json o .csv.'
+    if error:
+        return None, f'{INVALID_FORMAT_PREFIX}: {error}'
+    return records, None
 
 
 def _parse_json(file):
@@ -194,6 +204,11 @@ def _parse_csv(file):
         for row in df.to_dict(orient='records')
     ]
     return records, None
+
+
+def incomplete_data_message(missing: list) -> str:
+    """CP007: mensaje cuando faltan campos obligatorios — el proceso se detiene."""
+    return f'Datos incompletos: faltan los campos obligatorios {", ".join(missing)}.'
 
 
 def validate_columns(records: list) -> tuple:

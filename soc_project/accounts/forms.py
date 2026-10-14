@@ -15,6 +15,8 @@ SELECT_CLASS = (
     'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
 )
 
+USER_ALREADY_EXISTS_MESSAGE = 'El usuario ya existe.'
+
 
 class RegisterForm(UserCreationForm):
     email = forms.EmailField(
@@ -73,6 +75,13 @@ class AdminCreateUserForm(UserCreationForm):
         self.fields['username'].widget.attrs.update({'class': INPUT_CLASS})
         self.fields['password1'].widget.attrs.update({'class': INPUT_CLASS, 'data-testid': 'user-create-password1'})
         self.fields['password2'].widget.attrs.update({'class': INPUT_CLASS, 'data-testid': 'user-create-password2'})
+
+    def clean_username(self):
+        # CP001-B: texto exacto del caso de prueba en vez del genérico de Django.
+        username = self.cleaned_data['username']
+        if User.objects.filter(username__iexact=username).exists():
+            raise forms.ValidationError(USER_ALREADY_EXISTS_MESSAGE)
+        return username
 
     def clean_email(self):
         email = self.cleaned_data['email'].strip().lower()

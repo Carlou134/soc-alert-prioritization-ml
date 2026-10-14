@@ -32,6 +32,13 @@
         </form>
     </div>
 
+    <!-- CP011-B: "no se pudo clasificar" -->
+    {% for message in messages %}
+    <div data-testid="predict-message" class="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+        <p class="text-sm text-red-400">{{ message }}</p>
+    </div>
+    {% endfor %}
+
     {% if result %}
     <div class="bg-surface-raised border border-line rounded-lg p-6 {% if result == 'malicioso' %}border-l-4 border-l-red-500{% elif result == 'a_investigar' %}border-l-4 border-l-amber-500{% else %}border-l-4 border-l-emerald-500{% endif %}" data-testid="predict-result">
         <p class="text-xs text-fg-muted uppercase tracking-wide mb-3">Resultado de predicción</p>

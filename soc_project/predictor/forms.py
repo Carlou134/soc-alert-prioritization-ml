@@ -230,6 +230,9 @@ class JSONPredictionForm(forms.Form):
         ]
         missing = [f for f in required_fields if f not in data or data[f] is None]
         if missing:
-            raise forms.ValidationError(f'Campos faltantes: {", ".join(missing)}')
+            # CP011-B: datos insuficientes → "no se pudo clasificar".
+            raise forms.ValidationError(
+                f'No se pudo clasificar la alerta. Campos faltantes: {", ".join(missing)}'
+            )
 
         return data
