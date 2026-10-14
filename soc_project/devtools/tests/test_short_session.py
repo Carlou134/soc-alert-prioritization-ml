@@ -72,6 +72,20 @@ def test_inactivity_beyond_short_session_asks_for_login(faults_on, analyst_n1_us
     assert resp.url.startswith('/login/')
 
 
+def test_short_session_expires_even_with_bell_polling(faults_on, analyst_n1_user):
+    """Escenario real de QA: pestaña abierta (la campanita consulta cada 3 s) y
+    el usuario sin tocar nada. El polling no cuenta como actividad."""
+    FaultFlag.objects.create(key='short_session', expires_at=timezone.now() + timedelta(minutes=15))
+    client = _login(analyst_n1_user)
+    client.get('/dashboard/')
+    expire_before = _session_row(client).expire_date
+
+    for _ in range(5):
+        client.get('/notifications/unread-count/')
+
+    assert _session_row(client).expire_date == expire_before
+
+
 def test_session_returns_to_normal_after_disabling(faults_on, admin_user):
     client = _login(admin_user)
     client.post(PANEL_URL, {'key': 'short_session', 'action': 'enable'})

@@ -13,6 +13,7 @@ from django.utils import timezone
 from django_q.tasks import async_task
 
 from accounts.decorators import analyst_required, role_required
+from accounts.middleware import passive_session
 from accounts.models import (
     ACTION_ALERT_ASSIGNED,
     ACTION_ALERT_ESCALATED,
@@ -333,6 +334,7 @@ def upload_alerts_view(request):
     })
 
 
+@passive_session
 @login_required
 @analyst_required
 def dataset_status_view(request, pk):
@@ -348,6 +350,7 @@ def dataset_status_view(request, pk):
     })
 
 
+@passive_session
 @login_required
 def notifications_unread_count_view(request):
     """JSON liviano para el badge de la campanita en el navbar (Track 7) —
