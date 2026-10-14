@@ -38,6 +38,15 @@
         </div>
     </div>
 
+    <!-- Django messages (CP027: fallo al exportar) -->
+    {% for message in messages %}
+    <div data-testid="report-message" class="{% if message.tags == 'success' %}bg-emerald-500/10 border border-emerald-500/20{% else %}bg-red-500/10 border border-red-500/20{% endif %} rounded-lg px-4 py-3">
+        <p class="text-sm {% if message.tags == 'success' %}text-emerald-400{% else %}text-red-400{% endif %}">
+            {{ message }}
+        </p>
+    </div>
+    {% endfor %}
+
     <!-- Filtros -->
     <form method="get" class="bg-surface-raised/50 border border-line rounded-lg p-4" data-testid="report-filter-form">
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">

@@ -2,7 +2,9 @@
 # HU026 / HU027 — Reportes y exportación
 # ─────────────────────────────────────────────────────────────────────────────
 import io
+import logging
 from datetime import datetime
+from functools import wraps
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -12,17 +14,44 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from accounts.decorators import admin_required
 from accounts.models import ACTION_REPORT_EXPORT, log_action
+from devtools.faults import raise_if_active
 
-from ..models import Alert, AlertWorkflow, Incident
+from ..models import Alert, AlertWorkflow, Incident, log_error
+
+logger = logging.getLogger(__name__)
+
+EXPORT_ERROR_MESSAGE = 'No se pudo exportar el reporte.'
+
+
+def _export_guard(fault_key):
+    """CP027-A/B: si la generación del archivo falla, se registra el error y se
+    vuelve al reporte (con los mismos filtros) mostrando un mensaje, en vez de
+    un 500. `fault_key` es el fallo de devtools que simula ese formato."""
+    def decorator(view):
+        @wraps(view)
+        def wrapper(request, *args, **kwargs):
+            try:
+                raise_if_active(fault_key)
+                return view(request, *args, **kwargs)
+            except Exception as exc:
+                logger.exception('Fallo al exportar el reporte (%s)', view.__name__)
+                log_error(request.user, view.__name__, str(exc))
+                messages.error(request, EXPORT_ERROR_MESSAGE)
+                query = request.GET.urlencode()
+                return redirect(reverse('reports') +(f'?{query}' if query else ''))
+        return wrapper
+    return decorator
 
 
 def _build_report_queryset(params):
@@ -225,6 +254,7 @@ def report_view(request):
 
 @login_required
 @admin_required
+@_export_guard('export_excel')
 def report_export_excel_view(request):
     params = request.GET
     qs = _build_report_queryset(params)
@@ -297,6 +327,7 @@ def report_export_excel_view(request):
 
 @login_required
 @admin_required
+@_export_guard('export_pdf')
 def report_export_pdf_view(request):
     params = request.GET
     qs = _build_report_queryset(params)
@@ -505,6 +536,7 @@ def report_export_pdf_view(request):
 
 @login_required
 @admin_required
+@_export_guard('export_pdf')
 def report_export_incidents_pdf_view(request):
     import matplotlib
     matplotlib.use('Agg')
