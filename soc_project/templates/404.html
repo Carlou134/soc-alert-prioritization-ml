@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block title %}Página no encontrada — SOC Predictor{% endblock %}
+
+{% block content %}
+{% url 'dashboard' as dashboard_url %}
+{% include 'errors/_error_card.html' with code=404 title='Página no encontrada' message='El recurso que buscas no existe o ya no está disponible.' back_url=dashboard_url back_label='Volver al dashboard' %}
+{% endblock %}
+
+{% block public_content %}
+{% url 'login' as login_url %}
+{% include 'errors/_error_card.html' with code=404 title='Página no encontrada' message='El recurso que buscas no existe o ya no está disponible.' back_url=login_url back_label='Ir a iniciar sesión' %}
+{% endblock %}

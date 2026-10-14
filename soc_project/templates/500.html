@@ -1,0 +1,18 @@
+{% load static %}
+{# Django renderiza esta página sin contexto (sin request ni user): no puede heredar de base.html. #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error del servidor — SOC Predictor</title>
+    <link rel="icon" type="image/png" href="{% static 'icon.png' %}">
+    <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
+    <style>body { font-family: 'Inter', system-ui, sans-serif; }</style>
+</head>
+<body class="bg-surface text-fg min-h-screen">
+    <main class="min-h-screen flex items-center">
+        {% include 'errors/_error_card.html' with code=500 title='Ocurrió un error inesperado' message='No se pudo completar la operación. El error quedó registrado; intenta nuevamente en unos minutos.' back_url='/' back_label='Volver al inicio' %}
+    </main>
+</body>
+</html>
