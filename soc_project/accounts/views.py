@@ -3,7 +3,7 @@ from django.contrib.auth import authenticate, login, logout, update_session_auth
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 
 from .decorators import admin_required
 from .forms import (
@@ -26,6 +26,9 @@ from .models import (
     UserProfile,
     log_action,
 )
+
+
+USER_NOT_FOUND_MESSAGE = 'El usuario no existe.'
 
 
 def _safe_next(url):
@@ -163,9 +166,14 @@ def user_create_view(request):
 @login_required
 @admin_required
 def user_edit_view(request, user_id):
-    target_user = get_object_or_404(User, id=user_id)
-    profile, _ = UserProfile.objects.get_or_create(user=target_user)
     next_url = _safe_next(request.GET.get('next') or request.POST.get('next'))
+    # CP003: usuario inexistente → mensaje claro en el listado, sin tocar la BD.
+    try:
+        target_user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        messages.error(request, USER_NOT_FOUND_MESSAGE)
+        return redirect(next_url or 'user_list')
+    profile, _ = UserProfile.objects.get_or_create(user=target_user)
 
     if request.method == 'POST':
         form = UserRoleForm(request.POST)
