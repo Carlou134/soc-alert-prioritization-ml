@@ -1,7 +1,8 @@
 {% load static %}
 {# Django renderiza esta página sin contexto (sin request ni user): no puede heredar de base.html. #}
+{# Sin ui_theme disponible, el tema va fijo: un data-theme vacío deja la página sin estilos de tema. #}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
