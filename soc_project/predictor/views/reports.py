@@ -2,7 +2,7 @@
 # HU026 / HU027 — Reportes y exportación
 # ─────────────────────────────────────────────────────────────────────────────
 import io
-from datetime import datetime, date
+from datetime import datetime
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -17,6 +17,7 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.shortcuts import render
+from django.utils import timezone
 
 from accounts.decorators import admin_required
 from accounts.models import ACTION_REPORT_EXPORT, log_action
@@ -257,7 +258,7 @@ def report_export_excel_view(request):
         workflow = alert.workflow
         ws.append([
             alert.pk,
-            alert.created_at.strftime('%Y-%m-%d %H:%M') if alert.created_at else '',
+            timezone.localtime(alert.created_at).strftime('%Y-%m-%d %H:%M') if alert.created_at else '',
             alert.event_category,
             alert.protocol,
             alert.mitre_tactic,
@@ -279,7 +280,7 @@ def report_export_excel_view(request):
     wb.save(buffer)
     buffer.seek(0)
 
-    filename = f'reporte_alertas_{date.today().isoformat()}.xlsx'
+    filename = f'reporte_alertas_{timezone.localdate().isoformat()}.xlsx'
     log_action(
         request.user,
         ACTION_REPORT_EXPORT,
@@ -339,7 +340,7 @@ def report_export_pdf_view(request):
 
     story.append(Paragraph('Reporte de Alertas SOC', title_style))
     story.append(Paragraph(
-        f'Generado el {date.today().strftime("%d/%m/%Y")} — Total: {summary["total"]} alertas',
+        f'Generado el {timezone.localdate().strftime("%d/%m/%Y")} — Total: {summary["total"]} alertas',
         subtitle_style,
     ))
 
@@ -459,7 +460,7 @@ def report_export_pdf_view(request):
         pc = prediction.predicted_class if prediction else ''
         detail_data.append([
             str(alert.pk),
-            alert.created_at.strftime('%Y-%m-%d') if alert.created_at else '',
+            timezone.localtime(alert.created_at).strftime('%Y-%m-%d') if alert.created_at else '',
             alert.event_category[:20],
             alert.mitre_tactic[:18],
             alert.severity,
@@ -490,7 +491,7 @@ def report_export_pdf_view(request):
     doc.build(story)
     buffer.seek(0)
 
-    filename = f'reporte_alertas_{date.today().isoformat()}.pdf'
+    filename = f'reporte_alertas_{timezone.localdate().isoformat()}.pdf'
     log_action(
         request.user,
         ACTION_REPORT_EXPORT,
@@ -626,7 +627,7 @@ def report_export_incidents_pdf_view(request):
     story = []
     story.append(Paragraph('Reporte de Incidentes SOC', title_style))
     story.append(Paragraph(
-        f'Generado el {date.today().strftime("%d/%m/%Y")} — Total incidentes: {total_incidents}',
+        f'Generado el {timezone.localdate().strftime("%d/%m/%Y")} — Total incidentes: {total_incidents}',
         subtitle_style,
     ))
 
@@ -684,11 +685,11 @@ def report_export_incidents_pdf_view(request):
             mttr_str = '—'
         detail_data.append([
             str(a.pk),
-            a.created_at.strftime('%Y-%m-%d')       if a.created_at  else '',
+            timezone.localtime(a.created_at).strftime('%Y-%m-%d') if a.created_at else '',
             (a.event_category or '')[:18],
             CLASS_MAP.get(prediction.predicted_class if prediction else '', '—'),
-            incident.escalated_at.strftime('%d/%m/%Y %H:%M') if incident.escalated_at else '—',
-            incident.resolved_at.strftime('%d/%m/%Y %H:%M')  if incident.resolved_at  else 'Pendiente',
+            timezone.localtime(incident.escalated_at).strftime('%d/%m/%Y %H:%M') if incident.escalated_at else '—',
+            timezone.localtime(incident.resolved_at).strftime('%d/%m/%Y %H:%M')  if incident.resolved_at  else 'Pendiente',
             mttr_str,
             ROOT_LABELS.get(incident.root_cause, '—')       if incident.root_cause  else '—',
             incident.resolved_by.username[:12]               if incident.resolved_by else '—',
@@ -715,7 +716,7 @@ def report_export_incidents_pdf_view(request):
     doc.build(story)
     buffer.seek(0)
 
-    filename = f'reporte_incidentes_{date.today().isoformat()}.pdf'
+    filename = f'reporte_incidentes_{timezone.localdate().isoformat()}.pdf'
     log_action(
         request.user,
         ACTION_REPORT_EXPORT,
