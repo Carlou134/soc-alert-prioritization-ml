@@ -2,7 +2,9 @@
 # HU026 / HU027 — Reportes y exportación
 # ─────────────────────────────────────────────────────────────────────────────
 import io
-from datetime import datetime, date
+import logging
+from datetime import datetime
+from functools import wraps
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -12,16 +14,57 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.utils import timezone
 
 from accounts.decorators import admin_required
 from accounts.models import ACTION_REPORT_EXPORT, log_action
+from devtools.faults import raise_if_active
 
-from ..models import Alert, AlertWorkflow, Incident
+from ..models import Alert, AlertWorkflow, Incident, log_error
+
+logger = logging.getLogger(__name__)
+
+EXPORT_ERROR_MESSAGE = 'No se pudo exportar el reporte.'
+
+NO_DATA_MESSAGE = 'No hay información para los filtros seleccionados.'
+
+
+def _back_to_report(request):
+    """Vuelve a la página de reportes conservando los filtros aplicados."""
+    query = request.GET.urlencode()
+    return redirect(reverse('reports') + (f'?{query}' if query else ''))
+
+
+def _no_data_response(request):
+    """CP026: sin datos no se descarga ningún archivo — se avisa en el reporte."""
+    messages.info(request, NO_DATA_MESSAGE)
+    return _back_to_report(request)
+
+
+def _export_guard(fault_key):
+    """CP027-A/B: si la generación del archivo falla, se registra el error y se
+    vuelve al reporte (con los mismos filtros) mostrando un mensaje, en vez de
+    un 500. `fault_key` es el fallo de devtools que simula ese formato."""
+    def decorator(view):
+        @wraps(view)
+        def wrapper(request, *args, **kwargs):
+            try:
+                raise_if_active(fault_key)
+                return view(request, *args, **kwargs)
+            except Exception as exc:
+                logger.exception('Fallo al exportar el reporte (%s)', view.__name__)
+                log_error(request.user, view.__name__, str(exc))
+                messages.error(request, EXPORT_ERROR_MESSAGE)
+                return _back_to_report(request)
+        return wrapper
+    return decorator
 
 
 def _build_report_queryset(params):
@@ -219,14 +262,19 @@ def report_view(request):
         'status_breakdown':  status_breakdown,
         'eval_breakdown':    eval_breakdown,
         'query_string':      _qs_params.urlencode(),
+        'no_data':           summary['total'] == 0,
+        'no_data_message':   NO_DATA_MESSAGE,
     })
 
 
 @login_required
 @admin_required
+@_export_guard('export_excel')
 def report_export_excel_view(request):
     params = request.GET
     qs = _build_report_queryset(params)
+    if not qs.exists():
+        return _no_data_response(request)
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -257,7 +305,7 @@ def report_export_excel_view(request):
         workflow = alert.workflow
         ws.append([
             alert.pk,
-            alert.created_at.strftime('%Y-%m-%d %H:%M') if alert.created_at else '',
+            timezone.localtime(alert.created_at).strftime('%Y-%m-%d %H:%M') if alert.created_at else '',
             alert.event_category,
             alert.protocol,
             alert.mitre_tactic,
@@ -279,7 +327,7 @@ def report_export_excel_view(request):
     wb.save(buffer)
     buffer.seek(0)
 
-    filename = f'reporte_alertas_{date.today().isoformat()}.xlsx'
+    filename = f'reporte_alertas_{timezone.localdate().isoformat()}.xlsx'
     log_action(
         request.user,
         ACTION_REPORT_EXPORT,
@@ -296,9 +344,12 @@ def report_export_excel_view(request):
 
 @login_required
 @admin_required
+@_export_guard('export_pdf')
 def report_export_pdf_view(request):
     params = request.GET
     qs = _build_report_queryset(params)
+    if not qs.exists():
+        return _no_data_response(request)
     summary = _build_report_summary(qs)
 
     buffer = io.BytesIO()
@@ -339,7 +390,7 @@ def report_export_pdf_view(request):
 
     story.append(Paragraph('Reporte de Alertas SOC', title_style))
     story.append(Paragraph(
-        f'Generado el {date.today().strftime("%d/%m/%Y")} — Total: {summary["total"]} alertas',
+        f'Generado el {timezone.localdate().strftime("%d/%m/%Y")} — Total: {summary["total"]} alertas',
         subtitle_style,
     ))
 
@@ -459,7 +510,7 @@ def report_export_pdf_view(request):
         pc = prediction.predicted_class if prediction else ''
         detail_data.append([
             str(alert.pk),
-            alert.created_at.strftime('%Y-%m-%d') if alert.created_at else '',
+            timezone.localtime(alert.created_at).strftime('%Y-%m-%d') if alert.created_at else '',
             alert.event_category[:20],
             alert.mitre_tactic[:18],
             alert.severity,
@@ -490,7 +541,7 @@ def report_export_pdf_view(request):
     doc.build(story)
     buffer.seek(0)
 
-    filename = f'reporte_alertas_{date.today().isoformat()}.pdf'
+    filename = f'reporte_alertas_{timezone.localdate().isoformat()}.pdf'
     log_action(
         request.user,
         ACTION_REPORT_EXPORT,
@@ -504,6 +555,7 @@ def report_export_pdf_view(request):
 
 @login_required
 @admin_required
+@_export_guard('export_pdf')
 def report_export_incidents_pdf_view(request):
     import matplotlib
     matplotlib.use('Agg')
@@ -526,6 +578,8 @@ def report_export_incidents_pdf_view(request):
             pass
 
     total_incidents = qs.count()
+    if not total_incidents:
+        return _no_data_response(request)
     resolved_qs     = qs.filter(
         incident__is_resolved=True, incident__resolved_at__isnull=False, incident__escalated_at__isnull=False,
     )
@@ -626,7 +680,7 @@ def report_export_incidents_pdf_view(request):
     story = []
     story.append(Paragraph('Reporte de Incidentes SOC', title_style))
     story.append(Paragraph(
-        f'Generado el {date.today().strftime("%d/%m/%Y")} — Total incidentes: {total_incidents}',
+        f'Generado el {timezone.localdate().strftime("%d/%m/%Y")} — Total incidentes: {total_incidents}',
         subtitle_style,
     ))
 
@@ -684,11 +738,11 @@ def report_export_incidents_pdf_view(request):
             mttr_str = '—'
         detail_data.append([
             str(a.pk),
-            a.created_at.strftime('%Y-%m-%d')       if a.created_at  else '',
+            timezone.localtime(a.created_at).strftime('%Y-%m-%d') if a.created_at else '',
             (a.event_category or '')[:18],
             CLASS_MAP.get(prediction.predicted_class if prediction else '', '—'),
-            incident.escalated_at.strftime('%d/%m/%Y %H:%M') if incident.escalated_at else '—',
-            incident.resolved_at.strftime('%d/%m/%Y %H:%M')  if incident.resolved_at  else 'Pendiente',
+            timezone.localtime(incident.escalated_at).strftime('%d/%m/%Y %H:%M') if incident.escalated_at else '—',
+            timezone.localtime(incident.resolved_at).strftime('%d/%m/%Y %H:%M')  if incident.resolved_at  else 'Pendiente',
             mttr_str,
             ROOT_LABELS.get(incident.root_cause, '—')       if incident.root_cause  else '—',
             incident.resolved_by.username[:12]               if incident.resolved_by else '—',
@@ -715,7 +769,7 @@ def report_export_incidents_pdf_view(request):
     doc.build(story)
     buffer.seek(0)
 
-    filename = f'reporte_incidentes_{date.today().isoformat()}.pdf'
+    filename = f'reporte_incidentes_{timezone.localdate().isoformat()}.pdf'
     log_action(
         request.user,
         ACTION_REPORT_EXPORT,

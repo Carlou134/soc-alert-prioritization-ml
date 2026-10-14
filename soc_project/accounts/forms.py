@@ -1,19 +1,21 @@
 from django import forms
 from django.contrib.auth.models import User
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import PasswordChangeForm, UserCreationForm
 
 from .models import UserProfile
 
 INPUT_CLASS = (
-    'w-full bg-slate-700 border border-slate-600 text-slate-100 '
-    'placeholder:text-slate-500 rounded-md px-3 py-2 text-sm '
+    'w-full bg-surface-overlay border border-line-strong text-fg-strong '
+    'placeholder:text-fg-subtle rounded-md px-3 py-2 text-sm '
     'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
 )
 SELECT_CLASS = (
-    'w-full bg-slate-700 border border-slate-600 text-slate-100 '
+    'w-full bg-surface-overlay border border-line-strong text-fg-strong '
     'rounded-md px-3 py-2 text-sm '
     'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
 )
+
+USER_ALREADY_EXISTS_MESSAGE = 'El usuario ya existe.'
 
 
 class RegisterForm(UserCreationForm):
@@ -57,7 +59,7 @@ class AdminCreateUserForm(UserCreationForm):
         initial=True,
         label='Cuenta activa',
         widget=forms.CheckboxInput(
-            attrs={'class': 'w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded', 'data-testid': 'user-create-is-active'}
+            attrs={'class': 'w-4 h-4 text-blue-500 bg-surface-overlay border-line-strong rounded', 'data-testid': 'user-create-is-active'}
         ),
     )
 
@@ -74,11 +76,77 @@ class AdminCreateUserForm(UserCreationForm):
         self.fields['password1'].widget.attrs.update({'class': INPUT_CLASS, 'data-testid': 'user-create-password1'})
         self.fields['password2'].widget.attrs.update({'class': INPUT_CLASS, 'data-testid': 'user-create-password2'})
 
+    def clean_username(self):
+        # CP001-B: texto exacto del caso de prueba en vez del genérico de Django.
+        username = self.cleaned_data['username']
+        if User.objects.filter(username__iexact=username).exists():
+            raise forms.ValidationError(USER_ALREADY_EXISTS_MESSAGE)
+        return username
+
     def clean_email(self):
         email = self.cleaned_data['email'].strip().lower()
         if User.objects.filter(email=email).exists():
             raise forms.ValidationError('Este correo ya está registrado.')
         return email
+
+
+class ProfileForm(forms.ModelForm):
+    """Datos que el propio usuario puede editar. Rol, estado y username quedan
+    fuera a propósito: solo el admin los gestiona desde user_edit."""
+
+    email = forms.EmailField(
+        required=True,
+        label='Correo electrónico',
+        widget=forms.EmailInput(attrs={'class': INPUT_CLASS, 'data-testid': 'profile-email'}),
+    )
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email']
+        labels = {
+            'first_name': 'Nombre',
+            'last_name': 'Apellido',
+        }
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': INPUT_CLASS, 'data-testid': 'profile-first-name'}),
+            'last_name': forms.TextInput(attrs={'class': INPUT_CLASS, 'data-testid': 'profile-last-name'}),
+        }
+
+    def clean_email(self):
+        email = self.cleaned_data['email'].strip().lower()
+        if User.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError('Este correo ya está registrado.')
+        return email
+
+
+class ProfilePasswordForm(PasswordChangeForm):
+    """PasswordChangeForm de Django (valida la contraseña actual) con el estilo del sistema."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        labels = {
+            'old_password': 'Contraseña actual',
+            'new_password1': 'Nueva contraseña',
+            'new_password2': 'Confirmar nueva contraseña',
+        }
+        for name, label in labels.items():
+            self.fields[name].label = label
+            self.fields[name].help_text = ''
+            self.fields[name].widget.attrs.update({
+                'class': INPUT_CLASS,
+                'data-testid': f'profile-{name.replace("_", "-")}',
+            })
+
+
+class ThemeForm(forms.ModelForm):
+    """Preferencia de tema. Solo expone `theme`: el rol vive en el mismo modelo
+    y no debe poder tocarse desde aquí."""
+
+    class Meta:
+        model = UserProfile
+        fields = ['theme']
+        labels = {'theme': 'Tema'}
+        widgets = {'theme': forms.RadioSelect}
 
 
 class UserRoleForm(forms.Form):
@@ -91,6 +159,6 @@ class UserRoleForm(forms.Form):
         required=False,
         label='Usuario activo',
         widget=forms.CheckboxInput(
-            attrs={'class': 'w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded', 'data-testid': 'user-edit-is-active'}
+            attrs={'class': 'w-4 h-4 text-blue-500 bg-surface-overlay border-line-strong rounded', 'data-testid': 'user-edit-is-active'}
         ),
     )

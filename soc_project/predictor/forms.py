@@ -1,9 +1,9 @@
 from django import forms
 import json
 
-INPUT_CLASS = 'w-full bg-slate-700 border border-slate-600 text-slate-100 placeholder:text-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-TEXTAREA_CLASS = 'w-full bg-slate-700 border border-slate-600 text-slate-100 placeholder:text-slate-500 rounded-md px-3 py-3 h-72 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-SELECT_CLASS = 'w-full bg-slate-700 border border-slate-600 text-slate-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+INPUT_CLASS = 'w-full bg-surface-overlay border border-line-strong text-fg-strong placeholder:text-fg-subtle rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+TEXTAREA_CLASS = 'w-full bg-surface-overlay border border-line-strong text-fg-strong placeholder:text-fg-subtle rounded-md px-3 py-3 h-72 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+SELECT_CLASS = 'w-full bg-surface-overlay border border-line-strong text-fg-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
 
 # Los valores de los choices deben coincidir exactamente con los del dataset de entrenamiento.
 EVENT_CATEGORY_CHOICES = [
@@ -230,6 +230,9 @@ class JSONPredictionForm(forms.Form):
         ]
         missing = [f for f in required_fields if f not in data or data[f] is None]
         if missing:
-            raise forms.ValidationError(f'Campos faltantes: {", ".join(missing)}')
+            # CP011-B: datos insuficientes → "no se pudo clasificar".
+            raise forms.ValidationError(
+                f'No se pudo clasificar la alerta. Campos faltantes: {", ".join(missing)}'
+            )
 
         return data

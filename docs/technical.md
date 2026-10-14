@@ -39,6 +39,18 @@ Django Channels' only production-supported channel layer is Redis-backed — not
 **Authorization: two different failure modes for "you don't have permission" — know which one a view uses before relying on it.**
 Views wrapped in `@role_required(...)` (e.g. `alert_escalate_view`, `incident_resolve_view`, `alert_set_priority_view`) redirect (`302` to `dashboard`) when the role doesn't match. Views with an inline role check in the body (e.g. `alert_evaluate_view`, or the target-role check inside `alert_assign_view`) return `403` JSON instead. This is inconsistent by history, not by design — worth checking explicitly if you're writing a client against these endpoints, or a test that asserts on status code.
 
+**Theming: semantic color tokens, not hardcoded `slate-*` classes.**
+Templates use role-based classes (`bg-surface-raised`, `text-fg-muted`, `border-line`) defined in `theme/static_src/src/styles.css`: each theme sets `--theme-*` variables, and `@theme inline` points the utilities at them. The active theme is `<html data-theme>`, rendered server-side from `UserProfile.theme` by `accounts.context_processors.theme` (falls back to `dark`), so there's no flash on load. Rules that aren't obvious from the source:
+- `text-white` stays literal on colored backgrounds (blue/red buttons, badges); `text-fg-strong` is only for text on neutral surfaces. Mixing them up makes buttons unreadable in the light theme.
+- `<canvas>` doesn't understand `var()`, so Chart.js reads resolved colors through `themeColor(name, alpha)` (defined in `base.html`). SweetAlert2 sets inline styles, so it takes `var(--theme-*)` directly.
+- Light accent shades (`text-red-400`, `text-emerald-300`…) are designed for dark backgrounds. In the light theme, `styles.css` redefines those palette variables to their dark equivalents (400 → 700, 300 → 800, 100 → 900) instead of migrating ~320 classes. Read `red-400` as "red that's legible on this theme's background". **A new accent shade used in a template has to be added to both the light override block and the dark-island block**, or it keeps its dark-theme value on white.
+- `data-theme="dark"` on any element creates a dark island inside a light page. The SOAR terminal in `incident_detail.html` uses it on purpose and keeps fixed `slate` classes, because it imitates a console.
+- `theme/static/css/dist/styles.css` is committed: rebuild Tailwind whenever classes or tokens change, and commit the result alongside.
+
+**Password strength: Django's four default validators, enforced in every flow that sets a password.**
+`AUTH_PASSWORD_VALIDATORS` was an empty list until it was enabled in the middle of the TP2 test cycles. Validators only run when a password is *set* (web registration, admin user creation, profile password change); login only compares hashes. So existing and migration-seeded accounts keep working even with weak passwords, and no data migration is involved.
+*Gotcha:* `User.objects.create_user()` does **not** run the validators — only Django's forms do. The API registration (`RegisterAPIView`) calls `validate_password()` explicitly for that reason; any new code path that creates users or sets passwords outside a Django form has to do the same.
+
 ## Dependencies and why
 
 | Package | Why |
@@ -58,7 +70,7 @@ Views wrapped in `@role_required(...)` (e.g. `alert_escalate_view`, `incident_re
 
 ## Testing
 
-110 tests, `pytest-django`. Coverage is intentionally uneven — the test priorities were driven by mapping directly against the QA team's 30 user-story acceptance checklist (see [testing-backlog.md](testing-backlog.md)), not by chasing 100% line coverage everywhere.
+153 tests, `pytest-django`. Coverage is intentionally uneven — the test priorities were driven by mapping directly against the QA team's 30 user-story acceptance checklist (see [test-cases.md](test-cases.md)), not by chasing 100% line coverage everywhere.
 
 ```bash
 cd soc_project

@@ -1,11 +1,12 @@
 import json
+import logging
 
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db import transaction
-from django.db.models import F, Q
+from django.db import DatabaseError, transaction
+from django.db.models import Case, F, IntegerField, Q, Value, When
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -16,17 +17,25 @@ from accounts.models import (
     ACTION_ALERT_ASSIGNED,
     ACTION_ALERT_ESCALATED,
     ACTION_ALERT_EVALUATED,
+    ACTION_ALERT_NOT_FOUND,
+    ACTION_ALERT_STATUS_CHANGE_FAILED,
+    ACTION_ALERT_STATUS_CHANGED,
     ACTION_UPLOAD_ALERTS,
     log_action,
 )
+from devtools.faults import raise_if_active
 
 from ..mitre_metadata import resolve_techniques
 from ..models import Alert, AlertWorkflow, Dataset, Incident, PredictionLog, log_error
-from ..pipeline import REQUIRED_COLUMNS, parse_file, validate_columns, clean_records
-from ..utils import (
-    calculate_risk_score, calculate_shap_values, compute_shap_safe,
-    get_active_model_version, predict_alert,
+from ..pipeline import (
+    REQUIRED_COLUMNS, clean_records, incomplete_data_message, parse_file, validate_columns,
 )
+from ..utils import (
+    ModelUnavailableError, calculate_risk_score, calculate_shap_values,
+    compute_shap_safe, get_active_model_version, predict_alert,
+)
+
+logger = logging.getLogger(__name__)
 
 # Roles a los que cada rol puede asignar alertas (incluye auto-asignación)
 ASSIGNMENT_TARGETS = {
@@ -36,6 +45,50 @@ ASSIGNMENT_TARGETS = {
     'analyst_n1': ('analyst_n1', 'analyst_n2', 'trainee'),
     'trainee':    (),
 }
+
+# Niveles de severidad estándar del pipeline, de mayor a menor.
+SEVERITY_LEVELS = [
+    ('critical', 'Crítica'),
+    ('high',     'Alta'),
+    ('medium',   'Media'),
+    ('low',      'Baja'),
+    ('unknown',  'Desconocida'),
+]
+
+# Peso de cada prioridad del analista para ordenar el listado (mayor = más urgente).
+PRIORITY_RANK = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
+
+STATUS_SAVE_ERROR_MESSAGE = 'No se pudo registrar la acción. Intente nuevamente.'
+
+SHAP_UNAVAILABLE_MESSAGE = 'No hay información disponible sobre la explicabilidad de esta alerta.'
+
+UNCLASSIFIED_MESSAGE = 'No hay información disponible: la alerta aún no fue clasificada.'
+
+REQUIRES_CLASSIFICATION_MESSAGE = 'Debe clasificarse previamente.'
+
+ALERT_NOT_FOUND_MESSAGE = 'La alerta solicitada no existe.'
+
+ANALYST_NOT_FOUND_MESSAGE = 'El analista seleccionado no existe.'
+
+
+def _find_alert(pk, queryset=None):
+    """Alerta o None — los endpoints JSON responden 404 en JSON (CP022) en vez
+    de la página HTML de get_object_or_404, que el fetch() no puede leer."""
+    if queryset is None:
+        queryset = Alert.objects.select_related('workflow')
+    try:
+        return queryset.get(pk=pk)
+    except Alert.DoesNotExist:
+        return None
+
+
+def _alert_not_found_response():
+    return JsonResponse({'error': ALERT_NOT_FOUND_MESSAGE}, status=404)
+
+MODEL_UNAVAILABLE_PENDING_MESSAGE = (
+    'El modelo de clasificación no está disponible. '
+    'Las alertas siguen pendientes; intente nuevamente más tarde.'
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HU028 — Historial de alertas procesadas (n2 / n3 / admin)
@@ -83,7 +136,10 @@ def alert_history_view(request):
 
     analyst_filter = request.GET.get('analyst', '').strip()
     if analyst_filter:
-        qs = qs.filter(workflow__investigated_by__username__icontains=analyst_filter)
+        qs = qs.filter(
+            Q(workflow__assigned_to__username__icontains=analyst_filter)
+            | Q(workflow__investigated_by__username__icontains=analyst_filter)
+        )
 
     priority_filter = request.GET.get('analyst_priority', '').strip()
     if priority_filter == 'none':
@@ -145,6 +201,8 @@ def _build_alert_instance(record, predicted_class, probabilities, user):
 
     Los campos de predicción ya no viven en Alert (Track 1); se devuelven
     aparte para construir el PredictionLog pareado en _bulk_create_alerts().
+    Sin predicción (modelo no disponible, CP014-B) prediction_kwargs es None
+    y la alerta queda pendiente de clasificación.
     """
     alert = Alert(
         event_category        = record.get('event_category', ''),
@@ -170,6 +228,8 @@ def _build_alert_instance(record, predicted_class, probabilities, user):
         label                 = record.get('label', ''),
         created_by            = user,
     )
+    if predicted_class is None:
+        return alert, None
     prediction_kwargs = {
         'predicted_class': predicted_class,
         'risk_score': calculate_risk_score(probabilities),
@@ -197,6 +257,10 @@ def _bulk_create_alerts(pairs, user):
 
     alerts = [alert for alert, _ in pairs]
     created = Alert.objects.bulk_create(alerts, batch_size=500)
+
+    # Devtools (CP008-B): falla después de insertar las Alert, a mitad de la
+    # transacción, para comprobar que el rollback no deja registros parciales.
+    raise_if_active('db_save', DatabaseError('Fallo simulado al guardar en la base de datos.'))
 
     AlertWorkflow.objects.bulk_create(
         [AlertWorkflow(alert=alert, created_by=alert.created_by) for alert in created],
@@ -237,7 +301,7 @@ def upload_alerts_view(request):
 
     _, missing_cols = validate_columns(records)
     if missing_cols:
-        return JsonResponse({'error': f'Faltan columnas requeridas: {", ".join(missing_cols)}'}, status=400)
+        return JsonResponse({'error': incomplete_data_message(missing_cols)}, status=400)
 
     clean, stats = clean_records(records)
     if not clean:
@@ -324,7 +388,29 @@ def notifications_unread_count_view(request):
     )
     assigned_to_me = base_qs.filter(assigned_to=request.user).distinct().count()
 
-    return JsonResponse({'count': pending_datasets + assigned_to_me})
+    # 3. CP010-B: lotes que subí y fallaron, hasta que los marque como revisados.
+    ingestion_errors = _unseen_failed_datasets(request.user).count()
+
+    return JsonResponse({
+        'count':            pending_datasets + assigned_to_me + ingestion_errors,
+        'ingestion_errors': ingestion_errors,
+    })
+
+
+def _unseen_failed_datasets(user):
+    return Dataset.objects.filter(uploaded_by=user, status='failed', error_seen_at__isnull=True)
+
+
+@login_required
+def dataset_ack_error_view(request, pk):
+    """Marca como revisado el error de un lote propio — deja de sumar en la campanita."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    dataset = get_object_or_404(_unseen_failed_datasets(request.user), pk=pk)
+    dataset.error_seen_at = timezone.now()
+    dataset.save(update_fields=['error_seen_at'])
+    return redirect('alert_list')
 
 
 def _friendly_serializer_errors(errors: dict) -> dict:
@@ -452,20 +538,36 @@ def alert_list_view(request):
     if assigned_filter:
         qs = qs.filter(workflow__assigned_to__username__icontains=assigned_filter)
 
-    order = request.GET.get('order', 'date_desc').strip()
+    # HU021 / CP021: por defecto, de mayor a menor prioridad del analista; las
+    # alertas sin prioridad van al final y, dentro de cada nivel, por fecha.
+    order = request.GET.get('order', 'priority_desc').strip()
+    qs = qs.annotate(priority_rank=Case(
+        *[When(workflow__analyst_priority=value, then=Value(rank)) for value, rank in PRIORITY_RANK.items()],
+        default=None,
+        output_field=IntegerField(),
+    ))
     _order_map = {
-        'risk_desc': F('predictionlog__risk_score').desc(nulls_last=True),
-        'risk_asc':  F('predictionlog__risk_score').asc(nulls_last=True),
-        'date_desc': '-created_at',
-        'date_asc':  'created_at',
+        'priority_desc': (F('priority_rank').desc(nulls_last=True), '-created_at'),
+        'priority_asc':  (F('priority_rank').asc(nulls_last=True), '-created_at'),
+        'risk_desc': (F('predictionlog__risk_score').desc(nulls_last=True),),
+        'risk_asc':  (F('predictionlog__risk_score').asc(nulls_last=True),),
+        'date_desc': ('-created_at',),
+        'date_asc':  ('created_at',),
     }
-    qs = qs.order_by(_order_map.get(order, '-created_at')).distinct()
+    if order not in _order_map:
+        order = 'priority_desc'
+    qs = qs.order_by(*_order_map[order]).distinct()
 
-    severity_choices = (
-        Alert.objects.values_list('severity', flat=True)
+    # CP018: los niveles estándar siempre aparecen, haya o no alertas con ese
+    # nivel; se suman los valores no estándar que existan en la BD.
+    stored_severities = (
+        Alert.objects.exclude(severity='')
+        .values_list('severity', flat=True)
         .distinct()
-        .order_by('severity')
     )
+    known = {value for value, _ in SEVERITY_LEVELS}
+    extra = sorted({s.lower() for s in stored_severities} - known)
+    severity_choices = SEVERITY_LEVELS + [(s, s) for s in extra]
 
     # Contador de alertas pendientes (sin clasificar) para mostrar el botón
     pending_base = Alert.objects.filter(predictionlog__isnull=True)
@@ -500,6 +602,8 @@ def alert_list_view(request):
         'risk_max':         risk_max,
         'assigned_filter':  assigned_filter,
         'query_string':     _qs_params.urlencode(),
+        'has_filters':      any(v for k, v in _qs_params.items() if k != 'order'),
+        'ingestion_errors': _unseen_failed_datasets(request.user),
     }
     return render(request, 'predictor/alert_list.html', context)
 
@@ -549,6 +653,11 @@ def predict_pending_view(request):
                 shap_values=compute_shap_safe(data),
             )
             classified += 1
+        except ModelUnavailableError as exc:
+            # Sin modelo fallarían todas: se corta y las restantes siguen pendientes.
+            log_error(request.user, 'predict_pending', str(exc))
+            messages.error(request, MODEL_UNAVAILABLE_PENDING_MESSAGE)
+            return redirect('alert_list')
         except Exception as exc:
             log_error(request.user, 'predict_pending', str(exc))
 
@@ -568,7 +677,14 @@ def alert_set_status_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-    alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
+    alert = _find_alert(pk)
+    if alert is None:
+        return _alert_not_found_response()
+
+    # Una alerta escalada pasa a la mesa de incidentes: su estado ya no se gestiona
+    # desde aquí (CP023 — otro analista puede escalarla con este formulario abierto).
+    if alert.incident_id is not None:
+        return JsonResponse({'error': 'La alerta ya no se encuentra disponible.'}, status=409)
 
     profile = request.user.profile
     if profile.is_trainee and alert.workflow.assigned_to_id != request.user.pk:
@@ -587,20 +703,49 @@ def alert_set_status_view(request, pk):
         return JsonResponse({'error': 'Estado inválido'}, status=400)
 
     workflow = alert.workflow
+    LABELS = dict(AlertWorkflow.INVESTIGATION_STATUS_CHOICES)
+    prev_label = LABELS.get(workflow.investigation_status, workflow.investigation_status)
+
     workflow.investigation_status = status_value
     workflow.investigation_notes  = notes
     workflow.investigated_by      = request.user
     workflow.investigated_at      = timezone.now()
-    workflow.save(update_fields=[
-        'investigation_status', 'investigation_notes',
-        'investigated_by', 'investigated_at',
-    ])
+
+    # HU025: la acción y su justificación se registran juntas o no se registran.
+    try:
+        with transaction.atomic():
+            workflow.save(update_fields=[
+                'investigation_status', 'investigation_notes',
+                'investigated_by', 'investigated_at',
+            ])
+            # Devtools (CP025): falla entre el cambio de estado y su auditoría,
+            # para comprobar que el rollback no deja un cambio sin registrar.
+            raise_if_active('db_save', DatabaseError('Fallo simulado al guardar en la base de datos.'))
+            log_action(
+                request.user,
+                ACTION_ALERT_STATUS_CHANGED,
+                f'Cambió el estado de la alerta #{pk} de "{prev_label}" a "{LABELS[status_value]}". '
+                f'Justificación: {notes or "—"}',
+            )
+    except DatabaseError as exc:
+        log_error(request.user, 'alert_set_status', str(exc))
+        # CP025: el intento fallido también queda en auditoría (fuera de la
+        # transacción revertida). Si la BD sigue caída, queda solo el log.
+        try:
+            log_action(
+                request.user,
+                ACTION_ALERT_STATUS_CHANGE_FAILED,
+                f'Intento fallido de cambiar el estado de la alerta #{pk} a "{LABELS[status_value]}".',
+            )
+        except DatabaseError:
+            logger.exception('No se pudo auditar el intento fallido sobre la alerta #%s', pk)
+        return JsonResponse({'error': STATUS_SAVE_ERROR_MESSAGE}, status=503)
 
     return JsonResponse({
         'ok':       True,
         'status':   status_value,
         'by':       request.user.username,
-        'at':       workflow.investigated_at.strftime('%Y-%m-%d %H:%M'),
+        'at':       timezone.localtime(workflow.investigated_at).strftime('%Y-%m-%d %H:%M'),
     })
 
 
@@ -610,7 +755,9 @@ def alert_set_priority_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-    alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
+    alert = _find_alert(pk)
+    if alert is None:
+        return _alert_not_found_response()
 
     try:
         data = json.loads(request.body)
@@ -635,16 +782,21 @@ def alert_set_priority_view(request, pk):
 def alert_shap_view(request, pk):
     import json as _json
 
-    alert = get_object_or_404(Alert.objects.select_related('workflow', 'incident'), pk=pk)
-
-    prediction = alert.latest_prediction
-    if prediction is None:
-        messages.warning(request, 'Esta alerta no está clasificada. Clasificala primero para ver la explicabilidad.')
+    # CP020: una alerta inexistente (URL manual, alerta borrada, link viejo) vuelve
+    # al listado con un mensaje claro y el intento queda en la auditoría.
+    try:
+        alert = Alert.objects.select_related('workflow', 'incident').get(pk=pk)
+    except Alert.DoesNotExist:
+        log_action(request.user, ACTION_ALERT_NOT_FOUND, f'Intentó acceder a la alerta #{pk}, que no existe.')
+        messages.error(request, ALERT_NOT_FOUND_MESSAGE)
         return redirect('alert_list')
 
-    shap_data = prediction.shap_values
+    # CP030 / CP012-B: una alerta sin clasificar (ej. modelo no disponible al
+    # ingerirla) también muestra su detalle, sin inventar clasificación ni score.
+    prediction = alert.latest_prediction
+    shap_data = prediction.shap_values if prediction else None
 
-    if shap_data is None:
+    if prediction is not None and shap_data is None:
         data = {
             'event_category'       : alert.event_category,
             'protocol'             : alert.protocol,
@@ -664,9 +816,15 @@ def alert_shap_view(request, pk):
             'correlation_id'       : alert.correlation_id,
             'mitre_techniques'     : alert.mitre_techniques,
         }
-        shap_data = calculate_shap_values(data)
-        prediction.shap_values = shap_data
-        prediction.save(update_fields=['shap_values'])
+        # CP013 / CP015: si SHAP falla se registra y el detalle se muestra igual,
+        # sin gráficos. No se guarda nada: se reintenta en la próxima apertura.
+        try:
+            shap_data = calculate_shap_values(data)
+        except Exception as exc:
+            log_error(request.user, 'alert_shap', str(exc))
+        else:
+            prediction.shap_values = shap_data
+            prediction.save(update_fields=['shap_values'])
 
     user_role = request.user.profile.role
     allowed_roles = ASSIGNMENT_TARGETS.get(user_role, ())
@@ -678,13 +836,23 @@ def alert_shap_view(request, pk):
     )
 
     is_trainee   = request.user.profile.is_trainee
-    can_evaluate = request.user.profile.role in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1')
+    can_evaluate = (
+        prediction is not None
+        and request.user.profile.role in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1')
+    )
     can_escalate = (
         user_role in ('admin', 'analyst_n2')
         and alert.incident_id is None
+        and prediction is not None
         and prediction.predicted_class in ('malicioso', 'a_investigar')
     )
     readonly     = request.GET.get('readonly') == '1'
+    assigned_to_me = alert.workflow.assigned_to_id == request.user.pk
+    status_locked  = (
+        readonly
+        or alert.incident_id is not None
+        or (is_trainee and not assigned_to_me)
+    )
 
     _back_map = {
         'alert_list':    ('alert_list',    'Volver a alertas'),
@@ -706,14 +874,19 @@ def alert_shap_view(request, pk):
         'alert'              : alert,
         'prediction'         : prediction,
         'mitre_techniques_resolved': resolve_techniques(alert.mitre_techniques),
-        'shap_s1'            : _json.dumps(shap_data['s1']),
-        'shap_s2'            : _json.dumps(shap_data['s2']),
+        'classified'         : prediction is not None,
+        'shap_available'     : shap_data is not None,
+        'shap_unavailable_message': SHAP_UNAVAILABLE_MESSAGE if prediction else UNCLASSIFIED_MESSAGE,
+        'requires_classification_message': REQUIRES_CLASSIFICATION_MESSAGE,
+        'shap_s1'            : _json.dumps(shap_data['s1']) if shap_data else 'null',
+        'shap_s2'            : _json.dumps(shap_data['s2']) if shap_data else 'null',
         'status_choices'     : AlertWorkflow.INVESTIGATION_STATUS_CHOICES,
         'evaluation_choices' : AlertWorkflow.ML_EVALUATION_CHOICES,
         'can_assign'         : bool(allowed_roles),
         'assignable_users'   : assignable_users,
         'is_trainee'         : is_trainee,
-        'assigned_to_me'     : alert.workflow.assigned_to_id == request.user.pk,
+        'assigned_to_me'     : assigned_to_me,
+        'status_locked'      : status_locked,
         'can_evaluate'       : can_evaluate,
         'can_escalate'       : can_escalate,
         'readonly'           : readonly,
@@ -760,7 +933,9 @@ def alert_assign_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-    alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
+    alert = _find_alert(pk)
+    if alert is None:
+        return _alert_not_found_response()
     assigner_role = request.user.profile.role
     allowed_roles = ASSIGNMENT_TARGETS.get(assigner_role, ())
 
@@ -778,7 +953,11 @@ def alert_assign_view(request, pk):
         log_action(request.user, ACTION_ALERT_ASSIGNED, f'Alerta #{pk} desasignada.')
         return JsonResponse({'ok': True, 'assigned_to': None, 'username': ''})
 
-    target_user = get_object_or_404(User, pk=assigned_to_id)
+    # CP024: id inexistente o malformado → error en JSON, la asignación no cambia.
+    try:
+        target_user = User.objects.get(pk=assigned_to_id)
+    except (User.DoesNotExist, ValueError, TypeError):
+        return JsonResponse({'error': ANALYST_NOT_FOUND_MESSAGE}, status=404)
     target_profile = getattr(target_user, 'profile', None)
 
     if target_profile is None or target_profile.role not in allowed_roles:
@@ -807,7 +986,9 @@ def alert_evaluate_view(request, pk):
     if profile.role not in ('admin', 'analyst_n3', 'analyst_n2', 'analyst_n1'):
         return JsonResponse({'error': 'No tienes permisos para evaluar decisiones ML.'}, status=403)
 
-    alert = get_object_or_404(Alert.objects.select_related('workflow'), pk=pk)
+    alert = _find_alert(pk)
+    if alert is None:
+        return _alert_not_found_response()
 
     if alert.latest_prediction is None:
         return JsonResponse({'error': 'La alerta no está clasificada aún.'}, status=400)
@@ -845,7 +1026,7 @@ def alert_evaluate_view(request, pk):
         'evaluation': evaluation,
         'label':      LABELS[evaluation],
         'by':         request.user.username,
-        'at':         workflow.ml_evaluated_at.strftime('%Y-%m-%d %H:%M'),
+        'at':         timezone.localtime(workflow.ml_evaluated_at).strftime('%Y-%m-%d %H:%M'),
     })
 
 
@@ -859,7 +1040,9 @@ def alert_escalate_view(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-    alert = get_object_or_404(Alert, pk=pk)
+    alert = _find_alert(pk, Alert.objects.all())
+    if alert is None:
+        return _alert_not_found_response()
 
     if alert.incident_id is not None:
         return JsonResponse({'error': 'Esta alerta ya fue escalada a incidente.'}, status=400)

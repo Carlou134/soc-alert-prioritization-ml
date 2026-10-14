@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block title %}Módulo de desarrollador — SOC Predictor{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+    <div>
+        <h1 class="text-lg font-semibold text-fg-strong">Módulo de desarrollador</h1>
+        <p class="text-sm text-fg-muted mt-0.5">
+            Simula fallos para ejecutar los casos de prueba. Afectan a todos los usuarios
+            y se apagan solos a los {{ ttl_minutes }} minutos.
+        </p>
+    </div>
+
+    {% if messages %}
+    {% for message in messages %}
+    <div class="rounded-md px-4 py-3 text-sm border
+        {% if message.tags == 'error' %}bg-red-500/10 border-red-500/20 text-red-400
+        {% else %}bg-emerald-500/10 border-emerald-500/20 text-emerald-400{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <div class="bg-surface-raised border border-line rounded-lg overflow-x-auto">
+        <table class="w-full text-sm text-left">
+            <thead>
+                <tr class="border-b border-line bg-surface text-xs font-medium text-fg-muted uppercase tracking-wide">
+                    <th class="px-4 py-3">Fallo</th>
+                    <th class="px-4 py-3">Casos de prueba</th>
+                    <th class="px-4 py-3">Estado</th>
+                    <th class="px-4 py-3"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr class="border-b border-line/50 last:border-0" data-testid="fault-row-{{ row.key }}">
+                    <td class="px-4 py-3 text-fg-strong font-medium">{{ row.label }}</td>
+                    <td class="px-4 py-3 text-fg-muted font-mono text-xs">{{ row.cases }}</td>
+                    <td class="px-4 py-3">
+                        {% if row.flag %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-500/15 text-amber-500 border border-amber-500/25">Activo</span>
+                        <p class="text-xs text-fg-subtle mt-1">
+                            hasta las <span class="font-mono">{{ row.flag.expires_at|date:"H:i" }}</span>
+                            {% if row.flag.enabled_by %}· {{ row.flag.enabled_by.username }}{% endif %}
+                        </p>
+                        {% else %}
+                        <span class="text-xs text-fg-subtle">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <form method="post" class="inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="key" value="{{ row.key }}">
+                            {% if row.flag %}
+                            <input type="hidden" name="action" value="disable">
+                            <button type="submit" data-testid="fault-disable-{{ row.key }}"
+                                class="bg-surface-overlay hover:bg-surface-strong text-fg border border-line-strong px-3 py-1.5 rounded-md text-xs font-medium transition-colors">
+                                Desactivar
+                            </button>
+                            {% else %}
+                            <input type="hidden" name="action" value="enable">
+                            <button type="submit" data-testid="fault-enable-{{ row.key }}"
+                                class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors">
+                                Activar
+                            </button>
+                            {% endif %}
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

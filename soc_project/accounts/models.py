@@ -15,12 +15,18 @@ ACTION_ALERT_ASSIGNED = 'alert_assigned'
 ACTION_REPORT_EXPORT = 'report_export'
 ACTION_ALERT_EVALUATED = 'alert_evaluated'
 ACTION_ALERT_ESCALATED = 'alert_escalated'
+ACTION_ALERT_STATUS_CHANGED = 'alert_status_changed'
+ACTION_ALERT_NOT_FOUND = 'alert_not_found'
+ACTION_ALERT_STATUS_CHANGE_FAILED = 'alert_status_change_failed'
 ACTION_INCIDENT_RESOLVED = 'incident_resolved'
 ACTION_CONNECTOR_CREATED = 'connector_created'
 ACTION_CONNECTOR_UPDATED = 'connector_updated'
 ACTION_CONNECTOR_DELETED = 'connector_deleted'
 ACTION_CONNECTOR_TESTED = 'connector_tested'
 ACTION_CONNECTOR_RESYNCED = 'connector_resynced'
+ACTION_PROFILE_UPDATED = 'profile_updated'
+ACTION_PASSWORD_CHANGED = 'password_changed'
+ACTION_FAULT_TOGGLED = 'fault_toggled'
 
 ACTION_LABELS = {
     ACTION_USER_CREATED: 'Creación de usuario',
@@ -36,12 +42,18 @@ ACTION_LABELS = {
     ACTION_REPORT_EXPORT:   'Exportación de reporte',
     ACTION_ALERT_EVALUATED: 'Evaluación de decisión ML',
     ACTION_ALERT_ESCALATED:   'Escalado a incidente',
+    ACTION_ALERT_STATUS_CHANGED: 'Cambio de estado de alerta',
+    ACTION_ALERT_NOT_FOUND: 'Acceso a alerta inexistente',
+    ACTION_ALERT_STATUS_CHANGE_FAILED: 'Intento fallido de cambio de estado',
     ACTION_INCIDENT_RESOLVED: 'Cierre de incidente',
     ACTION_CONNECTOR_CREATED: 'Creación de conector SIEM',
     ACTION_CONNECTOR_UPDATED: 'Edición de conector SIEM',
     ACTION_CONNECTOR_DELETED: 'Eliminación de conector SIEM',
     ACTION_CONNECTOR_TESTED:  'Prueba de conexión SIEM',
     ACTION_CONNECTOR_RESYNCED: 'Resincronización forzada de conector SIEM',
+    ACTION_PROFILE_UPDATED: 'Actualización de perfil',
+    ACTION_PASSWORD_CHANGED: 'Cambio de contraseña',
+    ACTION_FAULT_TOGGLED: 'Simulación de fallo (desarrollador)',
 }
 
 
@@ -77,8 +89,16 @@ class UserProfile(models.Model):
         ('trainee', 'Practicante'),
     ]
 
+    THEME_DARK = 'dark'
+    THEME_LIGHT = 'light'
+    THEME_CHOICES = [
+        (THEME_DARK, 'Oscuro'),
+        (THEME_LIGHT, 'Claro'),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='analyst_n1')
+    theme = models.CharField(max_length=10, choices=THEME_CHOICES, default=THEME_DARK)
 
     class Meta:
         verbose_name = 'Perfil de Usuario'

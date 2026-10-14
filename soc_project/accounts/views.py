@@ -1,14 +1,23 @@
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 
 from .decorators import admin_required
-from .forms import AdminCreateUserForm, RegisterForm, UserRoleForm
+from .forms import (
+    AdminCreateUserForm,
+    ProfileForm,
+    ProfilePasswordForm,
+    RegisterForm,
+    ThemeForm,
+    UserRoleForm,
+)
 from .models import (
     ACTION_LABELS,
+    ACTION_PASSWORD_CHANGED,
+    ACTION_PROFILE_UPDATED,
     ACTION_USER_ACTIVATED,
     ACTION_USER_CREATED,
     ACTION_USER_DEACTIVATED,
@@ -17,6 +26,12 @@ from .models import (
     UserProfile,
     log_action,
 )
+
+
+USER_NOT_FOUND_MESSAGE = 'El usuario no existe.'
+
+# CP004-B: el CA pide "usuario inactivo" y el CP "usuario está desactivado".
+INACTIVE_USER_MESSAGE = 'El usuario está desactivado (inactivo). Contacta al administrador.'
 
 
 def _safe_next(url):
@@ -48,7 +63,7 @@ def login_view(request):
             try:
                 existing = User.objects.get(username=username)
                 if not existing.is_active:
-                    error = 'Tu cuenta está desactivada. Contacta al administrador.'
+                    error = INACTIVE_USER_MESSAGE
                 else:
                     error = 'Usuario o contraseña incorrectos.'
             except User.DoesNotExist:
@@ -154,9 +169,14 @@ def user_create_view(request):
 @login_required
 @admin_required
 def user_edit_view(request, user_id):
-    target_user = get_object_or_404(User, id=user_id)
-    profile, _ = UserProfile.objects.get_or_create(user=target_user)
     next_url = _safe_next(request.GET.get('next') or request.POST.get('next'))
+    # CP003: usuario inexistente → mensaje claro en el listado, sin tocar la BD.
+    try:
+        target_user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        messages.error(request, USER_NOT_FOUND_MESSAGE)
+        return redirect(next_url or 'user_list')
+    profile, _ = UserProfile.objects.get_or_create(user=target_user)
 
     if request.method == 'POST':
         form = UserRoleForm(request.POST)
@@ -210,6 +230,72 @@ def user_edit_view(request, user_id):
         'profile': profile,
         'next_url': next_url,
     })
+
+
+# ── Configuración de la cuenta ────────────────────────────────────────────────
+
+def _render_settings(request, **forms):
+    """Renderiza la página de configuración. Cada vista pasa solo el formulario
+    que procesó (con sus errores); los demás se construyen limpios."""
+    context = {
+        'form': forms.get('form') or ProfileForm(instance=request.user),
+        'password_form': forms.get('password_form') or ProfilePasswordForm(user=request.user),
+        'theme_form': forms.get('theme_form') or ThemeForm(instance=request.user.profile),
+    }
+    return render(request, 'accounts/profile_edit.html', context)
+
+
+@login_required
+def profile_edit_view(request):
+    if request.method != 'POST':
+        return _render_settings(request)
+
+    form = ProfileForm(request.POST, instance=request.user)
+    if form.is_valid():
+        if form.has_changed():
+            form.save()
+            log_action(
+                request.user,
+                ACTION_PROFILE_UPDATED,
+                f'{request.user.username} actualizó su perfil ({", ".join(form.changed_data)}).',
+            )
+        messages.success(request, 'Perfil actualizado correctamente.')
+        return redirect('profile_edit')
+
+    return _render_settings(request, form=form)
+
+
+@login_required
+def password_change_view(request):
+    # El formulario vive en la página de perfil; un GET directo vuelve allí.
+    if request.method != 'POST':
+        return redirect('profile_edit')
+
+    password_form = ProfilePasswordForm(user=request.user, data=request.POST)
+    if password_form.is_valid():
+        user = password_form.save()
+        # Sin esto, cambiar la contraseña invalida la sesión actual y desloguea al usuario.
+        update_session_auth_hash(request, user)
+        log_action(user, ACTION_PASSWORD_CHANGED, f'{user.username} cambió su contraseña.')
+        messages.success(request, 'Contraseña actualizada correctamente.')
+        return redirect('profile_edit')
+
+    return _render_settings(request, password_form=password_form)
+
+
+@login_required
+def theme_update_view(request):
+    # Igual que la contraseña: el formulario vive en la página de perfil.
+    if request.method != 'POST':
+        return redirect('profile_edit')
+
+    theme_form = ThemeForm(request.POST, instance=request.user.profile)
+    if theme_form.is_valid():
+        theme_form.save()
+        messages.success(request, 'Tema actualizado correctamente.')
+        return redirect('profile_edit')
+
+    return _render_settings(request, theme_form=theme_form)
 
 
 # ── Auditoría ─────────────────────────────────────────────────────────────────

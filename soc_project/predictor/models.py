@@ -47,6 +47,8 @@ class Dataset(models.Model):
     failed_count  = models.IntegerField(default=0)
     error_message = models.TextField(blank=True, default='')
     status        = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    # CP010-B: un lote 'failed' avisa en la campanita hasta que quien lo subió lo revisa.
+    error_seen_at = models.DateTimeField(null=True, blank=True)
     uploaded_by = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name='datasets'
     )

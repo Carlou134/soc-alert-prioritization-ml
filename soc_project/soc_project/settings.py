@@ -9,6 +9,9 @@ load_dotenv(BASE_DIR.parent / '.env')
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-change-this-key')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+# Módulo de desarrollador (devtools): simula fallos para los casos de prueba de QA.
+# Apagado por defecto — sin esta variable el panel ni siquiera existe (404).
+ENABLE_FAULT_INJECTION = os.environ.get('ENABLE_FAULT_INJECTION', 'False') == 'True'
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()]
 CSRF_TRUSTED_ORIGINS = [f'https://{host}' for host in ALLOWED_HOSTS if host]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -28,6 +31,7 @@ INSTALLED_APPS = [
     'accounts',
     'predictor',
     'connectors',
+    'devtools',
     'tailwind',
     'theme',
 ]
@@ -39,6 +43,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'accounts.middleware.NoCacheForAuthenticatedMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -55,6 +60,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'accounts.context_processors.theme',
+                'devtools.context_processors.fault_injection',
             ],
         },
     },
@@ -84,7 +91,14 @@ else:
         }
     }
 
-AUTH_PASSWORD_VALIDATORS = []
+# Solo se aplican al asignar una contraseña (registro, alta por admin, cambio);
+# el login no valida fortaleza, así que las cuentas existentes no se ven afectadas.
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
 
 LANGUAGE_CODE = 'es-pe'
 TIME_ZONE = 'America/Lima'
@@ -109,11 +123,31 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
-# HU005 — sesión del navegador expira tras 1h de inactividad (no 1h fija desde el login)
-SESSION_COOKIE_AGE = 3600
+# HU005 — la sesión del navegador expira tras N minutos de inactividad (no N
+# fijos desde el login). Configurable para que QA pruebe CP005-B sin esperar 1h.
+SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT_MINUTES', '60'))
+SESSION_COOKIE_AGE = SESSION_TIMEOUT_MINUTES * 60
 SESSION_SAVE_EVERY_REQUEST = True
 
 from datetime import timedelta
+
+# Sin esto, con DEBUG=False Django no escribe los errores 500 en ningún lado
+# (su handler de consola por defecto exige DEBUG=True). Azure App Service captura
+# stdout/stderr en el log stream, así que basta con mandarlos a consola.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {'format': '[{asctime}] {levelname} {name}: {message}', 'style': '{'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'default'},
+    },
+    'root': {'handlers': ['console'], 'level': 'WARNING'},
+    'loggers': {
+        'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
+    },
+}
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

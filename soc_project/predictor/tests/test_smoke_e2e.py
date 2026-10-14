@@ -79,8 +79,13 @@ def test_smoke_login_pipeline_normalize_queue(admin_user, q_cluster_sync):
     client = Client()
     client.force_login(admin_user)
 
+    # Con todos los campos obligatorios: sin ellos el pipeline se detiene (CP007).
     records = [{
-        'event_category': 'malware', 'protocol': 'tcp',
+        'event_category': 'malware', 'protocol': 'tcp', 'traffic_type': 'https',
+        'mitre_tactic': 'execution', 'kill_chain_stage': 'delivery', 'severity': 'high',
+        'ids_ips_alert': 'suspicious pattern', 'asset_criticality': 'medium',
+        'log_source': 'edr', 'firewall_action': 'monitored',
+        'failed_login_attempts': 3, 'request_rate_per_min': 20.0,
         'label': 'pipeline-smoke-1', 'correlation_id': 'PIPE-SMOKE-1',
     }]
     upload = SimpleUploadedFile('pipe.json', json.dumps(records).encode(), content_type='application/json')

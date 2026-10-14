@@ -7,10 +7,14 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from devtools.faults import raise_if_active
+
 logger = logging.getLogger(__name__)
 
 BASE_DIR   = Path(__file__).resolve().parent
 MODEL_PATH = BASE_DIR / 'ml' / 'soc_model.pkl'
+
+MODEL_UNAVAILABLE_MESSAGE = 'Modelo ML no disponible. Verificá los logs para más detalles.'
 
 
 # Lazy-loaded — se inicializan en _load_model() al primer uso
@@ -53,6 +57,18 @@ def _load_model() -> bool:
     except Exception as e:
         logger.critical(f'Model load failed: {e}')
         return False
+
+
+class ModelUnavailableError(RuntimeError):
+    """El artefacto ML no se pudo cargar — quien llama decide cómo degradar."""
+
+
+def _require_model():
+    # Devtools (CP014-B): simula que soc_model.pkl no está disponible.
+    raise_if_active('model_unavailable', ModelUnavailableError(MODEL_UNAVAILABLE_MESSAGE))
+    if not _load_model():
+        raise ModelUnavailableError(MODEL_UNAVAILABLE_MESSAGE)
+
 
 CLASS_LABELS = {0: 'benigno', 1: 'a_investigar', 2: 'malicioso'}
 
@@ -487,8 +503,7 @@ def _composite_proba(X: pd.DataFrame) -> np.ndarray:
 
 def predict_alert(data: dict) -> tuple:
     """Predicción jerárquica sobre una alerta individual."""
-    if not _load_model():
-        raise RuntimeError('Modelo ML no disponible. Verificá los logs para más detalles.')
+    _require_model()
     X = preprocess_input(data)
 
     p_mal  = rf_s1.predict_proba(X)[:, _idx_mal_s1]
@@ -515,8 +530,7 @@ def predict_batch(records: list) -> list:
     Usa preprocess_batch() para calcular incident features reales por correlation_id.
     Retorna lista de (predicted_class, probabilities) en el mismo orden que records.
     """
-    if not _load_model():
-        raise RuntimeError('Modelo ML no disponible. Verificá los logs para más detalles.')
+    _require_model()
     X = preprocess_batch(records)
 
     p_mal  = rf_s1.predict_proba(X)[:, _idx_mal_s1]
@@ -616,8 +630,9 @@ def _shap_base(expected_value, class_idx: int) -> float:
 
 
 def calculate_shap_values(data: dict, top_n: int = 15) -> dict:
-    if not _load_model():
-        raise RuntimeError('Modelo ML no disponible. Verificá los logs para más detalles.')
+    _require_model()
+    # Devtools (CP013, CP015): el modelo está, pero el cálculo SHAP falla.
+    raise_if_active('shap_unavailable')
     X = preprocess_input(data)
     exp_s1, exp_s2 = _get_shap_explainers()
 
@@ -655,6 +670,7 @@ def compute_shap_safe(data: dict):
     try:
         return calculate_shap_values(data)
     except Exception:
+        logger.exception('No se pudieron calcular los valores SHAP.')
         return None
 
 

@@ -8,8 +8,8 @@
     <!-- Header -->
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-            <h1 class="text-lg font-semibold text-white">Reportes de Alertas</h1>
-            <p class="text-sm text-slate-400 mt-0.5">Análisis histórico del comportamiento del sistema</p>
+            <h1 class="text-lg font-semibold text-fg-strong">Reportes de Alertas</h1>
+            <p class="text-sm text-fg-muted mt-0.5">Análisis histórico del comportamiento del sistema</p>
         </div>
 
         <!-- Botones de exportación -->
@@ -38,23 +38,32 @@
         </div>
     </div>
 
+    <!-- Django messages (CP027: fallo al exportar) -->
+    {% for message in messages %}
+    <div data-testid="report-message" class="{% if message.tags == 'success' %}bg-emerald-500/10 border border-emerald-500/20{% elif message.tags == 'info' %}bg-blue-500/5 border border-blue-500/20{% else %}bg-red-500/10 border border-red-500/20{% endif %} rounded-lg px-4 py-3">
+        <p class="text-sm {% if message.tags == 'success' %}text-emerald-400{% elif message.tags == 'info' %}text-blue-400{% else %}text-red-400{% endif %}">
+            {{ message }}
+        </p>
+    </div>
+    {% endfor %}
+
     <!-- Filtros -->
-    <form method="get" class="bg-slate-800/50 border border-slate-700 rounded-lg p-4" data-testid="report-filter-form">
+    <form method="get" class="bg-surface-raised/50 border border-line rounded-lg p-4" data-testid="report-filter-form">
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-                <label class="block text-xs text-slate-400 mb-1">Desde</label>
+                <label class="block text-xs text-fg-muted mb-1">Desde</label>
                 <input type="date" name="date_from" value="{{ params.date_from }}" data-testid="report-filter-date-from"
-                       class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                       class="w-full bg-surface border border-line rounded-md px-3 py-2 text-sm text-fg-emphasis focus:outline-none focus:ring-1 focus:ring-blue-500">
             </div>
             <div>
-                <label class="block text-xs text-slate-400 mb-1">Hasta</label>
+                <label class="block text-xs text-fg-muted mb-1">Hasta</label>
                 <input type="date" name="date_to" value="{{ params.date_to }}" data-testid="report-filter-date-to"
-                       class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                       class="w-full bg-surface border border-line rounded-md px-3 py-2 text-sm text-fg-emphasis focus:outline-none focus:ring-1 focus:ring-blue-500">
             </div>
             <div>
-                <label class="block text-xs text-slate-400 mb-1">Clase Predicha</label>
+                <label class="block text-xs text-fg-muted mb-1">Clase Predicha</label>
                 <select name="predicted_class" data-testid="report-filter-class"
-                        class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        class="w-full bg-surface border border-line rounded-md px-3 py-2 text-sm text-fg-emphasis focus:outline-none focus:ring-1 focus:ring-blue-500">
                     <option value="">Todas</option>
                     {% for val, label in class_choices %}
                     <option value="{{ val }}" {% if params.predicted_class == val %}selected{% endif %}>{{ label }}</option>
@@ -62,9 +71,9 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs text-slate-400 mb-1">Estado de Investigación</label>
+                <label class="block text-xs text-fg-muted mb-1">Estado de Investigación</label>
                 <select name="investigation_status" data-testid="report-filter-status"
-                        class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        class="w-full bg-surface border border-line rounded-md px-3 py-2 text-sm text-fg-emphasis focus:outline-none focus:ring-1 focus:ring-blue-500">
                     <option value="">Todos</option>
                     {% for val, label in status_choices %}
                     <option value="{{ val }}" {% if params.investigation_status == val %}selected{% endif %}>{{ label }}</option>
@@ -72,9 +81,9 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs text-slate-400 mb-1">Severidad</label>
+                <label class="block text-xs text-fg-muted mb-1">Severidad</label>
                 <select name="severity" data-testid="report-filter-severity"
-                        class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        class="w-full bg-surface border border-line rounded-md px-3 py-2 text-sm text-fg-emphasis focus:outline-none focus:ring-1 focus:ring-blue-500">
                     <option value="">Todas</option>
                     {% for sev in severities %}
                     <option value="{{ sev }}" {% if params.severity == sev %}selected{% endif %}>{{ sev }}</option>
@@ -82,9 +91,9 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs text-slate-400 mb-1">Evaluación ML</label>
+                <label class="block text-xs text-fg-muted mb-1">Evaluación ML</label>
                 <select name="ml_evaluation" data-testid="report-filter-ml-evaluation"
-                        class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        class="w-full bg-surface border border-line rounded-md px-3 py-2 text-sm text-fg-emphasis focus:outline-none focus:ring-1 focus:ring-blue-500">
                     <option value="">Todas</option>
                     {% for val, label in eval_choices %}
                     <option value="{{ val }}" {% if params.ml_evaluation == val %}selected{% endif %}>{{ label }}</option>
@@ -93,9 +102,9 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs text-slate-400 mb-1">Prioridad analista</label>
+                <label class="block text-xs text-fg-muted mb-1">Prioridad analista</label>
                 <select name="analyst_priority" data-testid="report-filter-priority"
-                        class="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        class="w-full bg-surface border border-line rounded-md px-3 py-2 text-sm text-fg-emphasis focus:outline-none focus:ring-1 focus:ring-blue-500">
                     <option value="">Todas</option>
                     {% for val, label in priority_choices %}
                     <option value="{{ val }}" {% if params.analyst_priority == val %}selected{% endif %}>{{ label }}</option>
@@ -108,16 +117,23 @@
                         class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
                     Filtrar
                 </button>
-                <a href="{% url 'reports' %}" data-testid="report-filter-clear" class="flex-1 flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-md text-sm font-medium">Limpiar</a>
+                <a href="{% url 'reports' %}" data-testid="report-filter-clear" class="flex-1 flex items-center justify-center bg-surface-overlay hover:bg-surface-strong text-fg-emphasis px-4 py-2 rounded-md text-sm font-medium">Limpiar</a>
             </div>
         </div>
     </form>
 
+    {% if no_data and not messages %}
+    <!-- Sin información (CP026) — si viene de una exportación bloqueada, ya lo dice el mensaje -->
+    <div data-testid="report-no-data" class="bg-blue-500/5 border border-blue-500/20 rounded-lg px-4 py-3">
+        <p class="text-sm text-blue-400">{{ no_data_message }}</p>
+    </div>
+    {% endif %}
+
     <!-- Tarjetas de resumen -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
-            <p class="text-xs text-slate-400 uppercase tracking-wide">Total</p>
-            <p class="text-2xl font-bold text-white mt-1">{{ summary.total }}</p>
+        <div class="bg-surface-raised border border-line rounded-lg p-4">
+            <p class="text-xs text-fg-muted uppercase tracking-wide">Total</p>
+            <p class="text-2xl font-bold text-fg-strong mt-1">{{ summary.total }}</p>
         </div>
         <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
             <p class="text-xs text-red-400 uppercase tracking-wide">Maliciosas</p>
@@ -141,41 +157,41 @@
         </div>
         <div class="text-right space-y-1">
             {% for label, count in eval_breakdown %}
-            <p class="text-xs text-slate-400">{{ label }}: <span class="text-white font-medium">{{ count }}</span></p>
+            <p class="text-xs text-fg-muted">{{ label }}: <span class="text-fg-strong font-medium">{{ count }}</span></p>
             {% endfor %}
         </div>
     </div>
 
     <!-- Desglose por estado -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-            <h2 class="text-sm font-semibold text-white mb-3">Por Estado de Investigación</h2>
+        <div class="bg-surface-raised/50 border border-line rounded-lg p-4">
+            <h2 class="text-sm font-semibold text-fg-strong mb-3">Por Estado de Investigación</h2>
             {% for label, count in status_breakdown %}
-            <div class="flex items-center justify-between py-1.5 border-b border-slate-700/50 last:border-0">
-                <span class="text-sm text-slate-300">{{ label }}</span>
-                <span class="text-sm font-medium text-white">{{ count }}</span>
+            <div class="flex items-center justify-between py-1.5 border-b border-line/50 last:border-0">
+                <span class="text-sm text-fg">{{ label }}</span>
+                <span class="text-sm font-medium text-fg-strong">{{ count }}</span>
             </div>
             {% endfor %}
         </div>
-        <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-            <h2 class="text-sm font-semibold text-white mb-3">Por Severidad</h2>
+        <div class="bg-surface-raised/50 border border-line rounded-lg p-4">
+            <h2 class="text-sm font-semibold text-fg-strong mb-3">Por Severidad</h2>
             {% for sev, count in summary.by_severity.items %}
-            <div class="flex items-center justify-between py-1.5 border-b border-slate-700/50 last:border-0">
-                <span class="text-sm text-slate-300">{{ sev|default:"—" }}</span>
-                <span class="text-sm font-medium text-white">{{ count }}</span>
+            <div class="flex items-center justify-between py-1.5 border-b border-line/50 last:border-0">
+                <span class="text-sm text-fg">{{ sev|default:"—" }}</span>
+                <span class="text-sm font-medium text-fg-strong">{{ count }}</span>
             </div>
             {% empty %}
-            <p class="text-sm text-slate-500">Sin datos</p>
+            <p class="text-sm text-fg-subtle">Sin datos</p>
             {% endfor %}
         </div>
     </div>
 
     <!-- Tabla de alertas -->
-    <div class="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden">
-        <div class="px-4 py-3 border-b border-slate-700">
-            <h2 class="text-sm font-semibold text-white">
+    <div class="bg-surface-raised/50 border border-line rounded-lg overflow-hidden">
+        <div class="px-4 py-3 border-b border-line">
+            <h2 class="text-sm font-semibold text-fg-strong">
                 Detalle de alertas
-                <span class="ml-2 text-xs text-slate-400 font-normal">({{ alerts.paginator.count }} resultados)</span>
+                <span class="ml-2 text-xs text-fg-muted font-normal">({{ alerts.paginator.count }} resultados)</span>
             </h2>
         </div>
 
@@ -183,7 +199,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-sm" data-testid="report-alerts-table">
                 <thead>
-                    <tr class="border-b border-slate-700 text-xs text-slate-400 uppercase tracking-wide">
+                    <tr class="border-b border-line text-xs text-fg-muted uppercase tracking-wide">
                         <th class="px-4 py-3 text-left">ID</th>
                         <th class="px-4 py-3 text-left">Fecha</th>
                         <th class="px-4 py-3 text-left">Categoría</th>
@@ -195,15 +211,15 @@
                         <th class="px-4 py-3 text-left">Asignado a</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-700/50">
+                <tbody class="divide-y divide-line/50">
                     {% for alert in alerts %}
-                    <tr class="hover:bg-slate-700/30" data-testid="report-alert-row-{{ alert.pk }}">
-                        <td class="px-4 py-3 text-slate-400 font-mono text-xs">#{{ alert.pk }}</td>
-                        <td class="px-4 py-3 text-slate-300 whitespace-nowrap">{{ alert.created_at|date:"d/m/Y H:i" }}</td>
-                        <td class="px-4 py-3 text-slate-300">{{ alert.event_category }}</td>
-                        <td class="px-4 py-3 text-slate-300">{{ alert.mitre_tactic }}</td>
+                    <tr class="hover:bg-surface-overlay/30" data-testid="report-alert-row-{{ alert.pk }}">
+                        <td class="px-4 py-3 text-fg-muted font-mono text-xs">#{{ alert.pk }}</td>
+                        <td class="px-4 py-3 text-fg whitespace-nowrap">{{ alert.created_at|date:"d/m/Y H:i" }}</td>
+                        <td class="px-4 py-3 text-fg">{{ alert.event_category }}</td>
+                        <td class="px-4 py-3 text-fg">{{ alert.mitre_tactic }}</td>
                         <td class="px-4 py-3">
-                            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">{{ alert.severity }}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-surface-overlay text-fg">{{ alert.severity }}</span>
                         </td>
                         <td class="px-4 py-3">
                             {% if alert.latest_prediction.predicted_class == 'malicioso' %}
@@ -213,18 +229,18 @@
                             {% elif alert.latest_prediction.predicted_class == 'benigno' %}
                             <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">Benigno</span>
                             {% else %}
-                            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-400">Sin clasificar</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-surface-overlay text-fg-muted">Sin clasificar</span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3">
                             {% if alert.workflow.investigation_status == 'new' %}
-                            <span class="text-xs text-slate-400">Nueva</span>
+                            <span class="text-xs text-fg-muted">Nueva</span>
                             {% elif alert.workflow.investigation_status == 'investigating' %}
                             <span class="text-xs text-blue-400">En investigación</span>
                             {% elif alert.workflow.investigation_status == 'investigated' %}
                             <span class="text-xs text-emerald-400">Investigada</span>
                             {% elif alert.workflow.investigation_status == 'false_positive' %}
-                            <span class="text-xs text-slate-500">Falso positivo</span>
+                            <span class="text-xs text-fg-subtle">Falso positivo</span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3">
@@ -235,10 +251,10 @@
                             {% elif alert.workflow.ml_evaluation == 'incorrect' %}
                             <span class="text-xs text-red-400">Incorrecta</span>
                             {% else %}
-                            <span class="text-xs text-slate-600">—</span>
+                            <span class="text-xs text-fg-faint">—</span>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 text-slate-400">{{ alert.workflow.assigned_to.username|default:"—" }}</td>
+                        <td class="px-4 py-3 text-fg-muted">{{ alert.workflow.assigned_to.username|default:"—" }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -247,18 +263,18 @@
 
         <!-- Paginación -->
         {% if alerts.has_other_pages %}
-        <div class="px-4 py-3 border-t border-slate-700 flex items-center justify-between">
-            <span class="text-xs text-slate-500">
+        <div class="px-4 py-3 border-t border-line flex items-center justify-between">
+            <span class="text-xs text-fg-subtle">
                 Página {{ alerts.number }} de {{ alerts.paginator.num_pages }}
             </span>
             <div class="flex gap-1">
                 {% if alerts.has_previous %}
                 <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ alerts.previous_page_number }}" data-testid="pagination-prev"
-                   class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-md">Anterior</a>
+                   class="px-3 py-1 text-xs bg-surface-overlay hover:bg-surface-strong text-fg rounded-md">Anterior</a>
                 {% endif %}
                 {% if alerts.has_next %}
                 <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ alerts.next_page_number }}" data-testid="pagination-next"
-                   class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-md">Siguiente</a>
+                   class="px-3 py-1 text-xs bg-surface-overlay hover:bg-surface-strong text-fg rounded-md">Siguiente</a>
                 {% endif %}
             </div>
         </div>
@@ -266,7 +282,7 @@
 
         {% else %}
         <div class="px-4 py-12 text-center">
-            <p class="text-slate-500 text-sm">No se encontraron alertas con los filtros aplicados.</p>
+            <p class="text-fg-subtle text-sm">No se encontraron alertas con los filtros aplicados.</p>
         </div>
         {% endif %}
     </div>

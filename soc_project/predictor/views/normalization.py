@@ -16,6 +16,7 @@ from ..pipeline import (
     OPTIONAL_COLUMNS,
     DISPLAY_COLUMNS,
     COLUMN_METADATA,
+    incomplete_data_message,
     parse_file,
     validate_columns,
     validate_column_types,
@@ -142,10 +143,10 @@ def _map_ctx(detected_cols, filename, missing_required, missing_optional, missin
         {
             'rows':           disp_rows,
             'title':          'Columnas de visualización — solo para la tabla de alertas, no afectan la predicción',
-            'header_class':   'bg-slate-700/40 border-slate-600',
-            'dot_class':      'bg-slate-400',
-            'title_class':    'text-slate-400',
-            'col_name_class': 'text-slate-400',
+            'header_class':   'bg-surface-overlay/40 border-line-strong',
+            'dot_class':      'bg-fg-muted',
+            'title_class':    'text-fg-muted',
+            'col_name_class': 'text-fg-muted',
         },
     ]
 
@@ -209,6 +210,16 @@ def pipeline_map_view(request):
 
         mapped_records = apply_mapping(records, mapping)
         new_detected, new_missing        = validate_columns(mapped_records)
+
+        # CP007: sin los campos obligatorios el modelo no puede predecir — el
+        # proceso se detiene en el mapeo y el usuario puede mapear o volver a cargar.
+        if new_missing:
+            ctx = _map_ctx(
+                detected_cols, filename, missing_required, missing_optional, missing_display,
+                prev_mapping, {},
+            )
+            ctx['error'] = incomplete_data_message(new_missing)
+            return render(request, 'predictor/pipeline.html', ctx)
         new_missing_optional = [c for c in OPTIONAL_COLUMNS if c not in new_detected]
         new_missing_display  = [c for c in DISPLAY_COLUMNS  if c not in new_detected]
 
@@ -244,6 +255,10 @@ def pipeline_normalize_view(request):
     if request.method == 'POST':
         if request.session.get('pipeline_already_saved'):
             return redirect('pipeline_preview')
+
+        # CP007: nunca se normaliza (ni se predice) con campos obligatorios faltantes.
+        if missing_cols:
+            return redirect('pipeline_map')
 
         try:
             clean, stats = clean_records(records)
@@ -300,6 +315,9 @@ def pipeline_normalize_view(request):
             ),
         )
         return redirect('pipeline_preview')
+
+    if missing_cols:
+        return redirect('pipeline_map')
 
     preview_rows = [
         [record.get(col, '') for col in detected_cols]

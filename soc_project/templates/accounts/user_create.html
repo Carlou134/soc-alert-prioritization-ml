@@ -7,7 +7,7 @@
 
     <!-- Back link -->
     <a href="{{ next_url|default:'' }}{% if not next_url %}{% url 'user_list' %}{% endif %}"
-       class="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white mb-6 transition-colors">
+       class="inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg-strong mb-6 transition-colors">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
         </svg>
@@ -15,18 +15,18 @@
     </a>
 
     <!-- Card -->
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+    <div class="bg-surface-raised border border-line rounded-xl p-6">
 
         <!-- Header -->
-        <div class="flex items-center gap-4 mb-6 pb-6 border-b border-slate-700">
+        <div class="flex items-center gap-4 mb-6 pb-6 border-b border-line">
             <div class="w-12 h-12 bg-blue-600/20 border border-blue-500/30 rounded-full flex items-center justify-center shrink-0">
                 <svg class="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
                 </svg>
             </div>
             <div>
-                <p class="text-white font-semibold">Crear nuevo usuario</p>
-                <p class="text-slate-400 text-sm">El usuario tendrá acceso inmediato según el rol asignado.</p>
+                <p class="text-fg-strong font-semibold">Crear nuevo usuario</p>
+                <p class="text-fg-muted text-sm">El usuario tendrá acceso inmediato según el rol asignado.</p>
             </div>
         </div>
 
@@ -37,7 +37,7 @@
 
             <!-- Username -->
             <div class="mb-4">
-                <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">
+                <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-fg mb-1.5">
                     Nombre de usuario
                 </label>
                 {{ form.username }}
@@ -48,7 +48,7 @@
 
             <!-- Email -->
             <div class="mb-4">
-                <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">
+                <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-fg mb-1.5">
                     Correo electrónico
                 </label>
                 {{ form.email }}
@@ -59,14 +59,14 @@
 
             <!-- Role -->
             <div class="mb-4">
-                <label for="{{ form.role.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">
+                <label for="{{ form.role.id_for_label }}" class="block text-sm font-medium text-fg mb-1.5">
                     Rol del sistema
                 </label>
                 {{ form.role }}
                 {% if form.role.errors %}
                 <p class="text-red-400 text-xs mt-1">{{ form.role.errors|join:", " }}</p>
                 {% endif %}
-                <p class="text-slate-500 text-xs mt-1.5">
+                <p class="text-fg-subtle text-xs mt-1.5">
                     Administrador — acceso total &nbsp;·&nbsp;
                     Analista N3/N2/N1 — niveles de análisis &nbsp;·&nbsp;
                     Practicante — acceso limitado
@@ -75,7 +75,7 @@
 
             <!-- Password -->
             <div class="mb-4">
-                <label for="{{ form.password1.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">
+                <label for="{{ form.password1.id_for_label }}" class="block text-sm font-medium text-fg mb-1.5">
                     Contraseña
                 </label>
                 {{ form.password1 }}
@@ -85,7 +85,7 @@
             </div>
 
             <div class="mb-5">
-                <label for="{{ form.password2.id_for_label }}" class="block text-sm font-medium text-slate-300 mb-1.5">
+                <label for="{{ form.password2.id_for_label }}" class="block text-sm font-medium text-fg mb-1.5">
                     Confirmar contraseña
                 </label>
                 {{ form.password2 }}
@@ -95,15 +95,15 @@
             </div>
 
             <!-- is_active toggle -->
-            <div class="mb-6 flex items-start gap-3 bg-slate-700/40 border border-slate-700 rounded-lg px-4 py-3">
+            <div class="mb-6 flex items-start gap-3 bg-surface-overlay/40 border border-line rounded-lg px-4 py-3">
                 <div class="flex items-center h-5 mt-0.5">
                     {{ form.is_active }}
                 </div>
                 <div>
-                    <label for="{{ form.is_active.id_for_label }}" class="text-sm font-medium text-slate-200 cursor-pointer">
+                    <label for="{{ form.is_active.id_for_label }}" class="text-sm font-medium text-fg-emphasis cursor-pointer">
                         {{ form.is_active.label }}
                     </label>
-                    <p class="text-slate-500 text-xs mt-0.5">
+                    <p class="text-fg-subtle text-xs mt-0.5">
                         Un usuario inactivo no puede iniciar sesión en el sistema.
                     </p>
                     {% if form.is_active.errors %}
@@ -126,7 +126,7 @@
                     Crear usuario
                 </button>
                 <a href="{{ next_url|default:'' }}{% if not next_url %}{% url 'user_list' %}{% endif %}" data-testid="user-create-cancel"
-                   class="flex-1 text-center bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-md px-4 py-2.5 transition-colors">
+                   class="flex-1 text-center bg-surface-overlay hover:bg-surface-strong text-fg text-sm font-medium rounded-md px-4 py-2.5 transition-colors">
                     Cancelar
                 </a>
             </div>

@@ -8,6 +8,7 @@ urlpatterns = [
     path('', include('accounts.urls')),
     path('', include('predictor.urls')),
     path('', include('connectors.urls')),
+    path('', include('devtools.urls')),
 
     path('api/accounts/', include('accounts.api_urls')),
     path('api/', include('predictor.api_urls')),

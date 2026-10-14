@@ -1,0 +1,12 @@
+{# Tarjeta compartida por 404.html y 500.html. Recibe: code, title, message, back_url, back_label. #}
+<div class="min-h-[60vh] flex items-center justify-center px-6 py-12">
+    <div class="w-full max-w-md text-center" data-testid="error-page-{{ code }}">
+        <p class="text-5xl font-bold text-fg-strong font-mono">{{ code }}</p>
+        <h1 class="text-lg font-semibold text-fg-strong mt-4" data-testid="error-title">{{ title }}</h1>
+        <p class="text-sm text-fg-muted mt-2" data-testid="error-message">{{ message }}</p>
+        <a href="{{ back_url }}" data-testid="error-back-link"
+           class="inline-flex items-center gap-2 mt-6 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+            {{ back_label }}
+        </a>
+    </div>
+</div>
