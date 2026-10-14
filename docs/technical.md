@@ -70,7 +70,7 @@ Templates use role-based classes (`bg-surface-raised`, `text-fg-muted`, `border-
 
 ## Testing
 
-110 tests, `pytest-django`. Coverage is intentionally uneven — the test priorities were driven by mapping directly against the QA team's 30 user-story acceptance checklist (see [testing-backlog.md](testing-backlog.md)), not by chasing 100% line coverage everywhere.
+153 tests, `pytest-django`. Coverage is intentionally uneven — the test priorities were driven by mapping directly against the QA team's 30 user-story acceptance checklist (see [test-cases.md](test-cases.md)), not by chasing 100% line coverage everywhere.
 
 ```bash
 cd soc_project
