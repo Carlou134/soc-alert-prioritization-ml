@@ -1,7 +1,16 @@
+import logging
+
 from django.contrib.auth.models import User
 
 from .models import Dataset, log_error
 from .utils import predict_alert, predict_batch
+
+logger = logging.getLogger(__name__)
+
+STORAGE_ERROR_MESSAGE = (
+    'No se pudieron guardar las alertas en la base de datos. '
+    'El incidente quedó registrado; intenta nuevamente.'
+)
 
 
 def process_alert_batch(dataset_id, records, user_id):
@@ -54,19 +63,29 @@ def process_alert_batch(dataset_id, records, user_id):
                 failed_count += 1
 
         saved_count = 0
+        storage_failed = False
         if instances:
             try:
                 _bulk_create_alerts(instances, user)
                 saved_count = len(instances)
             except Exception as exc:
+                # _bulk_create_alerts es atómico: no quedan registros parciales.
+                # log_error escribe en la misma BD que acaba de fallar, así que el
+                # incidente también va al log del proceso (CP008-B).
+                logger.exception('No se pudieron guardar las alertas del dataset #%s', dataset_id)
                 log_error(user, 'process_alert_batch_bulk', str(exc))
                 failed_count += len(instances)
                 instances = []
+                storage_failed = True
 
         dataset.saved_count = saved_count
         dataset.failed_count = failed_count
-        dataset.status = 'processed'
-        dataset.save(update_fields=['saved_count', 'failed_count', 'status'])
+        if storage_failed:
+            dataset.status = 'failed'
+            dataset.error_message = STORAGE_ERROR_MESSAGE
+        else:
+            dataset.status = 'processed'
+        dataset.save(update_fields=['saved_count', 'failed_count', 'status', 'error_message'])
     except Exception as exc:
         dataset.status = 'failed'
         dataset.error_message = str(exc)

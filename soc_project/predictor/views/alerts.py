@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.db.models import F, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -19,6 +19,7 @@ from accounts.models import (
     ACTION_UPLOAD_ALERTS,
     log_action,
 )
+from devtools.faults import raise_if_active
 
 from ..mitre_metadata import resolve_techniques
 from ..models import Alert, AlertWorkflow, Dataset, Incident, PredictionLog, log_error
@@ -197,6 +198,10 @@ def _bulk_create_alerts(pairs, user):
 
     alerts = [alert for alert, _ in pairs]
     created = Alert.objects.bulk_create(alerts, batch_size=500)
+
+    # Devtools (CP008-B): falla después de insertar las Alert, a mitad de la
+    # transacción, para comprobar que el rollback no deja registros parciales.
+    raise_if_active('db_save', DatabaseError('Fallo simulado al guardar en la base de datos.'))
 
     AlertWorkflow.objects.bulk_create(
         [AlertWorkflow(alert=alert, created_by=alert.created_by) for alert in created],
