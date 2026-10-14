@@ -142,7 +142,7 @@
                         <th class="px-4 py-3">Riesgo</th>
                         <th class="px-4 py-3">Estado</th>
                         <th class="px-4 py-3">Evaluación ML</th>
-                        <th class="px-4 py-3">Investigado por</th>
+                        <th class="px-4 py-3">Investigador asignado</th>
                         <th class="px-4 py-3"></th>
                     </tr>
                 </thead>
@@ -211,12 +211,17 @@
                             {% endif %}
                         </td>
 
-                        <td class="px-4 py-3">
-                            {% if alert.workflow.investigated_by %}
-                            <p class="text-xs text-fg">{{ alert.workflow.investigated_by.username }}</p>
-                            <p class="text-xs text-fg-faint font-mono">{{ alert.workflow.investigated_at|date:"Y-m-d" }}</p>
+                        <!-- HU028: investigador asignado; quién cambió el estado va como dato secundario -->
+                        <td class="px-4 py-3" data-testid="alert-history-assigned-{{ alert.pk }}">
+                            {% if alert.workflow.assigned_to %}
+                            <p class="text-xs text-fg">{{ alert.workflow.assigned_to.username }}</p>
                             {% else %}
-                            <span class="text-xs text-fg-faint">—</span>
+                            <p class="text-xs text-fg-faint">Sin asignar</p>
+                            {% endif %}
+                            {% if alert.workflow.investigated_by %}
+                            <p class="text-xs text-fg-faint whitespace-nowrap">
+                                Investigó {{ alert.workflow.investigated_by.username }} · <span class="font-mono">{{ alert.workflow.investigated_at|date:"Y-m-d" }}</span>
+                            </p>
                             {% endif %}
                         </td>
 

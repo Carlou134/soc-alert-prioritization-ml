@@ -130,7 +130,10 @@ def alert_history_view(request):
 
     analyst_filter = request.GET.get('analyst', '').strip()
     if analyst_filter:
-        qs = qs.filter(workflow__investigated_by__username__icontains=analyst_filter)
+        qs = qs.filter(
+            Q(workflow__assigned_to__username__icontains=analyst_filter)
+            | Q(workflow__investigated_by__username__icontains=analyst_filter)
+        )
 
     priority_filter = request.GET.get('analyst_priority', '').strip()
     if priority_filter == 'none':
