@@ -267,7 +267,7 @@ def connector_test_view(request, pk):
         'status': connector.status,
         'status_label': connector.get_status_display(),
         'message': message,
-        'tested_at': connector.last_tested_at.strftime('%d/%m/%Y %H:%M'),
+        'tested_at': timezone.localtime(connector.last_tested_at).strftime('%d/%m/%Y %H:%M'),
     })
 
 
@@ -294,7 +294,7 @@ def _run_sync_now(request, pk, *, reset_checkpoint, action, action_label):
         'status': connector.status,
         'status_label': connector.get_status_display(),
         'message': connector.last_test_message,
-        'last_synced_at': connector.last_synced_at.strftime('%d/%m/%Y %H:%M') if connector.last_synced_at else None,
+        'last_synced_at': timezone.localtime(connector.last_synced_at).strftime('%d/%m/%Y %H:%M') if connector.last_synced_at else None,
     })
 
 
