@@ -631,6 +631,8 @@ def _shap_base(expected_value, class_idx: int) -> float:
 
 def calculate_shap_values(data: dict, top_n: int = 15) -> dict:
     _require_model()
+    # Devtools (CP013, CP015): el modelo está, pero el cálculo SHAP falla.
+    raise_if_active('shap_unavailable')
     X = preprocess_input(data)
     exp_s1, exp_s2 = _get_shap_explainers()
 
@@ -668,6 +670,7 @@ def compute_shap_safe(data: dict):
     try:
         return calculate_shap_values(data)
     except Exception:
+        logger.exception('No se pudieron calcular los valores SHAP.')
         return None
 
 

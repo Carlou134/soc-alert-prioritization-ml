@@ -224,6 +224,7 @@
         </div>
     </div>
 
+    {% if shap_available %}
     <!-- Explanation intro -->
     <div class="bg-violet-500/5 border border-violet-500/20 rounded-xl p-4">
         <p class="text-sm text-fg">
@@ -300,6 +301,12 @@
             {% endif %}
         </div>
     </div>
+    {% else %}
+    <!-- Sin explicabilidad (CP013 / CP015) -->
+    <div data-testid="shap-unavailable" class="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
+        <p class="text-sm text-amber-400">{{ shap_unavailable_message }}</p>
+    </div>
+    {% endif %}
 
     <!-- Estado de investigación -->
     <div class="bg-surface-raised/50 border border-line/50 rounded-xl p-5 space-y-4">
@@ -673,8 +680,10 @@
         });
     }
 
-    buildChart('chartS1', shap_s1, 'rgba(239,68,68,0.75)',  'rgba(16,185,129,0.75)');
-    buildChart('chartS2', shap_s2, 'rgba(245,158,11,0.75)', 'rgba(59,130,246,0.75)');
+    if (shap_s1 && shap_s2) {
+        buildChart('chartS1', shap_s1, 'rgba(239,68,68,0.75)',  'rgba(16,185,129,0.75)');
+        buildChart('chartS2', shap_s2, 'rgba(245,158,11,0.75)', 'rgba(59,130,246,0.75)');
+    }
 
     // Render markdown para explicación ya guardada en BD
     const staticEl = document.getElementById('explain-static');
@@ -683,7 +692,7 @@
     }
 })();
 
-{% if not prediction.shap_explanation %}
+{% if shap_available and not prediction.shap_explanation %}
 document.addEventListener('DOMContentLoaded', function () {
     const badge   = document.getElementById('explain-badge');
     const loading = document.getElementById('explain-loading');

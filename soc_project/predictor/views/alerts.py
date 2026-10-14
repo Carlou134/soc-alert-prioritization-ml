@@ -41,6 +41,8 @@ ASSIGNMENT_TARGETS = {
 
 STATUS_SAVE_ERROR_MESSAGE = 'No se pudo guardar el estado de la alerta. Intente nuevamente.'
 
+SHAP_UNAVAILABLE_MESSAGE = 'No hay información de explicabilidad disponible para esta alerta.'
+
 MODEL_UNAVAILABLE_PENDING_MESSAGE = (
     'El modelo de clasificación no está disponible. '
     'Las alertas siguen pendientes; intente nuevamente más tarde.'
@@ -710,9 +712,15 @@ def alert_shap_view(request, pk):
             'correlation_id'       : alert.correlation_id,
             'mitre_techniques'     : alert.mitre_techniques,
         }
-        shap_data = calculate_shap_values(data)
-        prediction.shap_values = shap_data
-        prediction.save(update_fields=['shap_values'])
+        # CP013 / CP015: si SHAP falla se registra y el detalle se muestra igual,
+        # sin gráficos. No se guarda nada: se reintenta en la próxima apertura.
+        try:
+            shap_data = calculate_shap_values(data)
+        except Exception as exc:
+            log_error(request.user, 'alert_shap', str(exc))
+        else:
+            prediction.shap_values = shap_data
+            prediction.save(update_fields=['shap_values'])
 
     user_role = request.user.profile.role
     allowed_roles = ASSIGNMENT_TARGETS.get(user_role, ())
@@ -758,8 +766,10 @@ def alert_shap_view(request, pk):
         'alert'              : alert,
         'prediction'         : prediction,
         'mitre_techniques_resolved': resolve_techniques(alert.mitre_techniques),
-        'shap_s1'            : _json.dumps(shap_data['s1']),
-        'shap_s2'            : _json.dumps(shap_data['s2']),
+        'shap_available'     : shap_data is not None,
+        'shap_unavailable_message': SHAP_UNAVAILABLE_MESSAGE,
+        'shap_s1'            : _json.dumps(shap_data['s1']) if shap_data else 'null',
+        'shap_s2'            : _json.dumps(shap_data['s2']) if shap_data else 'null',
         'status_choices'     : AlertWorkflow.INVESTIGATION_STATUS_CHOICES,
         'evaluation_choices' : AlertWorkflow.ML_EVALUATION_CHOICES,
         'can_assign'         : bool(allowed_roles),
