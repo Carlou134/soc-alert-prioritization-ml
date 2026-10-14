@@ -2,6 +2,8 @@ import logging
 
 from django.contrib.auth.models import User
 
+from devtools.faults import raise_if_active
+
 from .models import Dataset, log_error
 from .utils import ModelUnavailableError, predict_alert, predict_batch
 
@@ -10,6 +12,11 @@ logger = logging.getLogger(__name__)
 STORAGE_ERROR_MESSAGE = (
     'No se pudieron guardar las alertas en la base de datos. '
     'El incidente quedó registrado; intenta nuevamente.'
+)
+
+INGEST_ERROR_MESSAGE = (
+    'Ocurrió un error crítico al procesar el archivo. '
+    'El incidente quedó registrado para su revisión.'
 )
 
 MODEL_UNAVAILABLE_NOTICE = (
@@ -46,6 +53,9 @@ def process_alert_batch(dataset_id, records, user_id):
         return
 
     try:
+        # Devtools (CP010-B): error no previsto en medio del procesamiento.
+        raise_if_active('ingest_critical')
+
         model_unavailable = False
         try:
             batch_results = predict_batch(records)
@@ -104,6 +114,10 @@ def process_alert_batch(dataset_id, records, user_id):
                 dataset.error_message = MODEL_UNAVAILABLE_NOTICE
         dataset.save(update_fields=['saved_count', 'failed_count', 'status', 'error_message'])
     except Exception as exc:
+        # CP010-B: el detalle técnico va al log; el usuario ve un mensaje claro
+        # y el lote fallido le aparece en la campanita.
+        logger.exception('Error crítico al procesar el dataset #%s', dataset_id)
+        log_error(user, 'process_alert_batch', str(exc))
         dataset.status = 'failed'
-        dataset.error_message = str(exc)
+        dataset.error_message = INGEST_ERROR_MESSAGE
         dataset.save(update_fields=['status', 'error_message'])

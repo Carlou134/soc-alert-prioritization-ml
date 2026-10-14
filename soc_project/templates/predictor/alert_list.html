@@ -34,6 +34,23 @@
         </div>
     </div>
 
+    <!-- Errores de ingesta sin revisar (CP010-B) — los que suman en la campanita -->
+    {% for dataset in ingestion_errors %}
+    <div data-testid="ingestion-error" class="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0">
+            <p class="text-sm font-medium text-red-400">Error al procesar «{{ dataset.filename }}»</p>
+            <p class="text-xs text-fg-muted mt-0.5">{{ dataset.error_message }} · {{ dataset.created_at|date:"Y-m-d H:i" }}</p>
+        </div>
+        <form method="post" action="{% url 'dataset_ack_error' dataset.pk %}">
+            {% csrf_token %}
+            <button type="submit" data-testid="ingestion-error-ack"
+                class="text-xs text-fg hover:text-fg-strong border border-line-strong rounded-md px-3 py-1.5">
+                Marcar como revisado
+            </button>
+        </form>
+    </div>
+    {% endfor %}
+
     <!-- Django messages -->
     {% if messages %}
     {% for message in messages %}

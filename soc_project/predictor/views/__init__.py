@@ -13,6 +13,7 @@ from .alerts import (
     _bulk_create_alerts,
     upload_alerts_view,
     dataset_status_view,
+    dataset_ack_error_view,
     notifications_unread_count_view,
     _friendly_serializer_errors,
     alert_list_view,

@@ -343,7 +343,29 @@ def notifications_unread_count_view(request):
     )
     assigned_to_me = base_qs.filter(assigned_to=request.user).distinct().count()
 
-    return JsonResponse({'count': pending_datasets + assigned_to_me})
+    # 3. CP010-B: lotes que subí y fallaron, hasta que los marque como revisados.
+    ingestion_errors = _unseen_failed_datasets(request.user).count()
+
+    return JsonResponse({
+        'count':            pending_datasets + assigned_to_me + ingestion_errors,
+        'ingestion_errors': ingestion_errors,
+    })
+
+
+def _unseen_failed_datasets(user):
+    return Dataset.objects.filter(uploaded_by=user, status='failed', error_seen_at__isnull=True)
+
+
+@login_required
+def dataset_ack_error_view(request, pk):
+    """Marca como revisado el error de un lote propio — deja de sumar en la campanita."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    dataset = get_object_or_404(_unseen_failed_datasets(request.user), pk=pk)
+    dataset.error_seen_at = timezone.now()
+    dataset.save(update_fields=['error_seen_at'])
+    return redirect('alert_list')
 
 
 def _friendly_serializer_errors(errors: dict) -> dict:
@@ -519,6 +541,7 @@ def alert_list_view(request):
         'risk_max':         risk_max,
         'assigned_filter':  assigned_filter,
         'query_string':     _qs_params.urlencode(),
+        'ingestion_errors': _unseen_failed_datasets(request.user),
     }
     return render(request, 'predictor/alert_list.html', context)
 
