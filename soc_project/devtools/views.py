@@ -9,7 +9,7 @@ from django.utils import timezone
 from accounts.decorators import admin_required
 from accounts.models import ACTION_FAULT_TOGGLED, log_action
 
-from .faults import FAULT_TTL, FAULTS, is_enabled
+from .faults import FAULT_HELP, FAULT_TTL, FAULTS, is_enabled
 from .models import FaultFlag
 
 
@@ -59,6 +59,7 @@ def fault_panel_view(request):
         {
             'key':        key,
             'label':      label,
+            'help':       FAULT_HELP.get(key, ''),
             'cases':      cases,
             'flag':       flags.get(key),
         }

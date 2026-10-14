@@ -8,8 +8,8 @@
     <div>
         <h1 class="text-lg font-semibold text-fg-strong">Módulo de desarrollador</h1>
         <p class="text-sm text-fg-muted mt-0.5">
-            Simula fallos para ejecutar los casos de prueba. Afectan a todos los usuarios
-            y se apagan solos a los {{ ttl_minutes }} minutos.
+            Simula fallos para ejecutar los casos de prueba. Afectan a todos los usuarios,
+            se activan al instante (sin reiniciar la app) y se apagan solos a los {{ ttl_minutes }} minutos.
         </p>
     </div>
 
@@ -36,7 +36,12 @@
             <tbody>
                 {% for row in rows %}
                 <tr class="border-b border-line/50 last:border-0" data-testid="fault-row-{{ row.key }}">
-                    <td class="px-4 py-3 text-fg-strong font-medium">{{ row.label }}</td>
+                    <td class="px-4 py-3">
+                        <p class="text-fg-strong font-medium">{{ row.label }}</p>
+                        {% if row.help %}
+                        <p class="text-xs text-fg-muted mt-0.5 max-w-md" data-testid="fault-help-{{ row.key }}">{{ row.help }}</p>
+                        {% endif %}
+                    </td>
                     <td class="px-4 py-3 text-fg-muted font-mono text-xs">{{ row.cases }}</td>
                     <td class="px-4 py-3">
                         {% if row.flag %}

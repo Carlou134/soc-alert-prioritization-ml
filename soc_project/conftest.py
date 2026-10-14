@@ -13,6 +13,14 @@ def _use_simple_static_storage(settings):
     }
 
 
+@pytest.fixture(autouse=True)
+def _fault_injection_off_by_default(settings):
+    """settings.py carga el .env local: si el desarrollador tiene
+    ENABLE_FAULT_INJECTION=True, la suite no debe cambiar de comportamiento.
+    Los tests de fallos simulados lo prenden explícitamente."""
+    settings.ENABLE_FAULT_INJECTION = False
+
+
 @pytest.fixture
 def q_cluster_sync(monkeypatch):
     """Fuerza que async_task() de django-q2 corra sincrónico en el proceso
