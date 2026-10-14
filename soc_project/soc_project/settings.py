@@ -123,6 +123,24 @@ SESSION_SAVE_EVERY_REQUEST = True
 
 from datetime import timedelta
 
+# Sin esto, con DEBUG=False Django no escribe los errores 500 en ningún lado
+# (su handler de consola por defecto exige DEBUG=True). Azure App Service captura
+# stdout/stderr en el log stream, así que basta con mandarlos a consola.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {'format': '[{asctime}] {levelname} {name}: {message}', 'style': '{'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'default'},
+    },
+    'root': {'handlers': ['console'], 'level': 'WARNING'},
+    'loggers': {
+        'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
+    },
+}
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
