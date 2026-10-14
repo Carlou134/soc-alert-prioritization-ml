@@ -39,11 +39,13 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
+    # Igual al de Django, pero el polling (@passive_session) no renueva la sesión.
+    'accounts.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'accounts.middleware.NoCacheForAuthenticatedMiddleware',
+    'devtools.middleware.ShortSessionMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -123,9 +125,10 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
-# HU005 — la sesión del navegador expira tras N minutos de inactividad (no N
-# fijos desde el login). Configurable para que QA pruebe CP005-B sin esperar 1h.
-SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT_MINUTES', '60'))
+# HU005 — la sesión del navegador expira tras 60 minutos de inactividad (no 60
+# fijos desde el login). Para probar CP005-B se usa "Sesión corta (3 minutos)"
+# del módulo de desarrollador, que la acorta al instante sin reiniciar la app.
+SESSION_TIMEOUT_MINUTES = 60
 SESSION_COOKIE_AGE = SESSION_TIMEOUT_MINUTES * 60
 SESSION_SAVE_EVERY_REQUEST = True
 
@@ -146,6 +149,10 @@ LOGGING = {
     'root': {'handlers': ['console'], 'level': 'WARNING'},
     'loggers': {
         'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
+        # Azure sondea el contenedor por su IP interna (169.254.x.x), que no está
+        # en ALLOWED_HOSTS: Django lo rechaza con 400, como debe. No se agrega la
+        # IP (cambia entre instancias); solo se evita que ensucie el log.
+        'django.security.DisallowedHost': {'handlers': [], 'propagate': False},
     },
 }
 
