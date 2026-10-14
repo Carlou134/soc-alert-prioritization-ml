@@ -331,7 +331,6 @@ print(f"\nReportes guardados en {REPORTS_DIR}")
 
 # -- Predicción sobre 10 muestras reales del test set (estratificado por severity) ---
 # Cubre los 4 niveles reales del dataset: unknown, medium, critical, high.
-# Incluye casos Canvia (high) para mostrar patrones del SOC peruano.
 # Features tomadas directamente de X_test: sin valores aproximados.
 
 _rng_demo  = np.random.RandomState(42)
@@ -342,9 +341,9 @@ _i_unk  = np.where(_sev_test == "unknown" )[0]
 _i_low  = np.where(_sev_test == "low"     )[0]
 _i_med  = np.where(_sev_test == "medium"  )[0]
 _i_crit = np.where(_sev_test == "critical")[0]
-_i_high = np.where(_sev_test == "high"    )[0]  # casi todo Canvia
+_i_high = np.where(_sev_test == "high"    )[0]
 
-# 2 unknown + 2 low + 2 medium + 2 critical + 2 high (Canvia)
+# 2 unknown + 2 low + 2 medium + 2 critical + 2 high
 _parts = [
     _rng_demo.choice(_i_unk,  size=min(2, len(_i_unk)),  replace=False),
     _rng_demo.choice(_i_low,  size=min(2, len(_i_low)),  replace=False),
@@ -361,16 +360,13 @@ _labels_demo = y_test.values[_sel].tolist()
 
 _pos_demo  = test_idx[_sel]
 _meta_demo = df_clean.iloc[_pos_demo][
-    ["correlation_id", "event_category", "severity",
+    ["event_category", "severity",
      "anomaly_score", "incident_evidence_count"]
 ].reset_index(drop=True)
-_meta_demo["fuente"] = _meta_demo["correlation_id"].apply(
-    lambda x: "Canvia" if x >= 700_001 else "Microsoft"
-)
 _NG_D = {0: "Benigno", 1: "A_Investigar", 2: "Malicioso"}
 
 print("\n-- 10 muestras reales del test set (unknown/medium/critical/high) --")
-print(f"{'#':>2}  {'Fuente':<10} {'Categoria':<24} {'Sev':<9} {'Anom':>5} "
+print(f"{'#':>2}  {'Categoria':<24} {'Sev':<9} {'Anom':>5} "
       f"{'Evid':>5}  {'Real':<14} {'Predicho':<14} {'Conf':>6}")
 print("-" * 100)
 _correctas_demo = 0
@@ -378,7 +374,7 @@ for i, (pred, prob, real) in enumerate(zip(_preds_demo, _probs_demo, _labels_dem
     ok = "OK" if pred == real else "XX"
     if pred == real: _correctas_demo += 1
     m = _meta_demo.iloc[i]
-    print(f"{i+1:>2}  {m['fuente']:<10} {m['event_category']:<24} "
+    print(f"{i+1:>2}  {m['event_category']:<24} "
           f"{m['severity']:<9} {m['anomaly_score']:>5.2f} {int(m['incident_evidence_count']):>5}  "
           f"{_NG_D[real]:<14} {_NG_D[pred]:<14} "
           f"{max(prob)*100:>5.1f}% {ok}   P:{prob[0]:.2f} I:{prob[1]:.2f} M:{prob[2]:.2f}")

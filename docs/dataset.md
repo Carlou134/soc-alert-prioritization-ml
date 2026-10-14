@@ -5,7 +5,6 @@ Describes the training data behind the model in [model.md](model.md): `soc_proje
 ## Size and provenance
 
 - **33,000 rows, 83 raw columns**, 1 exact duplicate row (32,999 after dedup).
-- `train_model.py`'s demo/reporting section labels rows by `correlation_id` (`>= 700,001` → `"Canvia"`, otherwise `"Microsoft"`), implying the dataset schema was designed to eventually blend alerts from more than one SOC source. **In the current file, every row falls in the `"Microsoft"` range** — verified directly (`0` rows with `correlation_id >= 700,001`). If a second, real-data source (e.g. an actual Canvia export) gets merged in later, this split logic already exists in the training script — but as of today the training data is single-source.
 - **Zero missing values** in any column.
 
 ## Class balance (target: `label`)
