@@ -845,7 +845,7 @@ def alert_evaluate_view(request, pk):
         'evaluation': evaluation,
         'label':      LABELS[evaluation],
         'by':         request.user.username,
-        'at':         workflow.ml_evaluated_at.strftime('%Y-%m-%d %H:%M'),
+        'at':         timezone.localtime(workflow.ml_evaluated_at).strftime('%Y-%m-%d %H:%M'),
     })
 
 
