@@ -12,6 +12,7 @@
             <p class="text-sm text-fg-muted mt-0.5" data-testid="alert-list-total-count">
                 {{ total_count }} alerta{{ total_count|pluralize }} en total
             </p>
+            <p class="text-xs text-fg-subtle mt-1" data-testid="alert-list-scope-note">{{ scope_note }}</p>
         </div>
         <div class="flex items-center gap-2">
             {% if pending_count > 0 %}
@@ -109,10 +110,9 @@
                 <select name="predicted_class" data-testid="alert-list-filter-class"
                     class="w-full bg-surface-overlay border border-line-strong text-fg rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Todas</option>
-                    <option value="malicioso"    {% if class_filter == 'malicioso' %}selected{% endif %}>Malicioso</option>
-                    <option value="a_investigar" {% if class_filter == 'a_investigar' %}selected{% endif %}>A investigar</option>
-                    <option value="benigno"      {% if class_filter == 'benigno' %}selected{% endif %}>Benigno</option>
-                    <option value="pending"      {% if class_filter == 'pending' %}selected{% endif %}>Pendiente</option>
+                    {% for value, label in class_options %}
+                    <option value="{{ value }}" {% if class_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
                 </select>
             </div>
 
