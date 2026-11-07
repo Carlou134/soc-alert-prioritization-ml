@@ -26,6 +26,7 @@ from accounts.models import (
 )
 from devtools.faults import raise_if_active
 
+from ..access import ALERT_ACCESS_DENIED_MESSAGE, ROLE_VISIBLE_CLASSES, can_view_alert
 from ..mitre_metadata import resolve_techniques
 from ..models import Alert, AlertWorkflow, Dataset, Incident, PredictionLog, log_error
 from ..pipeline import (
@@ -63,7 +64,29 @@ PRIORITY_RANK = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
 # bandas que colorea el listado: >= 0.7 alta, >= 0.3 media, resto baja.
 ML_RISK_BANDS = ((0.7, PRIORITY_RANK['high']), (0.3, PRIORITY_RANK['medium']))
 
-STATUS_SAVE_ERROR_MESSAGE = 'No se pudo registrar la acción. Intente nuevamente.'
+# Opciones del filtro "Clasificación ML" del listado.
+CLASS_FILTER_OPTIONS = [
+    ('malicioso',    'Malicioso'),
+    ('a_investigar', 'A investigar'),
+    ('benigno',      'Benigno'),
+    ('pending',      'Pendiente'),
+]
+
+# Nota de alcance del listado: explica por qué no coincide con el dashboard global.
+ROLE_SCOPE_NOTES = {
+    'analyst_n1': 'Mostrando tu bandeja: alertas clasificadas como Benigno. '
+                  'No incluye alertas A investigar o Maliciosas ni alertas escaladas a incidente.',
+    'trainee':    'Mostrando tu bandeja: alertas clasificadas como Benigno. '
+                  'No incluye alertas A investigar o Maliciosas ni alertas escaladas a incidente.',
+    'analyst_n2': 'Mostrando tu bandeja: alertas clasificadas como A investigar o Malicioso. '
+                  'No incluye alertas benignas ni alertas escaladas a incidente.',
+}
+DEFAULT_SCOPE_NOTE = (
+    'Mostrando todas las alertas no escaladas. '
+    'Las alertas escaladas se gestionan en la Mesa de Incidentes.'
+)
+
+STATUS_SAVE_ERROR_MESSAGE ='No se pudo registrar la acción. Intente nuevamente.'
 
 SHAP_UNAVAILABLE_MESSAGE = 'No hay información disponible sobre la explicabilidad de esta alerta.'
 
@@ -609,6 +632,11 @@ def alert_list_view(request):
         'search': search,
         'severity_filter': severity_filter,
         'class_filter': class_filter,
+        'class_options': [
+            (value, label) for value, label in CLASS_FILTER_OPTIONS
+            if value in ROLE_VISIBLE_CLASSES.get(role, dict(CLASS_FILTER_OPTIONS))
+        ],
+        'scope_note': ROLE_SCOPE_NOTES.get(role, DEFAULT_SCOPE_NOTE),
         'user_filter': user_filter,
         'date_from': date_from,
         'date_to': date_to,
@@ -809,6 +837,12 @@ def alert_shap_view(request, pk):
     except Alert.DoesNotExist:
         log_action(request.user, ACTION_ALERT_NOT_FOUND, f'Intentó acceder a la alerta #{pk}, que no existe.')
         messages.error(request, ALERT_NOT_FOUND_MESSAGE)
+        return redirect('alert_list')
+
+    # Bug 0003085: el detalle respeta la misma visibilidad por rol que el listado
+    # (ej. un N2 no abre benignas desde "Últimas alertas" ni por URL).
+    if not can_view_alert(request.user.profile.role, alert):
+        messages.error(request, ALERT_ACCESS_DENIED_MESSAGE)
         return redirect('alert_list')
 
     # CP030 / CP012-B: una alerta sin clasificar (ej. modelo no disponible al
