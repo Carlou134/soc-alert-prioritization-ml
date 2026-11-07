@@ -51,6 +51,7 @@
         <div>
             <p class="text-xs text-fg-subtle uppercase tracking-wide mb-1">Risk Score</p>
             {% if classified %}
+            <p class="text-xs text-fg-subtle mb-1" data-testid="risk-formula-hint">{{ risk_formula_hint }}</p>
             <p class="text-sm font-semibold {% if prediction.risk_score >= 0.7 %}text-red-400{% elif prediction.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
                 {{ prediction.risk_score|floatformat:4 }}
             </p>
@@ -222,8 +223,11 @@
                 </div>
                 {% if alert.label %}
                 <div>
-                    <p class="text-xs text-fg-subtle mb-0.5">Label original</p>
-                    <p class="text-sm text-fg-emphasis">{{ alert.label }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Etiqueta real</p>
+                    <p class="text-sm text-fg-emphasis" data-testid="alert-true-label">{{ true_label_display }}</p>
+                    {% if label_mismatch %}
+                    <p class="text-xs text-amber-400 mt-0.5" data-testid="alert-label-mismatch">La clasificación del modelo difiere de la etiqueta real</p>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>

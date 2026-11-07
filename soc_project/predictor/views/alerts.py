@@ -86,6 +86,23 @@ DEFAULT_SCOPE_NOTE = (
     'Las alertas escaladas se gestionan en la Mesa de Incidentes.'
 )
 
+# HU030: la etiqueta real del dataset se guarda codificada como en el
+# entrenamiento (0/1/2, ver train_model.py) o por nombre; el detalle la traduce
+# para que el analista la compare con la predicción del modelo.
+LABEL_CODES = {'0': 'benigno', '1': 'a_investigar', '2': 'malicioso'}
+CLASS_DISPLAY = {'benigno': 'Benigno', 'a_investigar': 'A investigar', 'malicioso': 'Malicioso'}
+
+# Debe reflejar _RISK_WEIGHTS de utils.calculate_risk_score.
+RISK_FORMULA_HINT = 'Riesgo = P(Malicioso) + 0,5 × P(A investigar)'
+
+
+def _true_label_class(label):
+    """Clase ML de la etiqueta original ('1' → 'a_investigar'), o '' si no se reconoce."""
+    value = (label or '').strip().lower()
+    value = LABEL_CODES.get(value, value)
+    return value if value in CLASS_DISPLAY else ''
+
+
 STATUS_SAVE_ERROR_MESSAGE ='No se pudo registrar la acción. Intente nuevamente.'
 
 SHAP_UNAVAILABLE_MESSAGE = 'No hay información disponible sobre la explicabilidad de esta alerta.'
@@ -932,9 +949,14 @@ def alert_shap_view(request, pk):
         _back_name, _back_label = _back_map.get(_next, _back_map['alert_list'])
         _back_url = _reverse(_back_name) + ('?' + _back_qs if _back_qs else '')
 
+    true_class = _true_label_class(alert.label)
+
     return render(request, 'predictor/alert_shap.html', {
         'alert'              : alert,
         'prediction'         : prediction,
+        'true_label_display' : CLASS_DISPLAY.get(true_class, alert.label),
+        'label_mismatch'     : bool(prediction and true_class and true_class != prediction.predicted_class),
+        'risk_formula_hint'  : RISK_FORMULA_HINT,
         'mitre_techniques_resolved': resolve_techniques(alert.mitre_techniques),
         'classified'         : prediction is not None,
         'shap_available'     : shap_data is not None,
