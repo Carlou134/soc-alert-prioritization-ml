@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import DatabaseError, transaction
-from django.db.models import Case, F, IntegerField, Q, Value, When
+from django.db.models import Case, F, IntegerField, OuterRef, Q, Subquery, Value, When
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -58,6 +58,10 @@ SEVERITY_LEVELS = [
 
 # Peso de cada prioridad del analista para ordenar el listado (mayor = más urgente).
 PRIORITY_RANK = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
+
+# Sin ajuste del analista, la prioridad sale del risk_score del ML con las mismas
+# bandas que colorea el listado: >= 0.7 alta, >= 0.3 media, resto baja.
+ML_RISK_BANDS = ((0.7, PRIORITY_RANK['high']), (0.3, PRIORITY_RANK['medium']))
 
 STATUS_SAVE_ERROR_MESSAGE = 'No se pudo registrar la acción. Intente nuevamente.'
 
@@ -541,17 +545,30 @@ def alert_list_view(request):
     if assigned_filter:
         qs = qs.filter(workflow__assigned_to__username__icontains=assigned_filter)
 
-    # HU021 / CP021: por defecto, de mayor a menor prioridad del analista; las
-    # alertas sin prioridad van al final y, dentro de cada nivel, por fecha.
+    # HU021 / CP021: por defecto, de mayor a menor prioridad efectiva: la del
+    # analista si la ajustó; si no, la banda del risk_score de la última
+    # predicción ML. Dentro de cada nivel desempata el risk_score y luego la
+    # fecha. Las alertas sin ajuste ni predicción van al final.
     order = request.GET.get('order', 'priority_desc').strip()
-    qs = qs.annotate(priority_rank=Case(
+    latest_risk = Subquery(
+        PredictionLog.objects.filter(alert=OuterRef('pk'))
+        .order_by('-created_at', '-pk')
+        .values('risk_score')[:1]
+    )
+    qs = qs.annotate(ml_risk=latest_risk).annotate(priority_rank=Case(
         *[When(workflow__analyst_priority=value, then=Value(rank)) for value, rank in PRIORITY_RANK.items()],
+        *[When(ml_risk__gte=threshold, then=Value(rank)) for threshold, rank in ML_RISK_BANDS],
+        When(ml_risk__isnull=False, then=Value(PRIORITY_RANK['low'])),
         default=None,
         output_field=IntegerField(),
     ))
     _order_map = {
-        'priority_desc': (F('priority_rank').desc(nulls_last=True), '-created_at'),
-        'priority_asc':  (F('priority_rank').asc(nulls_last=True), '-created_at'),
+        'priority_desc': (
+            F('priority_rank').desc(nulls_last=True), F('ml_risk').desc(nulls_last=True), '-created_at',
+        ),
+        'priority_asc': (
+            F('priority_rank').asc(nulls_last=True), F('ml_risk').asc(nulls_last=True), '-created_at',
+        ),
         'risk_desc': (F('predictionlog__risk_score').desc(nulls_last=True),),
         'risk_asc':  (F('predictionlog__risk_score').asc(nulls_last=True),),
         'date_desc': ('-created_at',),
