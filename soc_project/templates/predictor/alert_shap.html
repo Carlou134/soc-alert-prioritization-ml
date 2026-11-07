@@ -77,6 +77,12 @@
             </div>
         </div>
         {% endif %}
+        {% if system_action %}
+        <div class="col-span-2 md:col-span-4 pt-3 border-t border-line/50">
+            <p class="text-xs text-fg-subtle uppercase tracking-wide mb-1">Acción del sistema</p>
+            <p class="text-sm text-fg-emphasis" data-testid="alert-system-action">➜ {{ system_action }}</p>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Full alert detail -->

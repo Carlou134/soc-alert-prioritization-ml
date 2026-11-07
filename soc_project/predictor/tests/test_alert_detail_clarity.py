@@ -63,6 +63,42 @@ def test_classified_detail_explains_risk_formula(admin_user, make_alert):
     assert 'Riesgo = P(Malicioso) + 0,5 × P(A investigar)' in content
 
 
+@pytest.mark.parametrize('predicted_class, expected', [
+    ('benigno', 'Derivada a la bandeja de Analista Nivel 1'),
+    ('a_investigar', 'Derivada a la bandeja de Analista Nivel 2'),
+    ('malicioso', 'Derivada a la bandeja de Analista Nivel 2'),
+])
+def test_detail_shows_system_action_by_class(admin_user, make_alert, predicted_class, expected):
+    """HU030 criterio 1: clasificación, explicación y acción ejecutada."""
+    alert = make_alert(admin_user, predicted_class=predicted_class)
+
+    content = _detail(admin_user, alert).content.decode()
+
+    assert 'Acción del sistema' in content
+    assert expected in content
+
+
+def test_detail_shows_escalation_as_system_action(admin_user, analyst_n2_user, make_alert):
+    alert = make_alert(admin_user, predicted_class='malicioso')
+    client = Client()
+    client.force_login(analyst_n2_user)
+    client.post(f'/alerts/{alert.pk}/escalate/')
+    alert.refresh_from_db()
+
+    resp = _detail(admin_user, alert)
+
+    assert resp.context['system_action'] == f'Escalada al incidente #{alert.incident_id}'
+
+
+def test_unclassified_detail_shows_no_system_action(admin_user, make_alert):
+    """CP030: no se muestra una acción que no se generó."""
+    alert = make_alert(admin_user, predicted_class=None)
+
+    content = _detail(admin_user, alert).content.decode()
+
+    assert 'data-testid="alert-system-action"' not in content
+
+
 def test_risk_formula_matches_risk_weights():
     """Si cambian los pesos del risk score, el texto explicativo debe cambiar también."""
     from predictor.utils import calculate_risk_score

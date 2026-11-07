@@ -957,6 +957,18 @@ def alert_shap_view(request, pk):
 
     true_class = _true_label_class(alert.label)
 
+    # HU030 criterio 1: la acción que el sistema ejecutó con la alerta según su
+    # clasificación (la misma regla de bandejas de alert_list_view). Sin
+    # clasificación no hay acción (CP030).
+    if prediction is None:
+        system_action = ''
+    elif alert.incident_id is not None:
+        system_action = f'Escalada al incidente #{alert.incident_id}'
+    elif prediction.predicted_class == 'benigno':
+        system_action = 'Derivada a la bandeja de Analista Nivel 1'
+    else:
+        system_action = 'Derivada a la bandeja de Analista Nivel 2'
+
     return render(request, 'predictor/alert_shap.html', {
         'alert'              : alert,
         'prediction'         : prediction,
@@ -964,6 +976,7 @@ def alert_shap_view(request, pk):
         'label_mismatch'     : bool(prediction and true_class and true_class != prediction.predicted_class),
         'risk_formula_hint'  : RISK_FORMULA_HINT,
         'justification_required_message': JUSTIFICATION_REQUIRED_MESSAGE,
+        'system_action'      : system_action,
         'mitre_techniques_resolved': resolve_techniques(alert.mitre_techniques),
         'classified'         : prediction is not None,
         'shap_available'     : shap_data is not None,
