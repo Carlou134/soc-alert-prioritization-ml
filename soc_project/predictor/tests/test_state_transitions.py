@@ -63,8 +63,31 @@ def test_set_status_trainee_allowed_when_assigned_to_self(trainee_user, admin_us
 
     client = Client()
     client.force_login(trainee_user)
-    resp = _post_json(client, f'/alerts/{alert.pk}/status/', {'status': 'investigating'})
+    resp = _post_json(client, f'/alerts/{alert.pk}/status/', {'status': 'investigating', 'notes': 'revisando'})
     assert resp.status_code == 200
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize('notes', [None, '', '   '])
+def test_set_status_requires_justification(analyst_n1_user, admin_user, make_alert, notes):
+    """HU025 / CP025 paso 2: sin justificación no se registra la acción."""
+    from accounts.models import UserActionLog
+    from predictor.views.alerts import JUSTIFICATION_REQUIRED_MESSAGE
+
+    alert = make_alert(admin_user, predicted_class='benigno')
+    client = Client()
+    client.force_login(analyst_n1_user)
+    payload = {'status': 'investigating'}
+    if notes is not None:
+        payload['notes'] = notes
+
+    resp = _post_json(client, f'/alerts/{alert.pk}/status/', payload)
+
+    assert resp.status_code == 400
+    assert resp.json()['error'] == JUSTIFICATION_REQUIRED_MESSAGE
+    alert.workflow.refresh_from_db()
+    assert alert.workflow.investigation_status == 'new'
+    assert not UserActionLog.objects.filter(user=analyst_n1_user).exists()
 
 
 @pytest.mark.django_db

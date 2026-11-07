@@ -51,7 +51,8 @@ def test_alert_list_n1_only_sees_benign(admin_user, analyst_n1_user, make_alert)
 
 
 @pytest.mark.django_db
-def test_alert_list_n2_excludes_benign_and_unclassified(admin_user, analyst_n2_user, make_alert):
+def test_alert_list_n2_excludes_benign_but_shows_unclassified(admin_user, analyst_n2_user, make_alert):
+    """CP030: N2 necesita llegar desde su bandeja a la alerta sin clasificar."""
     make_alert(admin_user, predicted_class='malicioso', label='mal-1')
     make_alert(admin_user, predicted_class='a_investigar', label='inv-1')
     make_alert(admin_user, predicted_class='benigno', label='ben-1')
@@ -62,7 +63,7 @@ def test_alert_list_n2_excludes_benign_and_unclassified(admin_user, analyst_n2_u
     resp = client.get('/alerts/')
 
     labels = {a.label for a in resp.context['page_obj'].object_list}
-    assert labels == {'mal-1', 'inv-1'}
+    assert labels == {'mal-1', 'inv-1', 'sin-clasificar'}
 
 
 @pytest.mark.django_db

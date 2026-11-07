@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import DatabaseError, transaction
-from django.db.models import Case, F, IntegerField, Q, Value, When
+from django.db.models import Case, F, IntegerField, OuterRef, Q, Subquery, Value, When
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -26,6 +26,7 @@ from accounts.models import (
 )
 from devtools.faults import raise_if_active
 
+from ..access import ALERT_ACCESS_DENIED_MESSAGE, ROLE_VISIBLE_CLASSES, can_view_alert
 from ..mitre_metadata import resolve_techniques
 from ..models import Alert, AlertWorkflow, Dataset, Incident, PredictionLog, log_error
 from ..pipeline import (
@@ -59,7 +60,52 @@ SEVERITY_LEVELS = [
 # Peso de cada prioridad del analista para ordenar el listado (mayor = más urgente).
 PRIORITY_RANK = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
 
-STATUS_SAVE_ERROR_MESSAGE = 'No se pudo registrar la acción. Intente nuevamente.'
+# Sin ajuste del analista, la prioridad sale del risk_score del ML con las mismas
+# bandas que colorea el listado: >= 0.7 alta, >= 0.3 media, resto baja.
+ML_RISK_BANDS = ((0.7, PRIORITY_RANK['high']), (0.3, PRIORITY_RANK['medium']))
+
+# Opciones del filtro "Clasificación ML" del listado.
+CLASS_FILTER_OPTIONS = [
+    ('malicioso',    'Malicioso'),
+    ('a_investigar', 'A investigar'),
+    ('benigno',      'Benigno'),
+    ('pending',      'Pendiente'),
+]
+
+# Nota de alcance del listado: explica por qué no coincide con el dashboard global.
+ROLE_SCOPE_NOTES = {
+    'analyst_n1': 'Mostrando tu bandeja: alertas clasificadas como Benigno. '
+                  'No incluye alertas A investigar o Maliciosas ni alertas escaladas a incidente.',
+    'trainee':    'Mostrando tu bandeja: alertas clasificadas como Benigno. '
+                  'No incluye alertas A investigar o Maliciosas ni alertas escaladas a incidente.',
+    'analyst_n2': 'Mostrando tu bandeja: alertas clasificadas como A investigar o Malicioso '
+                  'y alertas sin clasificar. No incluye alertas benignas ni alertas escaladas a incidente.',
+}
+DEFAULT_SCOPE_NOTE = (
+    'Mostrando todas las alertas no escaladas. '
+    'Las alertas escaladas se gestionan en la Mesa de Incidentes.'
+)
+
+# HU030: la etiqueta real del dataset se guarda codificada como en el
+# entrenamiento (0/1/2, ver train_model.py) o por nombre; el detalle la traduce
+# para que el analista la compare con la predicción del modelo.
+LABEL_CODES = {'0': 'benigno', '1': 'a_investigar', '2': 'malicioso'}
+CLASS_DISPLAY = {'benigno': 'Benigno', 'a_investigar': 'A investigar', 'malicioso': 'Malicioso'}
+
+# Debe reflejar _RISK_WEIGHTS de utils.calculate_risk_score.
+RISK_FORMULA_HINT = 'Riesgo = P(Malicioso) + 0,5 × P(A investigar)'
+
+
+def _true_label_class(label):
+    """Clase ML de la etiqueta original ('1' → 'a_investigar'), o '' si no se reconoce."""
+    value = (label or '').strip().lower()
+    value = LABEL_CODES.get(value, value)
+    return value if value in CLASS_DISPLAY else ''
+
+
+JUSTIFICATION_REQUIRED_MESSAGE = 'Debe ingresar una justificación para registrar la acción.'
+
+STATUS_SAVE_ERROR_MESSAGE ='No se pudo registrar la acción. Intente nuevamente.'
 
 SHAP_UNAVAILABLE_MESSAGE = 'No hay información disponible sobre la explicabilidad de esta alerta.'
 
@@ -165,6 +211,12 @@ def alert_history_view(request):
     total_count = qs.count()
     paginator = Paginator(qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
+
+    # El historial es global, pero "Ver detalle" solo aparece si el rol puede
+    # abrir esa alerta (ej. N2 no abre benignas).
+    role = request.user.profile.role
+    for alert in page_obj.object_list:
+        alert.can_view = can_view_alert(role, alert)
 
     mitre_tactics = (
         Alert.objects.exclude(mitre_tactic='')
@@ -457,7 +509,9 @@ def alert_list_view(request):
     if role in ('analyst_n1', 'trainee'):
         qs = qs.filter(predictionlog__predicted_class='benigno')
     elif role == 'analyst_n2':
-        qs = qs.exclude(predictionlog__isnull=True).exclude(predictionlog__predicted_class='benigno')
+        # CP030: N2 también ve las alertas sin clasificar (procesamiento que no
+        # pudo completarse), para poder abrirlas desde su bandeja.
+        qs = qs.exclude(predictionlog__predicted_class='benigno')
 
     # Toggle "Mis alertas" / "Todas las alertas"
     mine = request.GET.get('mine', '').strip()
@@ -541,17 +595,30 @@ def alert_list_view(request):
     if assigned_filter:
         qs = qs.filter(workflow__assigned_to__username__icontains=assigned_filter)
 
-    # HU021 / CP021: por defecto, de mayor a menor prioridad del analista; las
-    # alertas sin prioridad van al final y, dentro de cada nivel, por fecha.
+    # HU021 / CP021: por defecto, de mayor a menor prioridad efectiva: la del
+    # analista si la ajustó; si no, la banda del risk_score de la última
+    # predicción ML. Dentro de cada nivel desempata el risk_score y luego la
+    # fecha. Las alertas sin ajuste ni predicción van al final.
     order = request.GET.get('order', 'priority_desc').strip()
-    qs = qs.annotate(priority_rank=Case(
+    latest_risk = Subquery(
+        PredictionLog.objects.filter(alert=OuterRef('pk'))
+        .order_by('-created_at', '-pk')
+        .values('risk_score')[:1]
+    )
+    qs = qs.annotate(ml_risk=latest_risk).annotate(priority_rank=Case(
         *[When(workflow__analyst_priority=value, then=Value(rank)) for value, rank in PRIORITY_RANK.items()],
+        *[When(ml_risk__gte=threshold, then=Value(rank)) for threshold, rank in ML_RISK_BANDS],
+        When(ml_risk__isnull=False, then=Value(PRIORITY_RANK['low'])),
         default=None,
         output_field=IntegerField(),
     ))
     _order_map = {
-        'priority_desc': (F('priority_rank').desc(nulls_last=True), '-created_at'),
-        'priority_asc':  (F('priority_rank').asc(nulls_last=True), '-created_at'),
+        'priority_desc': (
+            F('priority_rank').desc(nulls_last=True), F('ml_risk').desc(nulls_last=True), '-created_at',
+        ),
+        'priority_asc': (
+            F('priority_rank').asc(nulls_last=True), F('ml_risk').asc(nulls_last=True), '-created_at',
+        ),
         'risk_desc': (F('predictionlog__risk_score').desc(nulls_last=True),),
         'risk_asc':  (F('predictionlog__risk_score').asc(nulls_last=True),),
         'date_desc': ('-created_at',),
@@ -592,6 +659,11 @@ def alert_list_view(request):
         'search': search,
         'severity_filter': severity_filter,
         'class_filter': class_filter,
+        'class_options': [
+            (value, label) for value, label in CLASS_FILTER_OPTIONS
+            if value in ROLE_VISIBLE_CLASSES.get(role, dict(CLASS_FILTER_OPTIONS))
+        ],
+        'scope_note': ROLE_SCOPE_NOTES.get(role, DEFAULT_SCOPE_NOTE),
         'user_filter': user_filter,
         'date_from': date_from,
         'date_to': date_to,
@@ -705,6 +777,10 @@ def alert_set_status_view(request, pk):
     if status_value not in valid:
         return JsonResponse({'error': 'Estado inválido'}, status=400)
 
+    # HU025 / CP025 paso 2: toda acción registrada debe ir justificada.
+    if not notes:
+        return JsonResponse({'error': JUSTIFICATION_REQUIRED_MESSAGE}, status=400)
+
     workflow = alert.workflow
     LABELS = dict(AlertWorkflow.INVESTIGATION_STATUS_CHOICES)
     prev_label = LABELS.get(workflow.investigation_status, workflow.investigation_status)
@@ -794,6 +870,12 @@ def alert_shap_view(request, pk):
         messages.error(request, ALERT_NOT_FOUND_MESSAGE)
         return redirect('alert_list')
 
+    # Bug 0003085: el detalle respeta la misma visibilidad por rol que el listado
+    # (ej. un N2 no abre benignas desde "Últimas alertas" ni por URL).
+    if not can_view_alert(request.user.profile.role, alert):
+        messages.error(request, ALERT_ACCESS_DENIED_MESSAGE)
+        return redirect('alert_list')
+
     # CP030 / CP012-B: una alerta sin clasificar (ej. modelo no disponible al
     # ingerirla) también muestra su detalle, sin inventar clasificación ni score.
     prediction = alert.latest_prediction
@@ -832,7 +914,7 @@ def alert_shap_view(request, pk):
     user_role = request.user.profile.role
     allowed_roles = ASSIGNMENT_TARGETS.get(user_role, ())
     assignable_users = (
-        User.objects.filter(profile__role__in=allowed_roles)
+        User.objects.filter(profile__role__in=allowed_roles, is_active=True)
         .select_related('profile')
         .order_by('username')
         if allowed_roles else User.objects.none()
@@ -873,9 +955,28 @@ def alert_shap_view(request, pk):
         _back_name, _back_label = _back_map.get(_next, _back_map['alert_list'])
         _back_url = _reverse(_back_name) + ('?' + _back_qs if _back_qs else '')
 
+    true_class = _true_label_class(alert.label)
+
+    # HU030 criterio 1: la acción que el sistema ejecutó con la alerta según su
+    # clasificación (la misma regla de bandejas de alert_list_view). Sin
+    # clasificación no hay acción (CP030).
+    if prediction is None:
+        system_action = ''
+    elif alert.incident_id is not None:
+        system_action = f'Escalada al incidente #{alert.incident_id}'
+    elif prediction.predicted_class == 'benigno':
+        system_action = 'Derivada a la bandeja de Analista Nivel 1'
+    else:
+        system_action = 'Derivada a la bandeja de Analista Nivel 2'
+
     return render(request, 'predictor/alert_shap.html', {
         'alert'              : alert,
         'prediction'         : prediction,
+        'true_label_display' : CLASS_DISPLAY.get(true_class, alert.label),
+        'label_mismatch'     : bool(prediction and true_class and true_class != prediction.predicted_class),
+        'risk_formula_hint'  : RISK_FORMULA_HINT,
+        'justification_required_message': JUSTIFICATION_REQUIRED_MESSAGE,
+        'system_action'      : system_action,
         'mitre_techniques_resolved': resolve_techniques(alert.mitre_techniques),
         'classified'         : prediction is not None,
         'shap_available'     : shap_data is not None,
@@ -956,9 +1057,10 @@ def alert_assign_view(request, pk):
         log_action(request.user, ACTION_ALERT_ASSIGNED, f'Alerta #{pk} desasignada.')
         return JsonResponse({'ok': True, 'assigned_to': None, 'username': ''})
 
-    # CP024: id inexistente o malformado → error en JSON, la asignación no cambia.
+    # CP024: id inexistente, malformado o de un usuario desactivado (los usuarios
+    # no se borran, se desactivan) → error en JSON, la asignación no cambia.
     try:
-        target_user = User.objects.get(pk=assigned_to_id)
+        target_user = User.objects.get(pk=assigned_to_id, is_active=True)
     except (User.DoesNotExist, ValueError, TypeError):
         return JsonResponse({'error': ANALYST_NOT_FOUND_MESSAGE}, status=404)
     target_profile = getattr(target_user, 'profile', None)

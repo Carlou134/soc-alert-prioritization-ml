@@ -51,6 +51,7 @@
         <div>
             <p class="text-xs text-fg-subtle uppercase tracking-wide mb-1">Risk Score</p>
             {% if classified %}
+            <p class="text-xs text-fg-subtle mb-1" data-testid="risk-formula-hint">{{ risk_formula_hint }}</p>
             <p class="text-sm font-semibold {% if prediction.risk_score >= 0.7 %}text-red-400{% elif prediction.risk_score >= 0.3 %}text-amber-400{% else %}text-emerald-400{% endif %}">
                 {{ prediction.risk_score|floatformat:4 }}
             </p>
@@ -74,6 +75,12 @@
                 <span class="text-xs text-amber-400">A investigar: <strong>{{ prediction.probabilities.a_investigar|floatformat:4 }}</strong></span>
                 <span class="text-xs text-red-400">Malicioso: <strong>{{ prediction.probabilities.malicioso|floatformat:4 }}</strong></span>
             </div>
+        </div>
+        {% endif %}
+        {% if system_action %}
+        <div class="col-span-2 md:col-span-4 pt-3 border-t border-line/50">
+            <p class="text-xs text-fg-subtle uppercase tracking-wide mb-1">Acción del sistema</p>
+            <p class="text-sm text-fg-emphasis" data-testid="alert-system-action">➜ {{ system_action }}</p>
         </div>
         {% endif %}
     </div>
@@ -222,8 +229,11 @@
                 </div>
                 {% if alert.label %}
                 <div>
-                    <p class="text-xs text-fg-subtle mb-0.5">Label original</p>
-                    <p class="text-sm text-fg-emphasis">{{ alert.label }}</p>
+                    <p class="text-xs text-fg-subtle mb-0.5">Etiqueta real</p>
+                    <p class="text-sm text-fg-emphasis" data-testid="alert-true-label">{{ true_label_display }}</p>
+                    {% if label_mismatch %}
+                    <p class="text-xs text-amber-400 mt-0.5" data-testid="alert-label-mismatch">La clasificación del modelo difiere de la etiqueta real</p>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>
@@ -367,7 +377,7 @@
         <div>
             <label class="block text-xs font-medium text-fg-muted mb-1.5">
                 Justificación / acciones realizadas
-                <span class="text-fg-faint">(requerida para Investigada o Falso positivo)</span>
+                <span class="text-fg-faint">(requerida)</span>
             </label>
             <textarea id="investigationNotes" data-testid="investigation-notes" rows="3"
                 placeholder="Describir qué revisaste, qué encontraste y por qué tomaste esta decisión…"
@@ -748,8 +758,8 @@ document.getElementById('statusSave').addEventListener('click', function () {
     const feedback = document.getElementById('statusFeedback');
     const btn      = this;
 
-    if ((status === 'investigated' || status === 'false_positive') && !notes) {
-        feedback.textContent = 'Justificación requerida para este estado.';
+    if (!notes) {
+        feedback.textContent = '{{ justification_required_message|escapejs }}';
         feedback.className = 'text-xs text-red-400';
         return;
     }

@@ -50,7 +50,7 @@
            class="block bg-surface-raised border border-line rounded-lg p-5 hover:border-blue-500/50 transition-colors">
             <p class="text-xs text-fg-muted uppercase tracking-wide">Total alertas</p>
             <p class="text-3xl font-bold text-fg-strong mt-2 font-mono" data-testid="kpi-total-alerts">{{ total_alerts }}</p>
-            <p class="text-xs text-fg-subtle mt-1">Ingestadas en el sistema</p>
+            <p class="text-xs text-fg-subtle mt-1">Total en el sistema (todos los niveles)</p>
         </a>
         <a href="{% if can_see_pending %}{% url 'alert_list' %}?predicted_class=pending{% else %}#{% endif %}"
            data-testid="kpi-total-pending-link"
@@ -282,7 +282,7 @@
 
                         <!-- Acción SHAP -->
                         <td class="px-5 py-3">
-                            {% if alert.latest_prediction.predicted_class %}
+                            {% if alert.latest_prediction.predicted_class and alert.can_view %}
                             <a href="{% url 'alert_shap' alert.pk %}?next=dashboard" data-testid="dashboard-shap-link-{{ alert.pk }}"
                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-colors">
                                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -290,6 +290,14 @@
                                 </svg>
                                 SHAP
                             </a>
+                            {% elif alert.latest_prediction.predicted_class %}
+                            <span title="Esta alerta corresponde a otro nivel de analista" data-testid="dashboard-no-access-{{ alert.pk }}"
+                                  class="inline-flex items-center gap-1 text-xs text-fg-subtle cursor-help">
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                                </svg>
+                                Sin acceso
+                            </span>
                             {% else %}
                             <span class="text-xs text-fg-faint">—</span>
                             {% endif %}

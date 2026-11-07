@@ -5,6 +5,7 @@ from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.shortcuts import redirect, render
 
+from ..access import can_view_alert
 from ..models import Alert, Incident, TurnoNota
 
 # CP017: por debajo de este número de alertas clasificadas los gráficos no
@@ -85,9 +86,15 @@ def dashboard_view(request):
     # (ej: N1 no puede ver "malicioso" porque su rol fuerza predicted_class=
     # benigno, así que ese click nunca debe navegar como si mostrara datos).
     role = getattr(getattr(request.user, 'profile', None), 'role', None)
-    can_see_pending             = role in ('admin', 'analyst_n3')
+    can_see_pending             = role in ('admin', 'analyst_n3', 'analyst_n2')
     can_see_investigar_malicioso = role not in ('analyst_n1', 'trainee')
     can_see_incident_desk       = role in ('admin', 'analyst_n3')
+
+    # "Últimas alertas" es global, pero el link al detalle solo aparece si el
+    # rol puede abrir esa alerta.
+    recent_alerts = list(recent_alerts)
+    for alert in recent_alerts:
+        alert.can_view = can_view_alert(role, alert)
 
     turno_notas = TurnoNota.objects.select_related('autor')[:5]
 
