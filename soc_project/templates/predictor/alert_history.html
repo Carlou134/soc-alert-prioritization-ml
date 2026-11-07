@@ -226,10 +226,20 @@
                         </td>
 
                         <td class="px-4 py-3">
+                            {% if alert.can_view %}
                             <a href="{% url 'alert_shap' alert.pk %}?readonly=1&next=alert_history{% if query_string %}&back_qs={{ query_string|urlencode }}{% endif %}" data-testid="alert-history-detail-link-{{ alert.pk }}"
                                class="text-xs text-blue-400 hover:text-blue-300 whitespace-nowrap">
                                 Ver detalle →
                             </a>
+                            {% else %}
+                            <span title="Esta alerta corresponde a otro nivel de analista" data-testid="alert-history-no-access-{{ alert.pk }}"
+                                  class="inline-flex items-center gap-1 text-xs text-fg-subtle cursor-help whitespace-nowrap">
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                                </svg>
+                                Sin acceso
+                            </span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

@@ -86,7 +86,7 @@ def dashboard_view(request):
     # (ej: N1 no puede ver "malicioso" porque su rol fuerza predicted_class=
     # benigno, así que ese click nunca debe navegar como si mostrara datos).
     role = getattr(getattr(request.user, 'profile', None), 'role', None)
-    can_see_pending             = role in ('admin', 'analyst_n3')
+    can_see_pending             = role in ('admin', 'analyst_n3', 'analyst_n2')
     can_see_investigar_malicioso = role not in ('analyst_n1', 'trainee')
     can_see_incident_desk       = role in ('admin', 'analyst_n3')
 

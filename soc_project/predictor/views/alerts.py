@@ -78,8 +78,8 @@ ROLE_SCOPE_NOTES = {
                   'No incluye alertas A investigar o Maliciosas ni alertas escaladas a incidente.',
     'trainee':    'Mostrando tu bandeja: alertas clasificadas como Benigno. '
                   'No incluye alertas A investigar o Maliciosas ni alertas escaladas a incidente.',
-    'analyst_n2': 'Mostrando tu bandeja: alertas clasificadas como A investigar o Malicioso. '
-                  'No incluye alertas benignas ni alertas escaladas a incidente.',
+    'analyst_n2': 'Mostrando tu bandeja: alertas clasificadas como A investigar o Malicioso '
+                  'y alertas sin clasificar. No incluye alertas benignas ni alertas escaladas a incidente.',
 }
 DEFAULT_SCOPE_NOTE = (
     'Mostrando todas las alertas no escaladas. '
@@ -192,6 +192,12 @@ def alert_history_view(request):
     total_count = qs.count()
     paginator = Paginator(qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
+
+    # El historial es global, pero "Ver detalle" solo aparece si el rol puede
+    # abrir esa alerta (ej. N2 no abre benignas).
+    role = request.user.profile.role
+    for alert in page_obj.object_list:
+        alert.can_view = can_view_alert(role, alert)
 
     mitre_tactics = (
         Alert.objects.exclude(mitre_tactic='')
@@ -484,7 +490,9 @@ def alert_list_view(request):
     if role in ('analyst_n1', 'trainee'):
         qs = qs.filter(predictionlog__predicted_class='benigno')
     elif role == 'analyst_n2':
-        qs = qs.exclude(predictionlog__isnull=True).exclude(predictionlog__predicted_class='benigno')
+        # CP030: N2 también ve las alertas sin clasificar (procesamiento que no
+        # pudo completarse), para poder abrirlas desde su bandeja.
+        qs = qs.exclude(predictionlog__predicted_class='benigno')
 
     # Toggle "Mis alertas" / "Todas las alertas"
     mine = request.GET.get('mine', '').strip()

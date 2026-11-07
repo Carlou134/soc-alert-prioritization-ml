@@ -18,11 +18,21 @@ def _class_values(resp):
     return [value for value, _ in resp.context['class_options']]
 
 
-def test_n2_class_filter_hides_benign_and_pending(analyst_n2_user):
+def test_n2_class_filter_hides_benign(analyst_n2_user):
     resp = _get(analyst_n2_user, '/alerts/')
 
-    assert _class_values(resp) == ['malicioso', 'a_investigar']
+    assert _class_values(resp) == ['malicioso', 'a_investigar', 'pending']
     assert 'value="benigno"' not in resp.content.decode()
+
+
+def test_n2_pending_filter_lists_unclassified_alerts(analyst_n2_user, admin_user, make_alert):
+    """CP030: N2 filtra por Pendiente y encuentra la alerta sin clasificar."""
+    make_alert(admin_user, predicted_class=None, label='sin-clasificar')
+    make_alert(admin_user, predicted_class='malicioso', label='mal')
+
+    resp = _get(analyst_n2_user, '/alerts/?predicted_class=pending')
+
+    assert [a.label for a in resp.context['page_obj'].object_list] == ['sin-clasificar']
 
 
 @pytest.mark.parametrize('fixture', ['analyst_n1_user', 'trainee_user'])
@@ -108,3 +118,15 @@ def test_dashboard_hides_detail_link_for_alerts_the_role_cannot_open(analyst_n2_
     assert f'data-testid="dashboard-no-access-{benign.pk}"' in content
     assert f'data-testid="dashboard-shap-link-{malicious.pk}"' in content
     assert f'data-testid="dashboard-no-access-{malicious.pk}"' not in content
+
+
+def test_history_shows_no_access_badge_instead_of_detail_link(analyst_n2_user, admin_user, make_alert):
+    """CP028-A: el historial es global, pero N2 solo ve "Ver detalle" en lo que puede abrir."""
+    benign = make_alert(admin_user, predicted_class='benigno')
+    malicious = make_alert(admin_user, predicted_class='malicioso')
+
+    content = _get(analyst_n2_user, '/alerts/history/').content.decode()
+
+    assert f'data-testid="alert-history-detail-link-{benign.pk}"' not in content
+    assert f'data-testid="alert-history-no-access-{benign.pk}"' in content
+    assert f'data-testid="alert-history-detail-link-{malicious.pk}"' in content

@@ -4,10 +4,11 @@
 alerta y los links del dashboard. Un rol sin entrada ve todas las clases.
 """
 
+# 'pending' = sin clasificar; solo afecta a las opciones del filtro del listado.
 ROLE_VISIBLE_CLASSES = {
     'analyst_n1': ('benigno',),
     'trainee':    ('benigno',),
-    'analyst_n2': ('malicioso', 'a_investigar'),
+    'analyst_n2': ('malicioso', 'a_investigar', 'pending'),
 }
 
 ALERT_ACCESS_DENIED_MESSAGE = 'No tienes permisos para acceder a esta alerta.'
