@@ -883,7 +883,7 @@ def alert_shap_view(request, pk):
     user_role = request.user.profile.role
     allowed_roles = ASSIGNMENT_TARGETS.get(user_role, ())
     assignable_users = (
-        User.objects.filter(profile__role__in=allowed_roles)
+        User.objects.filter(profile__role__in=allowed_roles, is_active=True)
         .select_related('profile')
         .order_by('username')
         if allowed_roles else User.objects.none()
@@ -1007,9 +1007,10 @@ def alert_assign_view(request, pk):
         log_action(request.user, ACTION_ALERT_ASSIGNED, f'Alerta #{pk} desasignada.')
         return JsonResponse({'ok': True, 'assigned_to': None, 'username': ''})
 
-    # CP024: id inexistente o malformado → error en JSON, la asignación no cambia.
+    # CP024: id inexistente, malformado o de un usuario desactivado (los usuarios
+    # no se borran, se desactivan) → error en JSON, la asignación no cambia.
     try:
-        target_user = User.objects.get(pk=assigned_to_id)
+        target_user = User.objects.get(pk=assigned_to_id, is_active=True)
     except (User.DoesNotExist, ValueError, TypeError):
         return JsonResponse({'error': ANALYST_NOT_FOUND_MESSAGE}, status=404)
     target_profile = getattr(target_user, 'profile', None)

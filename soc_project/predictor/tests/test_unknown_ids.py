@@ -60,3 +60,38 @@ def test_assign_to_unknown_analyst_returns_json_error(admin_user, analyst_n1_use
     assert resp.json()['error'] == ANALYST_NOT_FOUND_MESSAGE
     alert.workflow.refresh_from_db()
     assert alert.workflow.assigned_to_id == analyst_n1_user.pk
+
+
+def _deactivate(user):
+    user.is_active = False
+    user.save(update_fields=['is_active'])
+
+
+def test_assign_to_deactivated_analyst_is_treated_as_unknown(admin_user, analyst_n1_user, analyst_n2_user, make_alert):
+    """CP024: los usuarios se desactivan, no se borran; uno desactivado cuenta
+    como inexistente → error y la asignación no cambia."""
+    alert = make_alert(admin_user)
+    alert.workflow.assigned_to = analyst_n1_user
+    alert.workflow.save(update_fields=['assigned_to'])
+    _deactivate(analyst_n2_user)
+    client = Client()
+    client.force_login(admin_user)
+
+    resp = _post_json(client, f'/alerts/{alert.pk}/assign/', {'assigned_to': analyst_n2_user.pk})
+
+    assert resp.status_code == 404
+    assert resp.json()['error'] == ANALYST_NOT_FOUND_MESSAGE
+    alert.workflow.refresh_from_db()
+    assert alert.workflow.assigned_to_id == analyst_n1_user.pk
+
+
+def test_deactivated_analyst_is_not_offered_for_assignment(admin_user, analyst_n2_user, analyst_n3_user, make_alert):
+    alert = make_alert(admin_user)
+    _deactivate(analyst_n2_user)
+    client = Client()
+    client.force_login(admin_user)
+
+    users = list(client.get(f'/alerts/{alert.pk}/shap/').context['assignable_users'])
+
+    assert analyst_n2_user not in users
+    assert analyst_n3_user in users
