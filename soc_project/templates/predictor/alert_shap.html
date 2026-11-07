@@ -371,7 +371,7 @@
         <div>
             <label class="block text-xs font-medium text-fg-muted mb-1.5">
                 Justificación / acciones realizadas
-                <span class="text-fg-faint">(requerida para Investigada o Falso positivo)</span>
+                <span class="text-fg-faint">(requerida)</span>
             </label>
             <textarea id="investigationNotes" data-testid="investigation-notes" rows="3"
                 placeholder="Describir qué revisaste, qué encontraste y por qué tomaste esta decisión…"
@@ -752,8 +752,8 @@ document.getElementById('statusSave').addEventListener('click', function () {
     const feedback = document.getElementById('statusFeedback');
     const btn      = this;
 
-    if ((status === 'investigated' || status === 'false_positive') && !notes) {
-        feedback.textContent = 'Justificación requerida para este estado.';
+    if (!notes) {
+        feedback.textContent = '{{ justification_required_message|escapejs }}';
         feedback.className = 'text-xs text-red-400';
         return;
     }

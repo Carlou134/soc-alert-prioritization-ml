@@ -103,6 +103,8 @@ def _true_label_class(label):
     return value if value in CLASS_DISPLAY else ''
 
 
+JUSTIFICATION_REQUIRED_MESSAGE = 'Debe ingresar una justificación para registrar la acción.'
+
 STATUS_SAVE_ERROR_MESSAGE ='No se pudo registrar la acción. Intente nuevamente.'
 
 SHAP_UNAVAILABLE_MESSAGE = 'No hay información disponible sobre la explicabilidad de esta alerta.'
@@ -775,6 +777,10 @@ def alert_set_status_view(request, pk):
     if status_value not in valid:
         return JsonResponse({'error': 'Estado inválido'}, status=400)
 
+    # HU025 / CP025 paso 2: toda acción registrada debe ir justificada.
+    if not notes:
+        return JsonResponse({'error': JUSTIFICATION_REQUIRED_MESSAGE}, status=400)
+
     workflow = alert.workflow
     LABELS = dict(AlertWorkflow.INVESTIGATION_STATUS_CHOICES)
     prev_label = LABELS.get(workflow.investigation_status, workflow.investigation_status)
@@ -957,6 +963,7 @@ def alert_shap_view(request, pk):
         'true_label_display' : CLASS_DISPLAY.get(true_class, alert.label),
         'label_mismatch'     : bool(prediction and true_class and true_class != prediction.predicted_class),
         'risk_formula_hint'  : RISK_FORMULA_HINT,
+        'justification_required_message': JUSTIFICATION_REQUIRED_MESSAGE,
         'mitre_techniques_resolved': resolve_techniques(alert.mitre_techniques),
         'classified'         : prediction is not None,
         'shap_available'     : shap_data is not None,
